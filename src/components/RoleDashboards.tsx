@@ -4,7 +4,7 @@
  */
 
 import React, { useState, FormEvent } from 'react';
-import { User, Manuscript, SystemAuditLog, JournalSettings, ReferenceItem, FigureTableItem } from '../types';
+import { User, UserRole, Manuscript, SystemAuditLog, JournalSettings, ReferenceItem, FigureTableItem } from '../types';
 import { DB, ARTICLE_TYPES } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import { 
@@ -56,6 +56,16 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   // Admin users edit state
   const [adminUsers, setAdminUsers] = useState<User[]>(() => DB.getUsers());
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [adminMode, setAdminMode] = useState<'editorial' | 'finance' | 'users'>('editorial');
+  const [userForm, setUserForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    institution: '',
+    role: 'Author' as UserRole,
+    orcidId: '',
+    isVerified: true,
+  });
 
   // Manage Settings state
   const [journalSettings, setJournalSettings] = useState<JournalSettings>(() => DB.getJournalSettings());
@@ -71,6 +81,74 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     setAdminUsers(updatedUsers);
     DB.setUsers(updatedUsers);
     onShowNotification(`Updated user role to ${newRole}`, 'success');
+  };
+
+  const resetUserForm = () => {
+    setEditingUserId(null);
+    setUserForm({
+      firstName: '',
+      lastName: '',
+      email: '',
+      institution: '',
+      role: 'Author',
+      orcidId: '',
+      isVerified: true,
+    });
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUserId(user.id);
+    setUserForm({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      institution: user.institution,
+      role: user.role,
+      orcidId: user.orcidId || '',
+      isVerified: user.isVerified,
+    });
+  };
+
+  const handleSaveAdminUser = (event: FormEvent) => {
+    event.preventDefault();
+    if (!userForm.firstName.trim() || !userForm.lastName.trim() || !userForm.email.trim() || !userForm.institution.trim()) {
+      onShowNotification('Fill first name, last name, email, and institution before saving user.', 'error');
+      return;
+    }
+    const duplicate = adminUsers.some(user => user.email.toLowerCase() === userForm.email.toLowerCase() && user.id !== editingUserId);
+    if (duplicate) {
+      onShowNotification('A user with this email already exists.', 'error');
+      return;
+    }
+    const updatedUsers = editingUserId
+      ? adminUsers.map(user => user.id === editingUserId ? { ...user, ...userForm } : user)
+      : [
+          ...adminUsers,
+          {
+            id: `user-${Date.now()}`,
+            ...userForm,
+            orcidId: userForm.orcidId || undefined,
+            joinedDate: new Date().toISOString().split('T')[0],
+          }
+        ];
+    setAdminUsers(updatedUsers);
+    DB.setUsers(updatedUsers);
+    resetUserForm();
+    onShowNotification(editingUserId ? 'User profile updated.' : 'New user created.', 'success');
+  };
+
+  const handleDeleteUser = (user: User) => {
+    if (user.id === currentUser.id) {
+      onShowNotification('Administrators cannot delete their own active account.', 'error');
+      return;
+    }
+    const confirmDelete = window.confirm(`Delete ${user.firstName} ${user.lastName} from the journal system?`);
+    if (!confirmDelete) return;
+    const updatedUsers = adminUsers.filter(item => item.id !== user.id);
+    setAdminUsers(updatedUsers);
+    DB.setUsers(updatedUsers);
+    if (editingUserId === user.id) resetUserForm();
+    onShowNotification('User deleted from the system.', 'success');
   };
 
   const handleSaveSettings = (e: React.FormEvent) => {
@@ -107,6 +185,19 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const assignedManuscripts = manuscripts.filter(m => 
       m.reviewerAssignments.some(ra => ra.reviewerId === currentUser.id)
     );
+
+    const reviewerStatusStyle = (status?: string, isSelected = false) => {
+      if (isSelected) return 'bg-teal-50 border-teal-500 ring-2 ring-teal-100';
+      if (status === 'completed') return 'bg-emerald-50 border-emerald-300 hover:border-emerald-500';
+      if (status === 'declined') return 'bg-rose-50 border-rose-300 hover:border-rose-500';
+      return 'bg-blue-50 border-blue-250 hover:border-blue-500';
+    };
+
+    const reviewerStatusBadge = (status?: string) => {
+      if (status === 'completed') return <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Completed</span>;
+      if (status === 'declined') return <span className="bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Declined</span>;
+      return <span className="bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">New / Pending</span>;
+    };
 
     const handleInviteAction = (m: Manuscript, statusUpdate: 'completed' | 'declined') => {
       const updated: Manuscript[] = manuscripts.map(item => {
@@ -170,9 +261,17 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
         <div className={`grid grid-cols-1 ${selectedManuscript ? 'lg:grid-cols-2' : ''} gap-6`}>
           {/* List queue */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
-            <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
-              <Clock className="h-4 w-4" /> Assigned Manuscripts ({assignedManuscripts.length})
-            </h4>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
+                <Clock className="h-4 w-4" /> Assigned Manuscripts ({assignedManuscripts.length})
+              </h4>
+              <div className="flex flex-wrap gap-1.5 text-[9px] font-bold uppercase">
+                <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">New / Pending</span>
+                <span className="px-2 py-0.5 rounded-full bg-teal-100 text-teal-800 border border-teal-200">Opened</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">Completed</span>
+                <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">Declined</span>
+              </div>
+            </div>
 
             {assignedManuscripts.length === 0 ? (
               <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">
@@ -182,22 +281,31 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               <div className="space-y-3">
                 {assignedManuscripts.map((m) => {
                   const assignment = m.reviewerAssignments.find(ra => ra.reviewerId === currentUser.id);
+                  const isSelected = selectedManuscript?.id === m.id;
                   return (
                     <div 
                       key={m.id} 
                       className={`p-4 border rounded-xl transition-all cursor-pointer ${
-                        selectedManuscript?.id === m.id ? 'bg-teal-50 border-teal-500' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                        reviewerStatusStyle(assignment?.status, isSelected)
                       }`}
                       onClick={() => setSelectedManuscript(m)}
                     >
-                      <span className="text-[10px] font-mono font-bold bg-white text-teal-800 border border-teal-100 px-2 py-0.5 rounded">
-                        ID: {m.id}
-                      </span>
+                      <div className="flex flex-wrap justify-between items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold bg-white text-teal-800 border border-teal-100 px-2 py-0.5 rounded">
+                          ID: {m.id}
+                        </span>
+                        {reviewerStatusBadge(assignment?.status)}
+                      </div>
                       <h5 className="font-bold text-slate-800 mt-2 line-clamp-2 text-sm">{m.title}</h5>
                       <div className="flex justify-between items-center mt-3 text-xs text-slate-500">
                         <span>Classification: <strong>{m.specialty}</strong></span>
-                        <span>Assign Stage: <strong>{assignment?.status.toUpperCase()}</strong></span>
+                        <span>Assigned: <strong>{assignment?.assignedAt ? new Date(assignment.assignedAt).toLocaleDateString() : 'N/A'}</strong></span>
                       </div>
+                      {assignment?.comments && (
+                        <p className="mt-2 text-[11px] text-emerald-800 font-semibold">
+                          Recommendation: {assignment.comments.recommendation.toUpperCase()}
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -814,6 +922,41 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
           </p>
         </div>
 
+        <form onSubmit={handleSaveAdminUser} className="bg-white border border-slate-200 p-5 rounded-2xl shadow-xs space-y-4">
+          <div className="flex items-center justify-between gap-3 border-b pb-3">
+            <div>
+              <h4 className="font-bold text-sm text-slate-800">{editingUserId ? 'Edit System User' : 'Create System User'}</h4>
+              <p className="text-xs text-slate-500">Administrators can create, edit, verify, re-role, and delete journal users.</p>
+            </div>
+            {editingUserId && (
+              <button type="button" onClick={resetUserForm} className="text-xs font-semibold text-slate-500 hover:text-slate-800">
+                Cancel edit
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <input value={userForm.firstName} onChange={(event) => setUserForm(prev => ({ ...prev, firstName: event.target.value }))} placeholder="First name" className="border border-slate-300 rounded-lg p-2 bg-slate-50" />
+            <input value={userForm.lastName} onChange={(event) => setUserForm(prev => ({ ...prev, lastName: event.target.value }))} placeholder="Last name" className="border border-slate-300 rounded-lg p-2 bg-slate-50" />
+            <input value={userForm.email} onChange={(event) => setUserForm(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" className="border border-slate-300 rounded-lg p-2 bg-slate-50" />
+            <select value={userForm.role} onChange={(event) => setUserForm(prev => ({ ...prev, role: event.target.value as UserRole }))} className="border border-slate-300 rounded-lg p-2 bg-slate-50 font-bold">
+              <option value="Author">Author</option>
+              <option value="Editor">Editor</option>
+              <option value="Managing Editor">Managing Editor</option>
+              <option value="Reviewer">Reviewer</option>
+              <option value="Administrator">Administrator</option>
+            </select>
+            <input value={userForm.institution} onChange={(event) => setUserForm(prev => ({ ...prev, institution: event.target.value }))} placeholder="Institution" className="md:col-span-2 border border-slate-300 rounded-lg p-2 bg-slate-50" />
+            <input value={userForm.orcidId} onChange={(event) => setUserForm(prev => ({ ...prev, orcidId: event.target.value }))} placeholder="ORCID iD (optional)" className="border border-slate-300 rounded-lg p-2 bg-slate-50" />
+            <label className="flex items-center gap-2 border border-slate-300 rounded-lg p-2 bg-slate-50 font-semibold text-slate-700">
+              <input type="checkbox" checked={userForm.isVerified} onChange={(event) => setUserForm(prev => ({ ...prev, isVerified: event.target.checked }))} />
+              Verified
+            </label>
+          </div>
+          <button type="submit" className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-4 py-2 rounded-lg">
+            {editingUserId ? 'Save User Changes' : 'Create User'}
+          </button>
+        </form>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Users Roster editor */}
           <div className="lg:col-span-2 bg-white border p-5 rounded-2xl space-y-4 shadow-xs">
@@ -825,6 +968,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     <th className="p-2">Name</th>
                     <th className="p-2">Email</th>
                     <th className="p-2">System Role</th>
+                    <th className="p-2">Verified</th>
                     <th className="p-2">Action</th>
                   </tr>
                 </thead>
@@ -856,13 +1000,33 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                       <td className="p-2">
                         <button
                           onClick={() => {
-                            const confirmBlock = window.confirm(`Restrict administrative privileges for ${user.firstName}?`);
-                            if (confirmBlock) onShowNotification('Scholar profile credentials locked.', 'info');
+                            const updatedUsers = adminUsers.map(item => item.id === user.id ? { ...item, isVerified: !item.isVerified } : item);
+                            setAdminUsers(updatedUsers);
+                            DB.setUsers(updatedUsers);
+                            onShowNotification('User verification state updated.', 'success');
                           }}
-                          className="text-[10px] font-bold text-rose-600 hover:underline"
+                          className={`px-2 py-1 rounded text-[10px] font-bold border ${
+                            user.isVerified ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'
+                          }`}
                         >
-                          Lock Account
+                          {user.isVerified ? 'Verified' : 'Unverified'}
                         </button>
+                      </td>
+                      <td className="p-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEditUser(user)}
+                            className="text-[10px] font-bold text-teal-700 hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            className="text-[10px] font-bold text-rose-600 hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -899,8 +1063,34 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     <div id="central-role-dashboards" className="space-y-6">
       {currentUser.role === 'Editor' && renderEditorWorkspace()}
       {currentUser.role === 'Reviewer' && renderReviewerDashboard()}
-      {currentUser.role === 'Managing Editor' && renderManagingEditorWorkspace()}
-      {currentUser.role === 'Administrator' && renderAdministratorPanel()}
+      {currentUser.role === 'Managing Editor' && (
+        <div className="space-y-8">
+          <div className="bg-teal-50 border border-teal-200 rounded-2xl px-5 py-4">
+            <h3 className="text-sm font-bold text-teal-900">Managing Editor Full Access</h3>
+            <p className="text-xs text-teal-800 mt-1">You can manage editorial decisions, reviewer assignment, financial verification, and audit review.</p>
+          </div>
+          {renderEditorWorkspace()}
+          {renderManagingEditorWorkspace()}
+        </div>
+      )}
+      {currentUser.role === 'Administrator' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 text-white rounded-2xl px-5 py-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold">Administrator Full System Access</h3>
+              <p className="text-xs text-slate-300 mt-1">Editorial control, finance/audit control, and user management are all available.</p>
+            </div>
+            <div className="flex gap-1 bg-white/10 p-1 rounded-lg text-xs font-bold">
+              <button onClick={() => setAdminMode('editorial')} className={`px-3 py-1.5 rounded-md ${adminMode === 'editorial' ? 'bg-white text-slate-900' : 'text-white hover:bg-white/10'}`}>Editorial</button>
+              <button onClick={() => setAdminMode('finance')} className={`px-3 py-1.5 rounded-md ${adminMode === 'finance' ? 'bg-white text-slate-900' : 'text-white hover:bg-white/10'}`}>Finance/Audit</button>
+              <button onClick={() => setAdminMode('users')} className={`px-3 py-1.5 rounded-md ${adminMode === 'users' ? 'bg-white text-slate-900' : 'text-white hover:bg-white/10'}`}>Users</button>
+            </div>
+          </div>
+          {adminMode === 'editorial' && renderEditorWorkspace()}
+          {adminMode === 'finance' && renderManagingEditorWorkspace()}
+          {adminMode === 'users' && renderAdministratorPanel()}
+        </div>
+      )}
     </div>
   );
 }
