@@ -4,7 +4,7 @@
  */
 
 import React, { ChangeEvent, ClipboardEvent, DragEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, Image, Table2, ChartNoAxesColumn, Superscript, Subscript, X, Trash2 } from 'lucide-react';
+import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, Image, Table2, ChartNoAxesColumn, Superscript, Subscript, X, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface RichTextEditorProps {
   label?: string;
@@ -30,6 +30,7 @@ export default function RichTextEditor({
   const savedRangeRef = useRef<Range | null>(null);
   const isInternalUpdate = useRef(false);
   const draggedMediaRef = useRef<HTMLElement | null>(null);
+  const insertionMarkerIdRef = useRef<string | null>(null);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [showTablePaste, setShowTablePaste] = useState(false);
   const [showDiagramPaste, setShowDiagramPaste] = useState(false);
@@ -70,6 +71,13 @@ export default function RichTextEditor({
     }
   };
 
+  const saveSelectionFromPoint = (x: number, y: number) => {
+    if (!editorRef.current) return;
+    const range = rangeFromPoint(x, y);
+    if (!range || !editorRef.current.contains(range.commonAncestorContainer)) return;
+    savedRangeRef.current = range.cloneRange();
+  };
+
   const restoreSelection = () => {
     const selection = window.getSelection();
     if (!selection || !savedRangeRef.current) return;
@@ -86,6 +94,52 @@ export default function RichTextEditor({
     selection.removeAllRanges();
     selection.addRange(range);
     savedRangeRef.current = range.cloneRange();
+  };
+
+  const isEmptySpacer = (node: ChildNode | null) => {
+    if (!node) return false;
+    if (node.nodeType === Node.TEXT_NODE) return !node.textContent?.trim();
+    if (!(node instanceof HTMLElement)) return false;
+    const html = node.innerHTML.replace(/&nbsp;/g, '').trim().toLowerCase();
+    return node.tagName === 'BR' || (node.tagName === 'P' && (!html || html === '<br>'));
+  };
+
+  const clearInsertionMarker = () => {
+    if (!editorRef.current || !insertionMarkerIdRef.current) return;
+    editorRef.current.querySelector(`[data-gbmn-caret-marker="${insertionMarkerIdRef.current}"]`)?.remove();
+    insertionMarkerIdRef.current = null;
+  };
+
+  const createInsertionMarker = () => {
+    if (!editorRef.current) return;
+    clearInsertionMarker();
+    editorRef.current.focus();
+    const selection = window.getSelection();
+    const liveRange = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const baseRange = savedRangeRef.current && editorRef.current.contains(savedRangeRef.current.commonAncestorContainer)
+      ? savedRangeRef.current.cloneRange()
+      : liveRange && editorRef.current.contains(liveRange.commonAncestorContainer)
+        ? liveRange.cloneRange()
+        : document.createRange();
+    if (
+      (!savedRangeRef.current || !editorRef.current.contains(savedRangeRef.current.commonAncestorContainer)) &&
+      (!liveRange || !editorRef.current.contains(liveRange.commonAncestorContainer))
+    ) {
+      baseRange.selectNodeContents(editorRef.current);
+      baseRange.collapse(false);
+    }
+    baseRange.deleteContents();
+    const markerId = crypto.randomUUID();
+    const marker = document.createElement('span');
+    marker.dataset.gbmnCaretMarker = markerId;
+    marker.style.display = 'inline-block';
+    marker.style.width = '0';
+    marker.style.height = '0';
+    marker.style.overflow = 'hidden';
+    marker.textContent = '\ufeff';
+    baseRange.insertNode(marker);
+    insertionMarkerIdRef.current = markerId;
+    placeCaretAfter(marker);
   };
 
   const rangeFromPoint = (x: number, y: number) => {
@@ -105,20 +159,40 @@ export default function RichTextEditor({
   const insertHtml = (html: string) => {
     if (!editorRef.current) return;
     editorRef.current.focus();
-    restoreSelection();
+    const savedRange = savedRangeRef.current;
     const selection = window.getSelection();
-    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-    const activeRange = range && editorRef.current.contains(range.commonAncestorContainer)
-      ? range
+    const liveRange = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const activeRange = savedRange && editorRef.current.contains(savedRange.commonAncestorContainer)
+      ? savedRange.cloneRange()
+      : liveRange && editorRef.current.contains(liveRange.commonAncestorContainer)
+        ? liveRange.cloneRange()
       : document.createRange();
-    if (!range || !editorRef.current.contains(range.commonAncestorContainer)) {
+    if (
+      (!savedRange || !editorRef.current.contains(savedRange.commonAncestorContainer)) &&
+      (!liveRange || !editorRef.current.contains(liveRange.commonAncestorContainer))
+    ) {
       activeRange.selectNodeContents(editorRef.current);
       activeRange.collapse(false);
     }
+    selection?.removeAllRanges();
+    selection?.addRange(activeRange);
     activeRange.deleteContents();
     const template = document.createElement('template');
     template.innerHTML = html;
     const fragment = template.content;
+    const marker = insertionMarkerIdRef.current
+      ? editorRef.current.querySelector(`[data-gbmn-caret-marker="${insertionMarkerIdRef.current}"]`)
+      : null;
+    if (marker) {
+      const nodes = Array.from(fragment.childNodes);
+      marker.replaceWith(...nodes);
+      const lastInserted = nodes[nodes.length - 1];
+      insertionMarkerIdRef.current = null;
+      if (lastInserted) placeCaretAfter(lastInserted);
+      handleInput();
+      saveSelection();
+      return;
+    }
     const lastNode = fragment.lastChild;
     activeRange.insertNode(fragment);
     if (lastNode) placeCaretAfter(lastNode);
@@ -203,7 +277,7 @@ export default function RichTextEditor({
     const media = target.closest('.gbmn-inline-media');
     if (!media) {
       setSelectedMediaId(null);
-      setTimeout(saveSelection, 0);
+      saveSelectionFromPoint(event.clientX, event.clientY);
       return;
     }
     event.preventDefault();
@@ -216,6 +290,24 @@ export default function RichTextEditor({
     selection?.removeAllRanges();
     selection?.addRange(range);
     savedRangeRef.current = range.cloneRange();
+  };
+
+  const moveSelectedMedia = (direction: 'up' | 'down') => {
+    if (!editorRef.current || !selectedMediaId) return;
+    const media = editorRef.current.querySelector<HTMLElement>(`.gbmn-inline-media[data-media-id="${selectedMediaId}"]`);
+    if (!media || !media.parentNode) return;
+    let neighbor = direction === 'up' ? media.previousSibling : media.nextSibling;
+    while (isEmptySpacer(neighbor)) {
+      neighbor = direction === 'up' ? neighbor.previousSibling : neighbor.nextSibling;
+    }
+    if (!neighbor) return;
+    if (direction === 'up') {
+      media.parentNode.insertBefore(media, neighbor);
+    } else {
+      media.parentNode.insertBefore(media, neighbor.nextSibling);
+    }
+    placeCaretAfter(media);
+    handleInput();
   };
 
   const deleteSelectedMedia = () => {
@@ -328,14 +420,20 @@ export default function RichTextEditor({
         <ToolbarBtn title="Insert image at cursor" onClick={() => { saveSelection(); imageInputRef.current?.click(); }}>
           <Image className="h-3.5 w-3.5" />
         </ToolbarBtn>
-        <ToolbarBtn title="Paste table at cursor" onClick={() => { saveSelection(); setShowTablePaste(true); setShowDiagramPaste(false); }}>
+        <ToolbarBtn title="Paste table at cursor" onClick={() => { saveSelection(); createInsertionMarker(); setShowTablePaste(true); setShowDiagramPaste(false); }}>
           <Table2 className="h-3.5 w-3.5" />
         </ToolbarBtn>
-        <ToolbarBtn title="Paste diagram at cursor" onClick={() => { saveSelection(); setShowDiagramPaste(true); setShowTablePaste(false); }}>
+        <ToolbarBtn title="Paste diagram at cursor" onClick={() => { saveSelection(); createInsertionMarker(); setShowDiagramPaste(true); setShowTablePaste(false); }}>
           <ChartNoAxesColumn className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn title="Delete selected table, figure, or diagram" onClick={deleteSelectedMedia}>
           <Trash2 className="h-3.5 w-3.5" />
+        </ToolbarBtn>
+        <ToolbarBtn title="Move selected table, figure, or diagram up" onClick={() => moveSelectedMedia('up')}>
+          <ArrowUp className="h-3.5 w-3.5" />
+        </ToolbarBtn>
+        <ToolbarBtn title="Move selected table, figure, or diagram down" onClick={() => moveSelectedMedia('down')}>
+          <ArrowDown className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
       </div>
@@ -350,7 +448,7 @@ export default function RichTextEditor({
                   {showTablePaste ? 'Create your table in Excel, Word, PowerPoint, Google Docs or Sheets, then paste it here.' : 'Paste SVG/HTML, chart markup, or diagram text. It will be inserted exactly where the cursor was.'}
                 </p>
               </div>
-              <button type="button" onClick={() => { setShowTablePaste(false); setShowDiagramPaste(false); }} className="p-1 text-slate-500 hover:text-slate-900">
+              <button type="button" onClick={() => { clearInsertionMarker(); setShowTablePaste(false); setShowDiagramPaste(false); }} className="p-1 text-slate-500 hover:text-slate-900">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -395,7 +493,7 @@ export default function RichTextEditor({
               </div>
             </div>
             <div className="flex justify-end gap-3 p-4 border-t bg-slate-50">
-            <button type="button" onClick={() => { setPasteBuffer(''); setInsertTitle(''); setInsertLegend(''); setShowTablePaste(false); setShowDiagramPaste(false); }} className="px-5 py-2 text-sm font-semibold border rounded-md text-slate-600 bg-white">
+            <button type="button" onClick={() => { clearInsertionMarker(); setPasteBuffer(''); setInsertTitle(''); setInsertLegend(''); setShowTablePaste(false); setShowDiagramPaste(false); }} className="px-5 py-2 text-sm font-semibold border rounded-md text-slate-600 bg-white">
               Cancel
             </button>
             <button type="button" disabled={!pasteBuffer.trim() || !insertTitle.trim()} onClick={showTablePaste ? insertTableFromText : insertDiagramFromText} className="px-5 py-2 text-sm font-semibold rounded-md bg-sky-300 text-white disabled:opacity-50 disabled:cursor-not-allowed">
@@ -417,7 +515,8 @@ export default function RichTextEditor({
         onDragStart={handleDragStart}
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
-        onMouseUp={saveSelection}
+        onMouseDown={(event) => saveSelectionFromPoint(event.clientX, event.clientY)}
+        onMouseUp={() => setTimeout(saveSelection, 0)}
         onKeyUp={saveSelection}
         onFocus={saveSelection}
         onClick={handleEditorClick}
