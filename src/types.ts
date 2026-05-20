@@ -81,12 +81,13 @@ export interface ReferenceItem {
 
 export interface FigureTableItem {
   id: string;
-  type: 'figure' | 'table';
+  type: 'figure' | 'table' | 'diagram';
   title: string;
   caption: string;
   fileUrl?: string; // or base64 data url for preview
   fileName?: string;
   tableData?: string[][]; // For grid/table builder
+  htmlContent?: string;
 }
 
 export interface SupplementaryFile {

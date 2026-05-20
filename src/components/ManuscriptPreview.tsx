@@ -28,6 +28,62 @@ function RichContent({ html }: { html: string }) {
   );
 }
 
+function RenderMediaItem({ item, index }: { item: Manuscript['figuresAndTables'][number]; index: number }) {
+  const label = item.type === 'table' ? 'TABLE' : item.type === 'diagram' ? 'DIAGRAM' : 'FIGURE';
+
+  if (item.htmlContent) {
+    return (
+      <figure className={`gbmn-inline-media gbmn-inline-media-${item.type}`}>
+        <div dangerouslySetInnerHTML={{ __html: item.htmlContent }} />
+        <figcaption>
+          <strong>{label} {index + 1}.</strong> {item.title}
+          {item.caption && <span> — {item.caption}</span>}
+        </figcaption>
+      </figure>
+    );
+  }
+
+  if (item.type === 'figure') {
+    return (
+      <figure className="gbmn-inline-media gbmn-inline-media-figure">
+        {item.fileUrl ? (
+          <img src={item.fileUrl} alt={item.title || item.fileName || `Figure ${index + 1}`} />
+        ) : (
+          <div className="gbmn-media-placeholder">[ {item.fileName || 'figure_file.png'} ]</div>
+        )}
+        <figcaption>
+          <strong>FIGURE {index + 1}.</strong> {item.title}
+          {item.caption && <span> — {item.caption}</span>}
+        </figcaption>
+      </figure>
+    );
+  }
+
+  return (
+    <figure className="gbmn-inline-media gbmn-inline-media-table">
+      <p className="gbmn-table-title">
+        TABLE {index + 1}. {item.title}
+      </p>
+      {item.tableData ? (
+        <table className="gbmn-inline-table">
+          <tbody>
+            {item.tableData.map((row, rIdx) => (
+              <tr key={rIdx}>
+                {row.map((cell, cIdx) => rIdx === 0 ? (
+                  <th key={cIdx}>{cell}</th>
+                ) : (
+                  <td key={cIdx}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
+      {item.caption && <figcaption>{item.caption}</figcaption>}
+    </figure>
+  );
+}
+
 export default function ManuscriptPreview({ manuscript, onShowNotification }: ManuscriptPreviewProps) {
   const articleConfig = ARTICLE_TYPES[manuscript.articleType];
 
@@ -97,67 +153,45 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         </div>
       </div>
 
-      {/* ──────────────────────────────────────────────────────────────────────
-          THE GBMN JOURNAL PAGE — matches the published template exactly
-         ────────────────────────────────────────────────────────────────────── */}
+      {/* GBMN journal page based on the supplied A4 case-generator template */}
       <div
         id="academic-manuscript-sheet"
-        className="bg-white border border-slate-200 shadow-2xl max-w-4xl mx-auto font-serif text-[#111827] leading-relaxed select-text relative"
-        style={{ fontFamily: 'Georgia, Times New Roman, serif' }}
+        className="bg-white shadow-2xl mx-auto font-serif text-[#111] leading-relaxed select-text relative"
+        style={{ fontFamily: 'Times New Roman, Times, serif', width: 560, minHeight: 792, padding: '40px 36px' }}
       >
-        {/* ── TOP HEADER BAR (matches gbmn template) ── */}
-        <div className="bg-white border-b-2 border-slate-800 px-10 pt-6 pb-4">
-          {/* Logo row */}
-          <div className="flex items-start justify-between mb-4">
-            {/* Left: GBMN logo simulation */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center">
-                <div
-                  className="text-white font-black text-2xl px-2 py-1 rounded-sm"
-                  style={{ background: '#1a1a2e', fontFamily: 'Arial Black, sans-serif', letterSpacing: '-1px' }}
-                >
-                  gbmn
-                </div>
-              </div>
-              <div className="ml-1" style={{ fontFamily: 'Arial, sans-serif' }}>
-                <div className="font-black text-sm text-gray-900 leading-none">GEORGIAN</div>
-                <div className="font-black text-sm text-gray-900 leading-none">BIOMEDICAL</div>
-                <div className="font-black text-sm text-gray-900 leading-none">NEWS</div>
-              </div>
-            </div>
-            {/* Right: Volume/Issue info */}
-            <div className="text-right" style={{ fontFamily: 'Arial, sans-serif' }}>
-              <div className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
-                VOLUME X. ISSUE X. {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}
-              </div>
-            </div>
-          </div>
-
-          {/* Thin teal separator line */}
-          <div className="h-0.5 bg-teal-700 mb-4" />
-
-          {/* Article type badge */}
-          <div className="mb-3">
-            <span
-              className="text-[10px] font-bold uppercase tracking-widest text-slate-500"
-              style={{ fontFamily: 'Arial, sans-serif' }}
+        <div className="bg-white">
+          <div className="flex items-start gap-3 mb-2">
+            <div
+              className="text-white font-black rounded-sm shrink-0 flex items-center justify-center"
+              style={{ width: 90, height: 70, background: '#006B6B', fontFamily: 'Arial, sans-serif', fontSize: 28, letterSpacing: '-1px' }}
             >
-              {articleConfig?.name || 'Article'}
-            </span>
+              gbmn
+            </div>
+            <div className="pt-1.5" style={{ fontFamily: 'Arial, sans-serif' }}>
+              <div className="font-bold text-[17px] leading-tight text-[#1a1a2e]">GEORGIAN</div>
+              <div className="font-bold text-[17px] leading-tight text-[#1a1a2e]">BIOMEDICAL</div>
+              <div className="font-bold text-[17px] leading-tight text-[#1a1a2e]">NEWS</div>
+            </div>
+          </div>
+          <div className="space-y-0.5 mb-1">
+            <div style={{ height: 2.5, background: '#006B6B' }} />
+            <div style={{ height: 2.5, background: '#006B6B' }} />
+          </div>
+          <div className="text-right text-[8.5px] font-bold uppercase tracking-wider text-[#1a1a2e] mb-4" style={{ fontFamily: 'Arial, sans-serif' }}>
+            VOLUME X ISSUE X. {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}
           </div>
 
-          {/* TITLE — large, bold, centered */}
           <h1
-            className="text-2xl font-extrabold text-slate-900 text-center leading-tight mb-4"
-            style={{ fontFamily: 'Georgia, serif', fontSize: '22px' }}
+            className="font-bold text-center leading-snug mb-3"
+            style={{ fontFamily: 'Arial, sans-serif', fontSize: 15, color: '#006B6B' }}
           >
             {manuscript.title || '[Article Title]'}
           </h1>
 
           {/* AUTHORS — centered, normal weight */}
           <div
-            className="text-center text-[13px] text-slate-700 mb-3"
-            style={{ fontFamily: 'Arial, sans-serif' }}
+            className="text-center text-[9.5px] text-[#333] mb-3"
+            style={{ fontFamily: 'Times New Roman, Times, serif' }}
           >
             {manuscript.authors.length === 0 ? (
               <span className="italic text-slate-400">Author Name¹, Author Name²…</span>
@@ -175,7 +209,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
           {/* AFFILIATIONS */}
           {manuscript.authors.length > 0 && (
-            <div className="text-center text-[10px] text-slate-500 space-y-0.5 mb-3" style={{ fontFamily: 'Arial, sans-serif' }}>
+            <div className="text-center text-[8.5px] text-slate-500 space-y-0.5 mb-3" style={{ fontFamily: 'Arial, sans-serif' }}>
               {manuscript.authors.map((a, i) => (
                 <p key={a.id}>
                   <sup className="text-teal-700 font-semibold">{i + 1}</sup>{' '}
@@ -188,14 +222,14 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         </div>
 
         {/* ── TWO-COLUMN BODY ── */}
-        <div className="px-6 py-6 md:columns-2 gap-6 text-[13px] leading-relaxed">
+        <div className="columns-2 gap-[18px] text-[8.5px] leading-relaxed">
 
           {/* ABSTRACT — full width, boxed */}
           {articleConfig?.abstractType !== 'none' && (
             <div className="break-inside-avoid mb-6 col-span-2" style={{ columnSpan: 'all' as any }}>
-              <div className="border-t border-b border-slate-300 py-3">
+              <div className="border-t border-b border-slate-300 py-2 mb-3">
                 <h2
-                  className="text-[10px] font-bold uppercase tracking-widest text-teal-800 mb-2"
+                  className="gbmn-section-heading"
                   style={{ fontFamily: 'Arial, sans-serif' }}
                 >
                   ABSTRACT
@@ -224,10 +258,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           {/* MANUSCRIPT SECTIONS */}
           {articleConfig?.requiredSections.filter(s => s !== 'Keywords').map((sectionName) => (
             <div key={sectionName} className="break-inside-avoid mb-5">
-              <h2
-                className="text-[10px] font-bold uppercase tracking-widest text-teal-800 border-b border-slate-200 pb-1 mb-2"
-                style={{ fontFamily: 'Arial, sans-serif' }}
-              >
+              <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
                 {sectionName}
               </h2>
               {manuscript.sections[sectionName] ? (
@@ -243,57 +274,20 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
         {/* FIGURES & TABLES — full width */}
         {manuscript.figuresAndTables.length > 0 && (
-          <div className="px-6 pb-6 border-t border-slate-200 pt-4">
-            <h2
-              className="text-[10px] font-bold uppercase tracking-widest text-teal-800 mb-4"
-              style={{ fontFamily: 'Arial, sans-serif' }}
-            >
+          <div className="pt-4">
+            <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
               FIGURES AND TABLES
             </h2>
-            <div className="space-y-6">
+            <div>
               {manuscript.figuresAndTables.map((item, idx) => (
-                <div key={item.id} className="break-inside-avoid">
-                  {item.type === 'figure' ? (
-                    <div>
-                      <div className="border border-slate-300 rounded h-44 bg-slate-50 flex items-center justify-center text-slate-400 text-xs italic mb-1">
-                        [ {item.fileName || 'figure_file.png'} ]
-                      </div>
-                      <p className="text-[10px] text-slate-700" style={{ fontFamily: 'Arial, sans-serif' }}>
-                        <strong>FIGURE {idx + 1}.</strong> {item.title}
-                        {item.caption && <span> — {item.caption}</span>}
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <p className="text-[10px] text-slate-700 mb-1 font-bold uppercase" style={{ fontFamily: 'Arial, sans-serif' }}>
-                        TABLE {idx + 1}. {item.title}
-                      </p>
-                      {item.tableData ? (
-                        <table className="w-full text-[11px] border-collapse border-t border-b border-slate-400" style={{ fontFamily: 'Arial, sans-serif' }}>
-                          <tbody>
-                            {item.tableData.map((row, rIdx) => (
-                              <tr key={rIdx} className={rIdx === 0 ? 'border-b border-slate-400' : 'border-b border-slate-200'}>
-                                {row.map((cell, cIdx) => (
-                                  <td key={cIdx} className={`p-1.5 ${rIdx === 0 ? 'font-bold text-center' : ''}`}>{cell}</td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : null}
-                      {item.caption && (
-                        <p className="text-[10px] text-slate-500 mt-1 italic">{item.caption}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <RenderMediaItem key={item.id} item={item} index={idx} />
               ))}
             </div>
           </div>
         )}
 
         {/* DECLARATIONS */}
-        <div className="px-6 pb-4 border-t border-slate-200 pt-4 text-[10px] space-y-3" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <div className="border-t border-slate-200 pt-3 mt-3 text-[8.5px] space-y-2" style={{ fontFamily: 'Arial, sans-serif' }}>
           {/* Funding */}
           {manuscript.fundingDetails.fundingAgency && (
             <div>
@@ -329,11 +323,8 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         </div>
 
         {/* REFERENCES */}
-        <div className="px-6 pb-8 border-t border-slate-200 pt-4">
-          <h2
-            className="text-[10px] font-bold uppercase tracking-widest text-teal-800 mb-3"
-            style={{ fontFamily: 'Arial, sans-serif' }}
-          >
+        <div className="border-t border-slate-200 pt-3 mt-3">
+          <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
             REFERENCES
           </h2>
           {manuscript.references.length === 0 ? (
@@ -341,7 +332,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
               [No references yet. Add in Step 11.]
             </p>
           ) : (
-            <ol className="list-decimal pl-5 space-y-1.5 text-[11px] leading-snug" style={{ fontFamily: 'Arial, sans-serif' }}>
+            <ol className="list-decimal pl-5 space-y-1.5 text-[8.5px] leading-snug" style={{ fontFamily: 'Arial, sans-serif' }}>
               {manuscript.references.map((ref) => (
                 <li key={ref.id} className="pl-1">
                   <span className="text-slate-700">{formatAMAReference(ref)}</span>
@@ -353,23 +344,100 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
         {/* FOOTER */}
         <div
-          className="border-t border-slate-300 px-10 py-3 flex justify-between items-center text-[8px] text-slate-400"
+          className="border-t border-slate-300 pt-3 mt-4 text-center text-[7px] text-slate-400"
           style={{ fontFamily: 'Arial, sans-serif' }}
         >
-          <span>The Georgian Biomedical News</span>
-          <span>Downloaded from gbmn.org. For personal use only. No other uses without permission.</span>
-          <span>Copyright © {new Date().getFullYear()}. All rights reserved.</span>
+          <p>The Georgian Biomedical News</p>
+          <p>Downloaded from gbmn.org. For personal use only. No other uses without permission.</p>
+          <p>Copyright © {new Date().getFullYear()}. All rights reserved.</p>
         </div>
       </div>
 
       <style>{`
+        #academic-manuscript-sheet { box-sizing: border-box; }
+        .gbmn-section-heading {
+          color: #C0392B;
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          margin: 10px 0 3px;
+          text-transform: uppercase;
+        }
+        .preview-rich {
+          color: #111;
+          font-family: "Times New Roman", Times, serif;
+          font-size: 8.5px;
+          line-height: 1.65;
+          text-align: justify;
+        }
+        .preview-rich p { margin: 0 0 5px; }
         .preview-rich ul { list-style: disc; padding-left: 1.5em; }
         .preview-rich ol { list-style: decimal; padding-left: 1.5em; }
         .preview-rich strong { font-weight: bold; }
         .preview-rich em { font-style: italic; }
+        .gbmn-inline-media {
+          break-inside: avoid;
+          margin: 10px 0;
+          padding: 6px 0;
+          font-family: Arial, sans-serif;
+          font-size: 8.5px;
+        }
+        .gbmn-inline-media img {
+          display: block;
+          max-width: 100%;
+          max-height: 240px;
+          object-fit: contain;
+          margin: 0 auto 4px;
+        }
+        .gbmn-media-placeholder {
+          height: 150px;
+          border: 0.5px solid #cbd5e1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #94a3b8;
+          background: #f8fafc;
+          font-size: 8.5px;
+          margin-bottom: 4px;
+        }
+        .gbmn-inline-media figcaption {
+          color: #334155;
+          font-size: 8px;
+          line-height: 1.45;
+        }
+        .gbmn-table-title {
+          color: #334155;
+          font-size: 8px;
+          font-weight: 700;
+          margin: 0 0 3px;
+          text-transform: uppercase;
+        }
+        .gbmn-inline-table {
+          width: 100%;
+          border-collapse: collapse;
+          border-top: 0.5px solid #334155;
+          border-bottom: 0.5px solid #334155;
+          font-size: 8px;
+        }
+        .gbmn-inline-table th, .gbmn-inline-table td {
+          padding: 3px 4px;
+          border-bottom: 0.5px solid #cbd5e1;
+          text-align: left;
+        }
+        .gbmn-inline-table th {
+          font-weight: 700;
+          text-align: center;
+        }
+        .gbmn-inline-media-diagram pre {
+          white-space: pre-wrap;
+          background: #f8fafc;
+          border: 0.5px solid #cbd5e1;
+          padding: 6px;
+          font-size: 8px;
+        }
         @media print {
           .no-print { display: none !important; }
-          #academic-manuscript-sheet { border: none; box-shadow: none; }
+          #academic-manuscript-sheet { border: none; box-shadow: none; width: 210mm; min-height: 297mm; }
         }
       `}</style>
     </div>

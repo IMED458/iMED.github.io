@@ -494,10 +494,7 @@ export const DB = {
   getCurrentUser(): User | null {
     const data = localStorage.getItem('gbmn_current_user');
     if (!data) {
-      // Default auto-login as Author to give immediate app access
-      const author = DEFAULT_USERS.find(u => u.role === 'Author')!;
-      localStorage.setItem('gbmn_current_user', JSON.stringify(author));
-      return author;
+      return null;
     }
     try {
       return JSON.parse(data);

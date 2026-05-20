@@ -92,10 +92,12 @@ export default function SubmissionWorkflow({
   const [authorIsCorr, setAuthorIsCorr] = useState(false);
 
   // 3. Figures/Table temporary state
-  const [mediaType, setMediaType] = useState<'figure' | 'table'>('figure');
+  const [mediaType, setMediaType] = useState<'figure' | 'table' | 'diagram'>('figure');
   const [mediaTitle, setMediaTitle] = useState('');
   const [mediaCaption, setMediaCaption] = useState('');
   const [mediaFileName, setMediaFileName] = useState('');
+  const [mediaFileUrl, setMediaFileUrl] = useState('');
+  const [mediaPasteContent, setMediaPasteContent] = useState('');
   
   // Custom Table cells creator state
   const [tableRows, setTableRows] = useState(3);
@@ -113,6 +115,27 @@ export default function SubmissionWorkflow({
     }
     updated[rIdx][cIdx] = val;
     setTempTableData(updated);
+  };
+
+  const escapeHtml = (text: string) => text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+  const tableFromDelimitedText = (text: string) => {
+    const rows = text.trim().split(/\r?\n/).filter(Boolean).map(row => row.split(/\t|,/).map(cell => cell.trim()));
+    if (rows.length === 0) return '';
+    return `<table class="gbmn-inline-table"><tbody>${rows.map((row, rIdx) => (
+      `<tr>${row.map(cell => rIdx === 0 ? `<th>${escapeHtml(cell)}</th>` : `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`
+    )).join('')}</tbody></table>`;
+  };
+
+  const handleMediaFileSelected = (file: File) => {
+    setMediaFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => setMediaFileUrl(String(reader.result || ''));
+    reader.readAsDataURL(file);
   };
 
   // 4. Citation Form States
@@ -210,13 +233,23 @@ export default function SubmissionWorkflow({
       return;
     }
 
+    const pastedHtml = mediaPasteContent.trim().includes('<table') || mediaPasteContent.trim().includes('<svg') || mediaPasteContent.trim().includes('<img')
+      ? mediaPasteContent.trim()
+      : mediaType === 'table' && mediaPasteContent.trim()
+        ? tableFromDelimitedText(mediaPasteContent)
+        : mediaType === 'diagram' && mediaPasteContent.trim()
+          ? `<pre>${escapeHtml(mediaPasteContent)}</pre>`
+          : undefined;
+
     const newItem: FigureTableItem = {
       id: `media-${Date.now()}`,
       type: mediaType,
       title: mediaTitle,
       caption: mediaCaption,
       fileName: mediaType === 'figure' ? (mediaFileName || 'clinical_plate_chart.png') : undefined,
-      tableData: mediaType === 'table' ? tempTableData : undefined
+      fileUrl: mediaType === 'figure' ? mediaFileUrl : undefined,
+      tableData: mediaType === 'table' && !pastedHtml ? tempTableData : undefined,
+      htmlContent: pastedHtml
     };
 
     updateField('figuresAndTables', [...manuscript.figuresAndTables, newItem]);
@@ -226,6 +259,8 @@ export default function SubmissionWorkflow({
     setMediaTitle('');
     setMediaCaption('');
     setMediaFileName('');
+    setMediaFileUrl('');
+    setMediaPasteContent('');
   };
 
   const handleAddCitation = (e: React.FormEvent) => {
@@ -769,7 +804,13 @@ export default function SubmissionWorkflow({
                   <input
                     type="radio" name="media-type-sel" checked={mediaType === 'table'} onChange={() => setMediaType('table')}
                   />
-                  <span>Table Structure Builder</span>
+                  <span>Table / Paste from Excel</span>
+                </label>
+                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
+                  <input
+                    type="radio" name="media-type-sel" checked={mediaType === 'diagram'} onChange={() => setMediaType('diagram')}
+                  />
+                  <span>Diagram Paste</span>
                 </label>
               </div>
 
@@ -791,7 +832,7 @@ export default function SubmissionWorkflow({
                       className="w-full bg-slate-50 border p-1.5 rounded text-slate-700 cursor-pointer"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) setMediaFileName(file.name);
+                        if (file) handleMediaFileSelected(file);
                       }}
                     />
                     {mediaFileName && <p className="text-[10px] text-teal-700 mt-1 font-mono">{mediaFileName}</p>}
@@ -817,7 +858,17 @@ export default function SubmissionWorkflow({
               </div>
 
               {mediaType === 'table' && (
-                <div className="bg-slate-50 p-3 rounded border space-y-2">
+                <div className="bg-slate-50 p-3 rounded border space-y-3">
+                  <div>
+                    <span className="font-bold text-[11px] block text-slate-700">Paste table from Excel, Word, PowerPoint, or HTML:</span>
+                    <textarea
+                      rows={4}
+                      value={mediaPasteContent}
+                      onChange={(e) => setMediaPasteContent(e.target.value)}
+                      placeholder="Paste copied cells here. If empty, the grid below will be used."
+                      className="mt-1 w-full bg-white border border-slate-300 rounded p-2 font-mono text-[11px]"
+                    />
+                  </div>
                   <span className="font-bold text-[11px] block text-slate-700">Fill Scientific data directly into cells matrix:</span>
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-xs text-left border-collapse border border-slate-300 bg-white">
@@ -840,6 +891,19 @@ export default function SubmissionWorkflow({
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+
+              {mediaType === 'diagram' && (
+                <div className="bg-slate-50 p-3 rounded border space-y-2">
+                  <span className="font-bold text-[11px] block text-slate-700">Paste diagram content:</span>
+                  <textarea
+                    rows={6}
+                    value={mediaPasteContent}
+                    onChange={(e) => setMediaPasteContent(e.target.value)}
+                    placeholder="Paste SVG/HTML exported from PowerPoint, Word, charts, or any diagram text here..."
+                    className="w-full bg-white border border-slate-300 rounded p-2 font-mono text-[11px]"
+                  />
                 </div>
               )}
 

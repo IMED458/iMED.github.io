@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { User, Manuscript, UserRole } from './types';
+import { User, Manuscript } from './types';
 import { DB } from './utils';
 import AuthLayout from './components/AuthLayout';
 import SidebarWorkflow from './components/SidebarWorkflow';
@@ -15,10 +15,7 @@ import {
   User as UserIcon, 
   LogOut, 
   Bell, 
-  Cpu, 
   Sparkles, 
-  FileText, 
-  ChevronRight, 
   AlertCircle 
 } from 'lucide-react';
 
@@ -82,24 +79,6 @@ export default function App() {
     DB.setCurrentUser(null);
     setCurrentUser(null);
     triggerNotification('Logged out from publishing dashboard.', 'info');
-  };
-
-  const handleQuickRoleSwap = (newRole: UserRole) => {
-    const usersList = DB.getUsers();
-    const targetedUser = usersList.find(u => u.role === newRole);
-    if (targetedUser) {
-      DB.setCurrentUser(targetedUser);
-      setCurrentUser(targetedUser);
-      triggerNotification(`Role swapped in sandbox mode: ${targetedUser.firstName} (${targetedUser.role})`, 'success');
-      
-      DB.addAuditLog({
-        userId: targetedUser.id,
-        userEmail: targetedUser.email,
-        action: 'TOOLBAR_ROLE_SWAP',
-        targetId: targetedUser.id,
-        details: `Simulated hot role transition directly to: ${newRole}`
-      });
-    }
   };
 
   // Get active editing draft or create an empty one if author has none
@@ -195,42 +174,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 2. CENTRAL SANDBOX NAVIGATION OVERLAY */}
-      {currentUser && (
-        <div id="sandbox-quickbar" className="bg-[#0f172a] text-slate-200 px-4 py-2 text-xs font-medium flex flex-wrap justify-between items-center gap-3 border-b border-slate-800 no-print">
-          <div className="flex items-center gap-2">
-            <Cpu className="h-4 w-4 text-teal-400 animate-pulse" />
-            <span className="text-slate-350">
-              GBMN Sandbox Environment Panel: 
-            </span>
-            <span className="bg-slate-800 text-teal-400 font-bold px-2 py-0.5 rounded-sm uppercase tracking-wide">
-              {currentUser.role} View Active
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-slate-400 mr-1.5">Quick-Swap Roles:</span>
-            {[ 'Author', 'Editor', 'Reviewer', 'Managing Editor', 'Administrator' ].map((role) => {
-              const isActive = currentUser.role === role;
-              return (
-                <button
-                  id={`sandbox-swap-${role.toLowerCase().replace(/\s+/g, '-')}`}
-                  key={role}
-                  onClick={() => handleQuickRoleSwap(role as UserRole)}
-                  className={`px-2.5 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                    isActive 
-                      ? 'bg-teal-705 text-white bg-teal-700 shadow-sm border border-teal-600' 
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
-                  }`}
-                >
-                  {role}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 3. SCIENTIFIC BRAND HEADNAV BAR */}
+      {/* 2. SCIENTIFIC BRAND HEADNAV BAR */}
       <header id="main-editorial-header" className="bg-white border-b border-slate-200 py-3.5 px-4 md:px-8 shadow-xs flex justify-between items-center flex-wrap gap-4 sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-teal-50 border border-teal-100 text-teal-700 rounded-lg">
