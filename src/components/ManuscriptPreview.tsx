@@ -106,6 +106,15 @@ function orcidUrl(orcidId?: string) {
   return `https://orcid.org/${clean}`;
 }
 
+function toGbmnTitleCase(title: string) {
+  const minor = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'from', 'if', 'in', 'into', 'on', 'or', 'of', 'the', 'to', 'with']);
+  return title.split(/\s+/).map((word, index) => {
+    const lower = word.toLowerCase();
+    if (index > 0 && minor.has(lower)) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(' ');
+}
+
 export default function ManuscriptPreview({ manuscript, onShowNotification }: ManuscriptPreviewProps) {
   const articleConfig = ARTICLE_TYPES[manuscript.articleType];
 
@@ -116,11 +125,58 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
     }
   };
 
+  const handleDownloadWord = () => {
+    const sheet = document.getElementById('academic-manuscript-sheet');
+    if (!sheet) return;
+    const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${manuscript.title || 'GBMN Manuscript'}</title>
+<style>
+@page WordSection1 { size: 8.27in 11.69in; margin: .58in .5in .58in .5in; }
+body { font-family: "Times New Roman", serif; color: #111; }
+#academic-manuscript-sheet { width: 7.27in; margin: 0 auto; box-shadow: none !important; padding: 0 !important; }
+.gbmn-body-columns { column-count: 2; column-gap: .25in; font-size: 10pt; line-height: 1.35; text-align: justify; }
+.gbmn-section-heading { color: #e00000; font-family: Arial, sans-serif; font-size: 12pt; font-weight: 400; text-transform: uppercase; margin: 14pt 0 4pt; }
+.gbmn-abstract .preview-rich { font-size: 9pt; line-height: 1.32; }
+.preview-rich { font-size: 10pt; line-height: 1.35; text-align: justify; }
+.preview-rich-dropcap p:first-child:first-letter, .preview-rich-dropcap:first-letter { float: left; font-size: 42pt; line-height: 34pt; margin: 3pt 4pt 0 0; }
+.gbmn-inline-media { break-inside: avoid; page-break-inside: avoid; margin: 8pt 0; }
+.gbmn-inline-media figcaption, .gbmn-table-title { font-family: Arial, sans-serif; font-size: 8pt; color: #333; margin: 0 0 3pt; }
+.gbmn-inline-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+.gbmn-inline-table th, .gbmn-inline-table td { border: .5pt solid #aaa; padding: 2pt 3pt; }
+a { color: #007f7f; }
+</style>
+</head>
+<body>${sheet.outerHTML}</body>
+</html>`;
+    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `GBMN_Manuscript_${manuscript.id || 'Draft'}.doc`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    if (onShowNotification) onShowNotification('Word-editable manuscript downloaded.', 'success');
+  };
+
   const abstractWordCount = Object.values(manuscript.abstractContents)
     .reduce((sum, text) => sum + stripHtml(text || '').split(/\s+/).filter(Boolean).length, 0);
 
   const bodyWordCount = Object.values(manuscript.sections)
     .reduce((sum, text) => sum + stripHtml(text || '').split(/\s+/).filter(Boolean).length, 0);
+  const combinedHtml = [
+    ...Object.values(manuscript.abstractContents),
+    ...Object.values(manuscript.sections),
+  ].join(' ');
+  const inlineFigureCount = (combinedHtml.match(/gbmn-inline-media-figure/g) || []).length + manuscript.figuresAndTables.filter(item => item.type === 'figure').length;
+  const inlineTableCount = (combinedHtml.match(/gbmn-inline-media-table/g) || []).length + manuscript.figuresAndTables.filter(item => item.type === 'table').length;
+  const mentionedFigures = Array.from(combinedHtml.matchAll(/\bFig\.?\s*(\d+)/gi)).map(match => Number(match[1]));
+  const mentionedTables = Array.from(combinedHtml.matchAll(/\bTable\s*(\d+)/gi)).map(match => Number(match[1]));
+  const missingMediaWarnings = [
+    ...mentionedFigures.filter(number => number > inlineFigureCount).map(number => `Fig. ${number} is mentioned but no matching figure exists.`),
+    ...mentionedTables.filter(number => number > inlineTableCount).map(number => `Table ${number} is mentioned but no matching table exists.`),
+  ];
 
   return (
     <div id="manuscript-preview-container" className="space-y-6 animate-fade-in">
@@ -143,6 +199,13 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           >
             <Printer className="h-4 w-4" />
             Print / Save PDF
+          </button>
+          <button
+            onClick={handleDownloadWord}
+            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer shadow-xs"
+          >
+            <Download className="h-4 w-4" />
+            Download Word
           </button>
           <button
             onClick={() => {
@@ -174,46 +237,53 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           <span>Refs: <strong>{manuscript.references.length}</strong></span>
         </div>
       </div>
+      {missingMediaWarnings.length > 0 && (
+        <div className="no-print bg-amber-50 border border-amber-200 text-amber-900 rounded-lg px-4 py-3 text-xs">
+          <strong>Media check:</strong> {missingMediaWarnings.join(' ')}
+        </div>
+      )}
 
       {/* GBMN journal page based on the supplied A4 case-generator template */}
       <div
         id="academic-manuscript-sheet"
         className="bg-white shadow-2xl mx-auto font-serif text-[#111] leading-relaxed select-text relative"
-        style={{ fontFamily: 'Times New Roman, Times, serif', width: 560, minHeight: 792, padding: '40px 36px' }}
+        style={{ fontFamily: 'Times New Roman, Times, serif', width: 794, minHeight: 1123, padding: '58px 48px' }}
       >
         <div className="bg-white">
-          <div className="flex items-start gap-3 mb-2">
+          <div className="flex items-start gap-3 mb-5">
             <div
               className="text-white font-black rounded-sm shrink-0 flex items-center justify-center"
-              style={{ width: 90, height: 70, background: '#006B6B', fontFamily: 'Arial, sans-serif', fontSize: 28, letterSpacing: '-1px' }}
+              style={{ width: 350, height: 96, background: '#3b8790', fontFamily: 'Arial, sans-serif', fontSize: 90, lineHeight: 1, letterSpacing: '-4px' }}
             >
               gbmn
             </div>
-            <div className="pt-1.5" style={{ fontFamily: 'Arial, sans-serif' }}>
-              <div className="font-bold text-[17px] leading-tight text-[#1a1a2e]">GEORGIAN</div>
-              <div className="font-bold text-[17px] leading-tight text-[#1a1a2e]">BIOMEDICAL</div>
-              <div className="font-bold text-[17px] leading-tight text-[#1a1a2e]">NEWS</div>
+            <div className="pt-1" style={{ fontFamily: 'Arial, sans-serif' }}>
+              <div className="font-bold text-[34px] leading-none text-black">GEORGIAN</div>
+              <div className="font-bold text-[34px] leading-none text-black">BIOMEDICAL</div>
+              <div className="font-bold text-[34px] leading-none text-black">NEWS</div>
             </div>
           </div>
-          <div className="space-y-0.5 mb-1">
-            <div style={{ height: 2.5, background: '#006B6B' }} />
-            <div style={{ height: 2.5, background: '#006B6B' }} />
-          </div>
-          <div className="text-right text-[8.5px] font-bold uppercase tracking-wider text-[#1a1a2e] mb-4" style={{ fontFamily: 'Arial, sans-serif' }}>
-            VOLUME X ISSUE X. {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }).toUpperCase()}
+          <div className="flex items-center gap-6 mb-9">
+            <div className="flex-1 space-y-1">
+              <div style={{ height: 3, background: '#007f7f' }} />
+              <div style={{ height: 3, background: '#007f7f' }} />
+            </div>
+            <div className="text-right text-[17px] font-bold uppercase text-black whitespace-nowrap" style={{ fontFamily: 'Arial, sans-serif' }}>
+              VOLUME X ISSUE X. {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()}
+            </div>
           </div>
 
           <h1
-            className="font-bold text-center leading-snug mb-3"
-            style={{ fontFamily: 'Arial, sans-serif', fontSize: 15, color: '#006B6B' }}
+            className="font-normal text-center leading-tight mb-4"
+            style={{ fontFamily: 'Arial, sans-serif', fontSize: '24pt', color: '#00827f' }}
           >
-            {manuscript.title || '[Article Title]'}
+            {manuscript.title ? toGbmnTitleCase(manuscript.title) : '[Article Title]'}
           </h1>
 
           {/* AUTHORS — centered, normal weight */}
           <div
-            className="text-center text-[9.5px] text-[#333] mb-3"
-            style={{ fontFamily: 'Times New Roman, Times, serif' }}
+            className="text-center text-[#777] mb-5"
+            style={{ fontFamily: 'Arial, sans-serif', fontSize: '14pt', lineHeight: 1.35 }}
           >
             {manuscript.authors.length === 0 ? (
               <span className="italic text-slate-400">Author Name¹, Author Name²…</span>
@@ -223,7 +293,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
                   {a.firstName} {a.middleInitial ? `${a.middleInitial}. ` : ''}{a.lastName}
                   {a.isCorresponding && <span className="text-teal-700 ml-0.5" title="Corresponding">✉</span>}
                   {orcidUrl(a.orcidId) ? (
-                    <a href={orcidUrl(a.orcidId)} target="_blank" rel="noreferrer" className="text-teal-700 font-semibold ml-0.5 align-super text-[9px] hover:underline">
+                    <a href={orcidUrl(a.orcidId)} target="_blank" rel="noreferrer" className="text-teal-700 font-semibold ml-0.5 align-super text-[10pt] hover:underline">
                       {i + 1}
                     </a>
                   ) : (
@@ -237,7 +307,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
           {/* AFFILIATIONS */}
           {manuscript.authors.length > 0 && (
-            <div className="text-center text-[8.5px] text-slate-500 space-y-0.5 mb-3" style={{ fontFamily: 'Arial, sans-serif' }}>
+            <div className="text-center text-slate-600 space-y-0.5 mb-5" style={{ fontFamily: 'Arial, sans-serif', fontSize: '10pt', lineHeight: 1.35 }}>
               {manuscript.authors.map((a, i) => (
                 <p key={a.id}>
                   <sup className="text-teal-700 font-semibold">{i + 1}</sup>{' '}
@@ -249,39 +319,34 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           )}
         </div>
 
-        {/* ── TWO-COLUMN BODY ── */}
-        <div className="columns-2 gap-[18px] text-[8.5px] leading-relaxed">
-
-          {/* ABSTRACT — full width, boxed */}
-          {articleConfig?.abstractType !== 'none' && (
-            <div className="break-inside-avoid mb-6 col-span-2" style={{ columnSpan: 'all' as any }}>
-              <div className="border-t border-b border-slate-300 py-2 mb-3">
-                <h2
-                  className="gbmn-section-heading"
-                  style={{ fontFamily: 'Arial, sans-serif' }}
-                >
-                  ABSTRACT
-                </h2>
-                {manuscript.abstractContents['text'] ? (
-                  <RichContent html={manuscript.abstractContents['text']} references={manuscript.references} />
-                ) : (
-                  <p className="text-slate-400 italic text-xs">
-                    [Abstract not yet entered. Fill in Step 7.]
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* KEYWORDS */}
-          {manuscript.sections['Keywords'] && (
-            <div className="break-inside-avoid mb-4" style={{ columnSpan: 'all' as any }}>
-              <p className="text-[10px]" style={{ fontFamily: 'Arial, sans-serif' }}>
-                <strong className="uppercase">Keywords:</strong>{' '}
-                <span className="text-slate-700">{manuscript.sections['Keywords']}</span>
+        {/* ABSTRACT — single column */}
+        {articleConfig?.abstractType !== 'none' && (
+          <div className="gbmn-abstract border-t border-b border-black py-3 mb-7">
+            <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
+              ABSTRACT
+            </h2>
+            {manuscript.abstractContents['text'] ? (
+              <RichContent html={manuscript.abstractContents['text']} references={manuscript.references} />
+            ) : (
+              <p className="text-slate-400 italic text-xs">
+                [Abstract not yet entered. Fill in Step 7.]
               </p>
-            </div>
-          )}
+            )}
+          </div>
+        )}
+
+        {/* KEYWORDS — single column */}
+        {manuscript.sections['Keywords'] && (
+          <div className="break-inside-avoid mb-7">
+            <p style={{ fontFamily: 'Arial, sans-serif', fontSize: '10pt' }}>
+              <strong className="uppercase">Keywords:</strong>{' '}
+              <span className="text-slate-700">{manuscript.sections['Keywords']}</span>
+            </p>
+          </div>
+        )}
+
+        {/* ── TWO-COLUMN BODY ── */}
+        <div className="gbmn-body-columns">
 
           {/* MANUSCRIPT SECTIONS */}
           {articleConfig?.requiredSections.filter(s => s !== 'Keywords').map((sectionName, sectionIndex) => (
@@ -389,29 +454,41 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
       <style>{`
         #academic-manuscript-sheet { box-sizing: border-box; }
+        .gbmn-body-columns {
+          column-count: 2;
+          column-width: 3.5in;
+          column-gap: 0.25in;
+          font-size: 10pt;
+          line-height: 1.35;
+          text-align: justify;
+        }
         .gbmn-section-heading {
-          color: #C0392B;
-          font-size: 8px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          margin: 10px 0 3px;
+          color: #e00000;
+          font-size: 12pt;
+          font-weight: 400;
+          letter-spacing: 0;
+          margin: 13px 0 5px;
           text-transform: uppercase;
         }
         .preview-rich {
           color: #111;
           font-family: "Times New Roman", Times, serif;
-          font-size: 8.5px;
-          line-height: 1.65;
+          font-size: 10pt;
+          line-height: 1.35;
           text-align: justify;
+        }
+        .gbmn-abstract .preview-rich {
+          font-size: 9pt;
+          line-height: 1.32;
         }
         .preview-rich p { margin: 0 0 5px; }
         .preview-rich-dropcap p:first-child:first-letter,
         .preview-rich-dropcap:first-letter {
           float: left;
-          font-size: 30px;
-          line-height: 22px;
-          font-weight: 700;
-          margin: 3px 3px 0 0;
+          font-size: 42pt;
+          line-height: 34pt;
+          font-weight: 400;
+          margin: 3px 5px 0 0;
           color: #111;
         }
         .gbmn-ref-link {
@@ -427,17 +504,18 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         .preview-rich em { font-style: italic; }
         .gbmn-inline-media {
           break-inside: avoid;
-          margin: 10px 0;
+          page-break-inside: avoid;
+          margin: 10px 0 12px;
           padding: 6px 0;
           font-family: Arial, sans-serif;
-          font-size: 8.5px;
+          font-size: 8pt;
         }
         .gbmn-inline-media img {
           display: block;
           max-width: 100%;
-          max-height: 240px;
+          max-height: 260px;
           object-fit: contain;
-          margin: 0 auto 4px;
+          margin: 4px auto 4px;
         }
         .gbmn-media-placeholder {
           height: 150px;
@@ -447,27 +525,27 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           justify-content: center;
           color: #94a3b8;
           background: #f8fafc;
-          font-size: 8.5px;
+          font-size: 8pt;
           margin-bottom: 4px;
         }
         .gbmn-inline-media figcaption {
           color: #334155;
-          font-size: 8px;
+          font-size: 8pt;
           line-height: 1.45;
+          margin: 0 0 4px;
         }
         .gbmn-table-title {
           color: #334155;
-          font-size: 8px;
-          font-weight: 700;
+          font-size: 8pt;
+          font-weight: 400;
           margin: 0 0 3px;
-          text-transform: uppercase;
         }
         .gbmn-inline-table {
           width: 100%;
           border-collapse: collapse;
           border-top: 0.5px solid #334155;
           border-bottom: 0.5px solid #334155;
-          font-size: 8px;
+          font-size: 8pt;
         }
         .gbmn-inline-table th, .gbmn-inline-table td {
           padding: 3px 4px;
@@ -483,11 +561,11 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           background: #f8fafc;
           border: 0.5px solid #cbd5e1;
           padding: 6px;
-          font-size: 8px;
+          font-size: 8pt;
         }
         @media print {
           .no-print { display: none !important; }
-          #academic-manuscript-sheet { border: none; box-shadow: none; width: 210mm; min-height: 297mm; }
+          #academic-manuscript-sheet { border: none; box-shadow: none; width: 210mm; min-height: 297mm; padding: 15mm 13mm !important; }
         }
       `}</style>
     </div>

@@ -98,7 +98,7 @@ export default function App() {
       title: '',
       runningTitle: '',
       specialty: 'Clinical Medicine',
-      articleType: 'original-article',
+      articleType: 'original-research',
       checklistAgreed: false,
       authors: [],
       abstractContents: {},

@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { ChangeEvent, ClipboardEvent, useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, Image, Table2, ChartNoAxesColumn, Superscript, Subscript, X } from 'lucide-react';
+import React, { ChangeEvent, ClipboardEvent, DragEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, Image, Table2, ChartNoAxesColumn, Superscript, Subscript, X, Trash2 } from 'lucide-react';
 
 interface RichTextEditorProps {
   label?: string;
@@ -29,6 +29,8 @@ export default function RichTextEditor({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const savedRangeRef = useRef<Range | null>(null);
   const isInternalUpdate = useRef(false);
+  const draggedMediaRef = useRef<HTMLElement | null>(null);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [showTablePaste, setShowTablePaste] = useState(false);
   const [showDiagramPaste, setShowDiagramPaste] = useState(false);
   const [pasteBuffer, setPasteBuffer] = useState('');
@@ -75,10 +77,51 @@ export default function RichTextEditor({
     selection.addRange(savedRangeRef.current);
   };
 
+  const placeCaretAfter = (node: Node) => {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    savedRangeRef.current = range.cloneRange();
+  };
+
+  const rangeFromPoint = (x: number, y: number) => {
+    const doc = document as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+    };
+    if (doc.caretRangeFromPoint) return doc.caretRangeFromPoint(x, y);
+    const position = doc.caretPositionFromPoint?.(x, y);
+    if (!position) return null;
+    const range = document.createRange();
+    range.setStart(position.offsetNode, position.offset);
+    range.collapse(true);
+    return range;
+  };
+
   const insertHtml = (html: string) => {
-    editorRef.current?.focus();
+    if (!editorRef.current) return;
+    editorRef.current.focus();
     restoreSelection();
-    document.execCommand('insertHTML', false, html);
+    const selection = window.getSelection();
+    const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+    const activeRange = range && editorRef.current.contains(range.commonAncestorContainer)
+      ? range
+      : document.createRange();
+    if (!range || !editorRef.current.contains(range.commonAncestorContainer)) {
+      activeRange.selectNodeContents(editorRef.current);
+      activeRange.collapse(false);
+    }
+    activeRange.deleteContents();
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const fragment = template.content;
+    const lastNode = fragment.lastChild;
+    activeRange.insertNode(fragment);
+    if (lastNode) placeCaretAfter(lastNode);
     handleInput();
     saveSelection();
   };
@@ -102,7 +145,7 @@ export default function RichTextEditor({
       ? pasteBuffer
       : tableFromDelimitedText(pasteBuffer);
     if (!html) return;
-    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table" contenteditable="false" draggable="true">${html}<figcaption><strong>${escapeHtml(insertTitle || 'Table')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption></figure><p><br></p>`);
+    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(insertTitle || 'Table')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${html}</figure><p><br></p>`);
     setPasteBuffer('');
     setInsertTitle('');
     setInsertLegend('');
@@ -114,7 +157,7 @@ export default function RichTextEditor({
     const content = pasteBuffer.includes('<svg') || pasteBuffer.includes('<img') || pasteBuffer.includes('<table')
       ? pasteBuffer
       : `<pre>${escapeHtml(pasteBuffer)}</pre>`;
-    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-diagram" contenteditable="false" draggable="true">${content}<figcaption><strong>${escapeHtml(insertTitle || 'Diagram')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption></figure><p><br></p>`);
+    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-diagram" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(insertTitle || 'Diagram')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${content}</figure><p><br></p>`);
     setPasteBuffer('');
     setInsertTitle('');
     setInsertLegend('');
@@ -124,7 +167,7 @@ export default function RichTextEditor({
   const insertImageFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => {
-      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-figure" contenteditable="false" draggable="true"><img src="${reader.result}" alt="${escapeHtml(file.name)}"><figcaption>${escapeHtml(file.name)}</figcaption></figure><p><br></p>`);
+      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-figure" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption>${escapeHtml(file.name)}</figcaption><img src="${reader.result}" alt="${escapeHtml(file.name)}"></figure><p><br></p>`);
     };
     reader.readAsDataURL(file);
   };
@@ -146,7 +189,7 @@ export default function RichTextEditor({
     }
     if (html.includes('<table')) {
       event.preventDefault();
-      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table" contenteditable="false" draggable="true">${html}<figcaption><strong>Table.</strong> Add title and legend...</figcaption></figure><p><br></p>`);
+      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>Table.</strong> Add title and legend...</figcaption>${html}</figure><p><br></p>`);
       return;
     }
     if (text) {
@@ -158,13 +201,86 @@ export default function RichTextEditor({
   const handleEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     const media = target.closest('.gbmn-inline-media');
-    if (!media) return;
+    if (!media) {
+      setSelectedMediaId(null);
+      setTimeout(saveSelection, 0);
+      return;
+    }
+    event.preventDefault();
+    const element = media as HTMLElement;
+    if (!element.dataset.mediaId) element.dataset.mediaId = crypto.randomUUID();
+    setSelectedMediaId(element.dataset.mediaId);
     const selection = window.getSelection();
     const range = document.createRange();
     range.selectNode(media);
     selection?.removeAllRanges();
     selection?.addRange(range);
     savedRangeRef.current = range.cloneRange();
+  };
+
+  const deleteSelectedMedia = () => {
+    if (!editorRef.current || !selectedMediaId) return;
+    const media = editorRef.current.querySelector<HTMLElement>(`.gbmn-inline-media[data-media-id="${selectedMediaId}"]`);
+    if (!media) return;
+    const next = media.nextSibling;
+    media.remove();
+    if (next) placeCaretAfter(next);
+    setSelectedMediaId(null);
+    handleInput();
+  };
+
+  const selectedMediaFromSelection = () => {
+    if (!editorRef.current) return null;
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return null;
+    const range = selection.getRangeAt(0);
+    const node = range.commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+      ? range.commonAncestorContainer as Element
+      : range.commonAncestorContainer.parentElement;
+    return node?.closest?.('.gbmn-inline-media') as HTMLElement | null;
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Backspace' && event.key !== 'Delete') return;
+    const media = selectedMediaId
+      ? editorRef.current?.querySelector<HTMLElement>(`.gbmn-inline-media[data-media-id="${selectedMediaId}"]`)
+      : selectedMediaFromSelection();
+    if (!media) return;
+    event.preventDefault();
+    media.remove();
+    setSelectedMediaId(null);
+    handleInput();
+  };
+
+  const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
+    const media = (event.target as HTMLElement).closest('.gbmn-inline-media') as HTMLElement | null;
+    if (!media) return;
+    if (!media.dataset.mediaId) media.dataset.mediaId = crypto.randomUUID();
+    draggedMediaRef.current = media;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/html', media.outerHTML);
+    event.dataTransfer.setData('text/plain', media.innerText);
+    setSelectedMediaId(media.dataset.mediaId);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    const html = event.dataTransfer.getData('text/html');
+    const dragged = draggedMediaRef.current;
+    if (!html || !dragged || !editorRef.current) return;
+    event.preventDefault();
+    const dropRange = rangeFromPoint(event.clientX, event.clientY);
+    if (!dropRange || !editorRef.current.contains(dropRange.commonAncestorContainer)) return;
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const moved = template.content.firstElementChild as HTMLElement | null;
+    if (!moved) return;
+    moved.dataset.mediaId = crypto.randomUUID();
+    dropRange.insertNode(moved);
+    dragged.remove();
+    draggedMediaRef.current = null;
+    setSelectedMediaId(moved.dataset.mediaId || null);
+    placeCaretAfter(moved);
+    handleInput();
   };
 
   const wordCount = value
@@ -209,7 +325,7 @@ export default function RichTextEditor({
           <AlignLeft className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <div className="w-px bg-slate-300 mx-0.5" />
-        <ToolbarBtn title="Insert image at cursor" onClick={() => imageInputRef.current?.click()}>
+        <ToolbarBtn title="Insert image at cursor" onClick={() => { saveSelection(); imageInputRef.current?.click(); }}>
           <Image className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn title="Paste table at cursor" onClick={() => { saveSelection(); setShowTablePaste(true); setShowDiagramPaste(false); }}>
@@ -217,6 +333,9 @@ export default function RichTextEditor({
         </ToolbarBtn>
         <ToolbarBtn title="Paste diagram at cursor" onClick={() => { saveSelection(); setShowDiagramPaste(true); setShowTablePaste(false); }}>
           <ChartNoAxesColumn className="h-3.5 w-3.5" />
+        </ToolbarBtn>
+        <ToolbarBtn title="Delete selected table, figure, or diagram" onClick={deleteSelectedMedia}>
+          <Trash2 className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
       </div>
@@ -294,6 +413,10 @@ export default function RichTextEditor({
         suppressContentEditableWarning
         onInput={handleInput}
         onPaste={handlePaste}
+        onKeyDown={handleKeyDown}
+        onDragStart={handleDragStart}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={handleDrop}
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
         onFocus={saveSelection}
@@ -318,6 +441,7 @@ export default function RichTextEditor({
         .rich-editor-area ul { list-style: disc; padding-left: 1.5em; }
         .rich-editor-area ol { list-style: decimal; padding-left: 1.5em; }
         .gbmn-inline-media { break-inside: avoid; margin: 12px 0; border: 1px solid #cbd5e1; padding: 8px; background: #fff; cursor: move; }
+        .gbmn-inline-media[data-media-id="${selectedMediaId || ''}"] { outline: 2px solid #0f766e; outline-offset: 2px; }
         .gbmn-inline-media::selection { background: rgba(15, 118, 110, 0.18); }
         .gbmn-inline-media img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
         .gbmn-inline-media figcaption { margin-top: 6px; font-family: Arial, sans-serif; font-size: 11px; color: #475569; }

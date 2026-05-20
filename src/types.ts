@@ -37,20 +37,11 @@ export interface AuthorDetails {
 }
 
 export type ArticleTypeKey =
-  | 'original-article'
-  | 'special-article'
-  | 'brief-report'
-  | 'clinical-problem'
-  | 'clinical-practice'
-  | 'review-article'
-  | 'editorial'
-  | 'perspective'
-  | 'clinical-implications'
-  | 'letter-to-editor'
-  | 'special-report'
-  | 'health-policy'
-  | 'medicine-society'
-  | 'sounding-board';
+  | 'clinical-cases'
+  | 'original-research'
+  | 'review-articles'
+  | 'commentary'
+  | 'other';
 
 export interface ArticleTypeConfig {
   key: ArticleTypeKey;
