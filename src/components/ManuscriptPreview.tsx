@@ -18,12 +18,28 @@ function stripHtml(html: string): string {
 }
 
 // Render HTML safely (used in preview)
-function RichContent({ html }: { html: string }) {
+function referenceUrl(ref: Manuscript['references'][number]) {
+  if (ref.doi) return `https://doi.org/${ref.doi.replace(/^doi:/i, '').trim()}`;
+  return ref.url || undefined;
+}
+
+function linkReferenceCitations(html: string, references: Manuscript['references']) {
+  return html.replace(/\[(\d+(?:\s*[-,]\s*\d+)*)\]/g, (match, inner) => {
+    const first = Number(inner.split(/[-,]/)[0]?.trim());
+    const ref = references[first - 1];
+    const url = ref ? referenceUrl(ref) : undefined;
+    return url
+      ? `<a class="gbmn-ref-link" href="${url}" target="_blank" rel="noreferrer">${match}</a>`
+      : match;
+  });
+}
+
+function RichContent({ html, references, dropCap = false }: { html: string; references: Manuscript['references']; dropCap?: boolean }) {
   if (!html) return null;
   return (
     <div
-      className="text-slate-850 text-[14px] leading-relaxed preview-rich"
-      dangerouslySetInnerHTML={{ __html: html }}
+      className={`text-slate-850 text-[14px] leading-relaxed preview-rich ${dropCap ? 'preview-rich-dropcap' : ''}`}
+      dangerouslySetInnerHTML={{ __html: linkReferenceCitations(html, references) }}
     />
   );
 }
@@ -247,7 +263,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
                   ABSTRACT
                 </h2>
                 {manuscript.abstractContents['text'] ? (
-                  <RichContent html={manuscript.abstractContents['text']} />
+                  <RichContent html={manuscript.abstractContents['text']} references={manuscript.references} />
                 ) : (
                   <p className="text-slate-400 italic text-xs">
                     [Abstract not yet entered. Fill in Step 7.]
@@ -268,13 +284,13 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           )}
 
           {/* MANUSCRIPT SECTIONS */}
-          {articleConfig?.requiredSections.filter(s => s !== 'Keywords').map((sectionName) => (
+          {articleConfig?.requiredSections.filter(s => s !== 'Keywords').map((sectionName, sectionIndex) => (
             <div key={sectionName} className="break-inside-avoid mb-5">
               <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
                 {sectionName}
               </h2>
               {manuscript.sections[sectionName] ? (
-                <RichContent html={manuscript.sections[sectionName]} />
+                <RichContent html={manuscript.sections[sectionName]} references={manuscript.references} dropCap={sectionIndex === 0} />
               ) : (
                 <p className="text-slate-400 italic text-xs font-mono">
                   [Section empty — edit in Step 9]
@@ -347,7 +363,13 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
             <ol className="list-decimal pl-5 space-y-1.5 text-[8.5px] leading-snug" style={{ fontFamily: 'Arial, sans-serif' }}>
               {manuscript.references.map((ref) => (
                 <li key={ref.id} className="pl-1">
-                  <span className="text-slate-700">{formatAMAReference(ref)}</span>
+                  {referenceUrl(ref) ? (
+                    <a href={referenceUrl(ref)} target="_blank" rel="noreferrer" className="text-slate-700 hover:text-teal-700 hover:underline">
+                      {formatAMAReference(ref)}
+                    </a>
+                  ) : (
+                    <span className="text-slate-700">{formatAMAReference(ref)}</span>
+                  )}
                 </li>
               ))}
             </ol>
@@ -383,6 +405,22 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           text-align: justify;
         }
         .preview-rich p { margin: 0 0 5px; }
+        .preview-rich-dropcap p:first-child:first-letter,
+        .preview-rich-dropcap:first-letter {
+          float: left;
+          font-size: 30px;
+          line-height: 22px;
+          font-weight: 700;
+          margin: 3px 3px 0 0;
+          color: #111;
+        }
+        .gbmn-ref-link {
+          color: #007f7f;
+          font-size: 75%;
+          vertical-align: super;
+          text-decoration: none;
+          font-weight: 700;
+        }
         .preview-rich ul { list-style: disc; padding-left: 1.5em; }
         .preview-rich ol { list-style: decimal; padding-left: 1.5em; }
         .preview-rich strong { font-weight: bold; }

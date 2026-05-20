@@ -14,7 +14,6 @@ import {
   Layers, 
   FileText, 
   Key, 
-  Image, 
   Bookmark, 
   Paperclip, 
   ShieldCheck, 
@@ -92,7 +91,7 @@ export const SUBMISSION_STEPS: SubmissionStep[] = [
     label: 'Keywords',
     icon: Key,
     validator: (m) => {
-      const cnt = (m.sections['Keywords'] || '').split(',').map(k => k.trim()).filter(Boolean).length;
+      const cnt = (m.sections['Keywords'] || '').split(/[;,]/).map(k => k.trim()).filter(Boolean).length;
       if (cnt >= 3 && cnt <= 6) return 'complete';
       if (cnt > 0) return 'warning';
       return 'empty';
@@ -111,12 +110,6 @@ export const SUBMISSION_STEPS: SubmissionStep[] = [
       if (filled.length > 0) return 'warning';
       return 'empty';
     },
-  },
-  {
-    id: 'figures',
-    label: 'Figures & Tables',
-    icon: Image,
-    validator: (m) => m.figuresAndTables.length > 0 ? 'complete' : 'empty',
   },
   {
     id: 'references',
@@ -189,6 +182,23 @@ interface SidebarWorkflowProps {
   onStepSelected: (stepId: string) => void;
 }
 
+function statusHelp(stepId: string, status: 'complete' | 'warning' | 'empty') {
+  if (status === 'complete') return '';
+  const messages: Record<string, string> = {
+    checklist: 'Checklist must be accepted before submission.',
+    'title-meta': 'Full title, running title, and specialty are required.',
+    authors: 'Add at least one author, ORCID, and a corresponding author.',
+    abstract: 'Abstract is required for this article type.',
+    keywords: 'Enter 3-6 MeSH-style keywords separated by semicolons or commas.',
+    sections: 'Required manuscript body sections need content.',
+    references: 'Add complete AMA references.',
+    ethics: 'Ethics fields and IRB upload should be completed.',
+    conflicts: 'Signed conflict of interest form is required.',
+    payment: 'Payment receipt upload is required before final submission.',
+  };
+  return messages[stepId] || '';
+}
+
 export default function SidebarWorkflow({ manuscript, activeStep, onStepSelected }: SidebarWorkflowProps) {
   return (
     <aside id="submission-sidebar" className="w-full md:w-80 bg-white border border-slate-200 rounded-2xl py-5 px-4 shadow-sm h-fit">
@@ -209,34 +219,41 @@ export default function SidebarWorkflow({ manuscript, activeStep, onStepSelected
           const status = step.validator(manuscript);
           const IconComponent = step.icon;
           const isActive = activeStep === step.id;
+          const help = statusHelp(step.id, status);
 
           return (
-            <button
-              id={`step-tab-${step.id}`}
-              key={step.id}
-              onClick={() => onStepSelected(step.id)}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs font-medium transition-all cursor-pointer ${
-                isActive 
-                  ? 'bg-teal-700 text-white shadow-xs' 
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <IconComponent className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                <span className="truncate">{step.label}</span>
-              </div>
-              <div>
-                {status === 'complete' && (
-                  <CheckCircle className={`h-4 w-4 ${isActive ? 'text-teal-200' : 'text-green-600'}`} />
-                )}
-                {status === 'warning' && (
-                  <AlertCircle className={`h-4 w-4 ${isActive ? 'text-amber-200' : 'text-amber-500'}`} />
-                )}
-                {status === 'empty' && (
-                  <Circle className={`h-3.5 w-3.5 ${isActive ? 'text-teal-300 opacity-60' : 'text-slate-300'}`} />
-                )}
-              </div>
-            </button>
+            <div key={step.id}>
+              <button
+                id={`step-tab-${step.id}`}
+                onClick={() => onStepSelected(step.id)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left text-xs font-medium transition-all cursor-pointer ${
+                  isActive 
+                    ? 'bg-teal-700 text-white shadow-xs' 
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <IconComponent className={`h-4 w-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  <span className="truncate">{step.label}</span>
+                </div>
+                <div>
+                  {status === 'complete' && (
+                    <CheckCircle className={`h-4 w-4 ${isActive ? 'text-teal-200' : 'text-green-600'}`} />
+                  )}
+                  {status === 'warning' && (
+                    <AlertCircle className={`h-4 w-4 ${isActive ? 'text-amber-200' : 'text-amber-500'}`} />
+                  )}
+                  {status === 'empty' && (
+                    <Circle className={`h-3.5 w-3.5 ${isActive ? 'text-teal-300 opacity-60' : 'text-slate-300'}`} />
+                  )}
+                </div>
+              </button>
+              {isActive && help && (
+                <p className="px-3 pt-1 pb-2 text-[10px] leading-snug text-amber-700">
+                  {help}
+                </p>
+              )}
+            </div>
           );
         })}
       </nav>

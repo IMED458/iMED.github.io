@@ -90,6 +90,7 @@ export default function SubmissionWorkflow({
   const [authorTitle, setAuthorTitle] = useState('MD, PhD');
   const [authorContrib, setAuthorContrib] = useState('Draft Writing & Methodology');
   const [authorIsCorr, setAuthorIsCorr] = useState(false);
+  const [editingAuthorId, setEditingAuthorId] = useState<string | null>(null);
 
   // 3. Figures/Table temporary state
   const [mediaType, setMediaType] = useState<'figure' | 'table' | 'diagram'>('figure');
@@ -212,15 +213,17 @@ export default function SubmissionWorkflow({
       isCorresponding: authorIsCorr
     };
 
-    let updatedAuthors = [...manuscript.authors];
+    let updatedAuthors = editingAuthorId
+      ? manuscript.authors.filter(a => a.id !== editingAuthorId)
+      : [...manuscript.authors];
     if (authorIsCorr) {
       // Toggle all other corresponding off
       updatedAuthors = updatedAuthors.map(a => ({ ...a, isCorresponding: false }));
     }
 
-    updatedAuthors.push(newAuthor);
+    updatedAuthors.push({ ...newAuthor, id: editingAuthorId || newAuthor.id });
     updateField('authors', updatedAuthors);
-    onShowNotification(`Author ${authorFirst} ${authorLast} successfully added!`, 'success');
+    onShowNotification(`Author ${authorFirst} ${authorLast} successfully ${editingAuthorId ? 'updated' : 'added'}!`, 'success');
 
     // Reset author inputs
     setAuthorFirst('');
@@ -233,6 +236,26 @@ export default function SubmissionWorkflow({
     setAuthorDept('');
     setAuthorAffil('');
     setAuthorIsCorr(false);
+    setEditingAuthorId(null);
+  };
+
+  const handleEditAuthor = (auth: AuthorDetails) => {
+    setEditingAuthorId(auth.id);
+    setAuthorFirst(auth.firstName);
+    setAuthorMiddle(auth.middleInitial || '');
+    setAuthorLast(auth.lastName);
+    setAuthorEmail(auth.email);
+    setAuthorPhone(auth.phone);
+    setAuthorOrcid(auth.orcidId);
+    setAuthorSpec(auth.specialty);
+    setAuthorCountry(auth.country);
+    setAuthorCity(auth.city);
+    setAuthorInst(auth.institution);
+    setAuthorDept(auth.department);
+    setAuthorAffil(auth.affiliation);
+    setAuthorTitle(auth.academicTitle);
+    setAuthorContrib(auth.contributionRole);
+    setAuthorIsCorr(auth.isCorresponding);
   };
 
   const handleRemoveAuthor = (authId: string) => {
@@ -373,16 +396,15 @@ export default function SubmissionWorkflow({
             {activeStep === 'abstract' && '7. Structured abstract compilation'}
             {activeStep === 'keywords' && '8. Indexed indexing Keywords'}
             {activeStep === 'sections' && '9. Structured Manuscript Body Segments'}
-            {activeStep === 'figures' && '10. Interactive Scientific Figures & Tables'}
-            {activeStep === 'references' && '11. AMA Bibliography Reference Library'}
-            {activeStep === 'supplementary' && '12. Optional Appendix Datasets & Protocols'}
-            {activeStep === 'ethics' && '13. Institutional Review Board (IRB) Clearance'}
-            {activeStep === 'conflicts' && '14. Disclosure of Financial Conflicts (COI)'}
-            {activeStep === 'funding' && '15. Rustaveli & Global Research Grants'}
-            {activeStep === 'payment' && '16. Author APC processing wire receipt'}
-            {activeStep === 'editor-files' && '17. Cover Letter & Referee Guidelines'}
-            {activeStep === 'preview' && '18. Pre-Publication Live Watermarked proof'}
-            {activeStep === 'summary-submit' && '19. Final Integrity Evaluation & Submitting'}
+            {activeStep === 'references' && '10. AMA Bibliography Reference Library'}
+            {activeStep === 'supplementary' && '11. Optional Appendix Datasets & Protocols'}
+            {activeStep === 'ethics' && '12. Institutional Review Board (IRB) Clearance'}
+            {activeStep === 'conflicts' && '13. Disclosure of Financial Conflicts (COI)'}
+            {activeStep === 'funding' && '14. Rustaveli & Global Research Grants'}
+            {activeStep === 'payment' && '15. Author APC processing wire receipt'}
+            {activeStep === 'editor-files' && '16. Cover Letter & Referee Guidelines'}
+            {activeStep === 'preview' && '17. Pre-Publication Live Watermarked proof'}
+            {activeStep === 'summary-submit' && '18. Final Integrity Evaluation & Submitting'}
           </h2>
         </div>
 
@@ -476,8 +498,12 @@ export default function SubmissionWorkflow({
                   type="checkbox"
                   checked={manuscript.checklistAgreed}
                   onChange={(e) => {
-                    updateField('checklistAgreed', e.target.checked);
-                    updateField('checklistAgreedAt', new Date().toISOString());
+                    onUpdateManuscript({
+                      ...manuscript,
+                      checklistAgreed: e.target.checked,
+                      checklistAgreedAt: e.target.checked ? new Date().toISOString() : undefined,
+                      updatedAt: new Date().toISOString()
+                    });
                   }}
                   className="h-5 w-5 text-teal-600 border-slate-300 rounded focus:ring-teal-500 mt-0.5"
                 />
@@ -580,6 +606,13 @@ export default function SubmissionWorkflow({
                           <ArrowDown className="h-3.5 w-3.5" />
                         </button>
                         <button 
+                          onClick={() => handleEditAuthor(auth)}
+                          className="px-2 py-1 border border-teal-200 bg-teal-50 text-teal-800 rounded hover:bg-teal-100 text-[10px] font-bold"
+                          title="Edit author"
+                        >
+                          Edit
+                        </button>
+                        <button 
                           onClick={() => handleRemoveAuthor(auth.id)}
                           className="p-1 border border-red-200 bg-red-50 text-red-700 rounded hover:bg-red-100 ml-1.5"
                           title="Exclude Affiliation"
@@ -595,7 +628,7 @@ export default function SubmissionWorkflow({
 
             {/* Creation Card */}
             <form onSubmit={handleAddAuthor} className="bg-white border p-5 rounded-xl space-y-4">
-              <h4 className="font-bold text-slate-850 text-xs uppercase tracking-wider">Add Co-Author credentials</h4>
+              <h4 className="font-bold text-slate-850 text-xs uppercase tracking-wider">{editingAuthorId ? 'Edit Author credentials' : 'Add Co-Author credentials'}</h4>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">First Name *</label>
@@ -690,7 +723,7 @@ export default function SubmissionWorkflow({
                 type="submit"
                 className="bg-teal-700 hover:bg-teal-800 text-white font-semibold py-2 px-4 rounded-lg shadow-xs cursor-pointer"
               >
-                + Link Author Affiliate to Manuscript
+                {editingAuthorId ? 'Save Author Changes' : '+ Link Author Affiliate to Manuscript'}
               </button>
             </form>
           </div>
@@ -752,7 +785,7 @@ export default function SubmissionWorkflow({
         {activeStep === 'keywords' && (
           <div className="space-y-3 text-xs animate-fade-in">
             <div className="bg-slate-50 p-4 border rounded-xl space-y-1">
-              <label htmlFor="input-m-keywords" className="block font-bold text-slate-805">Academic Indexing Keywords (3 to 6 tags, comma separated) *</label>
+              <label htmlFor="input-m-keywords" className="block font-bold text-slate-805">Academic Indexing Keywords (3 to 6 MeSH terms, semicolon separated) *</label>
               <input
                 id="input-m-keywords"
                 type="text"
@@ -761,13 +794,13 @@ export default function SubmissionWorkflow({
                   const updatedSecs = { ...manuscript.sections, Keywords: e.target.value };
                   updateField('sections', updatedSecs);
                 }}
-                placeholder="e.g., mitochondrial disease, biochemistry, Georgia, diabetes"
+                placeholder="e.g., Diabetes Mellitus; Cardiomyopathies; Cytokines"
                 className="w-full bg-white border border-slate-350 p-2 text-sm rounded-lg focus:outline-hidden"
               />
             </div>
             <p className="text-slate-400 italic text-[11px]">
-              Use standardized MeSH (Medical Subject Headings) terms where possible. Number of tags entered:{' '}
-              <strong>{(manuscript.sections['Keywords'] || '').split(',').map(k => k.trim()).filter(Boolean).length}</strong>
+              Use standardized MeSH (Medical Subject Headings) terms. Number of tags entered:{' '}
+              <strong>{(manuscript.sections['Keywords'] || '').split(/[;,]/).map(k => k.trim()).filter(Boolean).length}</strong>
             </p>
           </div>
         )}
@@ -789,18 +822,6 @@ export default function SubmissionWorkflow({
                 showWordCount
               />
             ))}
-          </div>
-        )}
-
-        {/* 10. FIGURES & TABLES */}
-        {activeStep === 'figures' && (
-          <div className="space-y-4 text-xs animate-fade-in">
-            <div className="bg-teal-50 border border-teal-200 rounded-xl p-5">
-              <h4 className="font-bold text-teal-900 text-sm">Figures, tables, and diagrams are inserted inside the manuscript text.</h4>
-              <p className="mt-2 text-teal-800 leading-relaxed">
-                Open <strong>Manuscript Sections</strong>, click exactly where the figure/table/diagram should appear, then use the image, table, or diagram toolbar buttons. You can cut and paste inserted blocks to rearrange them anywhere in the text.
-              </p>
-            </div>
           </div>
         )}
 
@@ -1203,11 +1224,10 @@ export default function SubmissionWorkflow({
                 <button
                   type="button"
                   onClick={() => {
-                    downloadWordTemplate(
-                      'GBMN_COI_Form.doc',
-                      'GBMN Conflict of Interest Form',
-                      '<h1>Georgian Biomedical News - Conflicts of Interest Form</h1><p>Manuscript title: ________________________________</p><p>Authors: ________________________________</p><p>Please disclose all financial, institutional, or industry relationships relevant to this manuscript.</p><p>Signature: __________________ Date: ____________</p>'
-                    );
+                    const a = document.createElement('a');
+                    a.href = `${import.meta.env.BASE_URL}forms/GBMN-Copyright-form.docx`;
+                    a.download = 'GBMN-Copyright-form.docx';
+                    a.click();
                     onShowNotification('Downloaded GBMN Conflict Disclosure Template form.', 'success');
                   }}
                   className="bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold border px-3 py-1.5 rounded text-[11px]"
@@ -1389,11 +1409,10 @@ export default function SubmissionWorkflow({
                 <button
                   type="button"
                   onClick={() => {
-                    downloadWordTemplate(
-                      'GBMN_Cover_Letter_Template.doc',
-                      'GBMN Cover Letter',
-                      `<h1>Cover Letter</h1><p><strong>Georgian Biomedical News (GBMN)</strong><br>Editorial Office</p><p>Date: ${new Date().toLocaleDateString()}</p><p>Dear Editor,</p><p>We are pleased to submit our manuscript entitled "<strong>[MANUSCRIPT TITLE]</strong>" for consideration for publication in Georgian Biomedical News.</p><p>[Describe the significance of your work and why it is suitable for GBMN.]</p><p>We confirm that this manuscript has not been published elsewhere and is not under consideration by another journal. All authors approve this submission.</p><p>Corresponding Author:<br>Name:<br>Affiliation:<br>Email:<br>Phone:</p><p>Sincerely,<br>[Author Name(s)]</p>`
-                    );
+                    const a = document.createElement('a');
+                    a.href = `${import.meta.env.BASE_URL}forms/GBMN-Cover-letter.docx`;
+                    a.download = 'GBMN-Cover-letter.docx';
+                    a.click();
                     onShowNotification('Cover letter template downloaded.', 'success');
                   }}
                   className="bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold border border-teal-200 px-3 py-1.5 rounded text-[11px]"
@@ -1436,11 +1455,10 @@ export default function SubmissionWorkflow({
                 <button
                   type="button"
                   onClick={() => {
-                    downloadWordTemplate(
-                      'GBMN_Copyright_Transfer_Form.doc',
-                      'GBMN Copyright Transfer Form',
-                      '<h1>Copyright Transfer Form</h1><p><strong>Georgian Biomedical News (GBMN)</strong></p><p>Manuscript Title: ________________________________</p><p>The undersigned author(s) warrant that the article is original, is not under consideration elsewhere, and has not been previously published.</p><p>Author signatures:</p><p>1. _________________________ Date: ____________</p><p>2. _________________________ Date: ____________</p><p>3. _________________________ Date: ____________</p>'
-                    );
+                    const a = document.createElement('a');
+                    a.href = `${import.meta.env.BASE_URL}forms/GBMN-Copyright-form.docx`;
+                    a.download = 'GBMN-Copyright-form.docx';
+                    a.click();
                     onShowNotification('Copyright form downloaded.', 'success');
                   }}
                   className="bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold border border-teal-200 px-3 py-1.5 rounded text-[11px]"
@@ -1576,7 +1594,7 @@ export default function SubmissionWorkflow({
           onClick={() => {
             const steps = [
               'getting-started', 'policies', 'checklist', 'title-meta', 'authors', 'article-type',
-              'abstract', 'keywords', 'sections', 'figures', 'references', 'supplementary',
+              'abstract', 'keywords', 'sections', 'references', 'supplementary',
               'ethics', 'conflicts', 'funding', 'payment', 'editor-files', 'preview', 'summary-submit'
             ];
             const currentIdx = steps.indexOf(activeStep);
@@ -1605,7 +1623,7 @@ export default function SubmissionWorkflow({
           onClick={() => {
             const steps = [
               'getting-started', 'policies', 'checklist', 'title-meta', 'authors', 'article-type',
-              'abstract', 'keywords', 'sections', 'figures', 'references', 'supplementary',
+              'abstract', 'keywords', 'sections', 'references', 'supplementary',
               'ethics', 'conflicts', 'funding', 'payment', 'editor-files', 'preview', 'summary-submit'
             ];
             const currentIdx = steps.indexOf(activeStep);

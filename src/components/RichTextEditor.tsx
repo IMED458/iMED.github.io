@@ -136,14 +136,14 @@ export default function RichTextEditor({
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    const html = event.clipboardData.getData('text/html');
+    const text = event.clipboardData.getData('text/plain');
     const imageFile = Array.from(event.clipboardData.files).find(file => file.type.startsWith('image/'));
-    if (imageFile) {
+    if (imageFile && !html && !text) {
       event.preventDefault();
       insertImageFile(imageFile);
       return;
     }
-    const html = event.clipboardData.getData('text/html');
-    const text = event.clipboardData.getData('text/plain');
     if (html.includes('<table')) {
       event.preventDefault();
       insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table" contenteditable="false" draggable="true">${html}<figcaption><strong>Table.</strong> Add title and legend...</figcaption></figure><p><br></p>`);
@@ -153,6 +153,18 @@ export default function RichTextEditor({
       event.preventDefault();
       insertHtml(escapeHtml(text).replace(/\n/g, '<br>'));
     }
+  };
+
+  const handleEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const media = target.closest('.gbmn-inline-media');
+    if (!media) return;
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNode(media);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    savedRangeRef.current = range.cloneRange();
   };
 
   const wordCount = value
@@ -285,6 +297,7 @@ export default function RichTextEditor({
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
         onFocus={saveSelection}
+        onClick={handleEditorClick}
         data-placeholder={placeholder}
         className="w-full bg-white border border-slate-300 rounded-b-lg p-3 font-serif text-[14px] leading-relaxed focus:ring-1 focus:ring-teal-600 focus:outline-none text-slate-800 rich-editor-area"
         style={{ minHeight }}
@@ -305,6 +318,7 @@ export default function RichTextEditor({
         .rich-editor-area ul { list-style: disc; padding-left: 1.5em; }
         .rich-editor-area ol { list-style: decimal; padding-left: 1.5em; }
         .gbmn-inline-media { break-inside: avoid; margin: 12px 0; border: 1px solid #cbd5e1; padding: 8px; background: #fff; cursor: move; }
+        .gbmn-inline-media::selection { background: rgba(15, 118, 110, 0.18); }
         .gbmn-inline-media img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
         .gbmn-inline-media figcaption { margin-top: 6px; font-family: Arial, sans-serif; font-size: 11px; color: #475569; }
         .gbmn-inline-table { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; }
