@@ -1,0 +1,906 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, FormEvent } from 'react';
+import { User, Manuscript, SystemAuditLog, JournalSettings, ReferenceItem, FigureTableItem } from '../types';
+import { DB, ARTICLE_TYPES } from '../utils';
+import ManuscriptPreview from './ManuscriptPreview';
+import { 
+  Users, 
+  FileText, 
+  Settings2, 
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  UserPlus, 
+  BookOpen, 
+  TrendingUp, 
+  ShieldCheck, 
+  Search, 
+  BadgeAlert, 
+  Database,
+  Sliders,
+  DollarSign,
+  AlertCircle,
+  FileSpreadsheet
+} from 'lucide-react';
+
+interface RoleDashboardsProps {
+  currentUser: User;
+  manuscripts: Manuscript[];
+  onUpdateManuscripts: (newManuscripts: Manuscript[]) => void;
+  onShowNotification: (msg: string, type: 'success' | 'info' | 'error') => void;
+}
+
+export default function RoleDashboards({ currentUser, manuscripts, onUpdateManuscripts, onShowNotification }: RoleDashboardsProps) {
+  const [selectedManuscript, setSelectedManuscript] = useState<Manuscript | null>(null);
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'reviewed' | 'logs'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Reviewer Scoring Form States
+  const [reviewScoreEthical, setReviewScoreEthical] = useState('None identified');
+  const [reviewScoreMethod, setReviewScoreMethod] = useState(5);
+  const [reviewScoreOrig, setReviewScoreOrig] = useState(5);
+  const [reviewScoreMerit, setReviewScoreMerit] = useState(5);
+  const [reviewComments, setReviewComments] = useState('');
+  const [reviewPrivate, setReviewPrivate] = useState('');
+  const [reviewRecommend, setReviewRecommend] = useState<'accept' | 'minor-revision' | 'major-revision' | 'reject'>('accept');
+
+  // Decision Form
+  const [editorComments, setEditorComments] = useState('');
+  const [decisionManuscriptId, setDecisionManuscriptId] = useState('');
+  const [showDecisionModal, setShowDecisionModal] = useState(false);
+
+  // Admin users edit state
+  const [adminUsers, setAdminUsers] = useState<User[]>(() => DB.getUsers());
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+
+  // Manage Settings state
+  const [journalSettings, setJournalSettings] = useState<JournalSettings>(() => DB.getJournalSettings());
+
+  // General statistics
+  const totalSubmissions = manuscripts.filter(m => m.status !== 'Draft').length;
+  const underReviewCount = manuscripts.filter(m => m.status === 'Under Review').length;
+  const decisionPendingCount = manuscripts.filter(m => m.status === 'Submitted').length;
+  const acceptedCount = manuscripts.filter(m => m.status === 'Accepted' || m.status === 'Published').length;
+
+  const handleUpdateUserRole = (userId: string, newRole: any) => {
+    const updatedUsers = adminUsers.map(u => u.id === userId ? { ...u, role: newRole as any } : u);
+    setAdminUsers(updatedUsers);
+    DB.setUsers(updatedUsers);
+    onShowNotification(`Updated user role to ${newRole}`, 'success');
+  };
+
+  const handleSaveSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    DB.setJournalSettings(journalSettings);
+    onShowNotification('Journal central policies updated successfully!', 'success');
+  };
+
+  // Status Badge Helper
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Draft':
+        return <span className="bg-slate-100 text-slate-700 border border-slate-300 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Draft</span>;
+      case 'Submitted':
+        return <span className="bg-blue-50 text-blue-800 border border-blue-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Submitting Office</span>;
+      case 'Under Review':
+        return <span className="bg-yellow-50 text-yellow-800 border border-yellow-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Peer Reviewing</span>;
+      case 'Revision Requested':
+        return <span className="bg-amber-50 text-amber-805 border border-amber-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Revision Needed</span>;
+      case 'Accepted':
+        return <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Accepted</span>;
+      case 'Rejected':
+        return <span className="bg-rose-50 text-rose-800 border border-rose-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Declined</span>;
+      case 'Published':
+        return <span className="bg-teal-550 text-teal-800 border border-teal-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Published Online</span>;
+      default:
+        return <span className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">{status}</span>;
+    }
+  };
+
+  // Render Reviewer Dashboard
+  const renderReviewerDashboard = () => {
+    // Find manuscripts assigned to this reviewer
+    const assignedManuscripts = manuscripts.filter(m => 
+      m.reviewerAssignments.some(ra => ra.reviewerId === currentUser.id)
+    );
+
+    const handleInviteAction = (m: Manuscript, statusUpdate: 'completed' | 'declined') => {
+      const updated: Manuscript[] = manuscripts.map(item => {
+        if (item.id === m.id) {
+          const updatedAssignments = item.reviewerAssignments.map(ra => {
+            if (ra.reviewerId === currentUser.id) {
+              return { 
+                ...ra, 
+                status: statusUpdate as 'assigned' | 'completed' | 'declined',
+                comments: statusUpdate === 'completed' ? {
+                  id: `rev-com-${Date.now()}`,
+                  reviewerId: currentUser.id,
+                  reviewerName: `${currentUser.firstName} ${currentUser.lastName}`,
+                  ethicalConcerns: reviewScoreEthical,
+                  methodologyScore: reviewScoreMethod,
+                  originalityScore: reviewScoreOrig,
+                  scientificMeritScore: reviewScoreMerit,
+                  constructiveComments: reviewComments || 'Study is of superior design. Suggested minor linguistic improvements.',
+                  confidentialToEditor: reviewPrivate,
+                  recommendation: reviewRecommend,
+                  submittedAt: new Date().toISOString()
+                } : undefined
+              };
+            }
+            return ra;
+          });
+          
+          return { 
+            ...item, 
+            status: statusUpdate === 'completed' ? 'Submitted' as any : item.status, 
+            reviewerAssignments: updatedAssignments 
+          };
+        }
+        return item;
+      });
+      onUpdateManuscripts(updated);
+      onShowNotification('Structured reviewer evaluation matrix recorded!', 'success');
+      setSelectedManuscript(null);
+
+      DB.addAuditLog({
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        action: 'REVIEW_SUBMITTED',
+        targetId: m.id,
+        details: `Submitting referee response. Recommendation target: ${reviewRecommend}`
+      });
+    };
+
+    return (
+      <div id="reviewer-dashboard" className="space-y-6">
+        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+          <h3 className="text-lg font-display font-bold text-slate-800 flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-teal-700" />
+            Reviewer Editorial Queue
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Welcome, Referee. Please evaluate assigned Georgian Biomedical News double-blind submissions below.
+          </p>
+        </div>
+
+        <div className={`grid grid-cols-1 ${selectedManuscript ? 'lg:grid-cols-2' : ''} gap-6`}>
+          {/* List queue */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+            <h4 className="font-semibold text-sm text-slate-700 flex items-center gap-1.5">
+              <Clock className="h-4 w-4" /> Assigned Manuscripts ({assignedManuscripts.length})
+            </h4>
+
+            {assignedManuscripts.length === 0 ? (
+              <div className="p-8 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-sm">
+                No active manuscript assignments delegated to your ORCID address.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {assignedManuscripts.map((m) => {
+                  const assignment = m.reviewerAssignments.find(ra => ra.reviewerId === currentUser.id);
+                  return (
+                    <div 
+                      key={m.id} 
+                      className={`p-4 border rounded-xl transition-all cursor-pointer ${
+                        selectedManuscript?.id === m.id ? 'bg-teal-50 border-teal-500' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                      }`}
+                      onClick={() => setSelectedManuscript(m)}
+                    >
+                      <span className="text-[10px] font-mono font-bold bg-white text-teal-800 border border-teal-100 px-2 py-0.5 rounded">
+                        ID: {m.id}
+                      </span>
+                      <h5 className="font-bold text-slate-800 mt-2 line-clamp-2 text-sm">{m.title}</h5>
+                      <div className="flex justify-between items-center mt-3 text-xs text-slate-500">
+                        <span>Classification: <strong>{m.specialty}</strong></span>
+                        <span>Assign Stage: <strong>{assignment?.status.toUpperCase()}</strong></span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Structured Evaluation Form */}
+          {selectedManuscript && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h4 className="font-bold text-sm text-teal-800">
+                   Evaluate manuscript ID: {selectedManuscript.id}
+                </h4>
+                <button 
+                  onClick={() => setSelectedManuscript(null)}
+                  className="text-xs font-semibold text-slate-400 hover:text-slate-600"
+                >
+                  Close Pane [X]
+                </button>
+              </div>
+
+              {/* Reviewer scoring system */}
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Ethical Concerns Inquiry</label>
+                  <input
+                    type="text"
+                    value={reviewScoreEthical}
+                    onChange={(e) => setReviewScoreEthical(e.target.value)}
+                    placeholder="Describe omissions or IRB issues if any, or 'None'"
+                    className="w-full bg-slate-50 border border-slate-350 rounded-lg p-2 focus:outline-hidden"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Methodology (1-5)</label>
+                    <select
+                      value={reviewScoreMethod}
+                      onChange={(e) => setReviewScoreMethod(Number(e.target.value))}
+                      className="w-full bg-slate-50 border border-slate-350 rounded-lg p-2 focus:outline-hidden"
+                    >
+                      <option value="5">5 - Pristine and Robust</option>
+                      <option value="4">4 - Good experimental design</option>
+                      <option value="3">3 - Satisfactory but narrow</option>
+                      <option value="2">2 - Needs additional controls</option>
+                      <option value="1">1 - Fatally flawed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Originality (1-5)</label>
+                    <select
+                      value={reviewScoreOrig}
+                      onChange={(e) => setReviewScoreOrig(Number(e.target.value))}
+                      className="w-full bg-slate-50 border border-slate-350 rounded-lg p-2 focus:outline-hidden"
+                    >
+                      <option value="5">5 - Novel clinical breakthrough</option>
+                      <option value="4">4 - Significant update</option>
+                      <option value="3">3 - Confirms known paradigms</option>
+                      <option value="2">2 - Incremental replication</option>
+                      <option value="1">1 - Repetitive study</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Scientific Merit (1-5)</label>
+                    <select
+                      value={reviewScoreMerit}
+                      onChange={(e) => setReviewScoreMerit(Number(e.target.value))}
+                      className="w-full bg-slate-50 border border-slate-350 rounded-lg p-2 focus:outline-hidden"
+                    >
+                      <option value="5">5 - Decisive impact</option>
+                      <option value="4">4 - High value to practitioners</option>
+                      <option value="3">3 - Average relevance</option>
+                      <option value="2">2 - Minor medical worth</option>
+                      <option value="1">1 - Deficient merit</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Constructive Comments to Authors *</label>
+                  <textarea
+                    rows={4}
+                    value={reviewComments}
+                    onChange={(e) => setReviewComments(e.target.value)}
+                    placeholder="Enter detailed paragraph reviewing biochemical, methodological, or editorial adjustments required..."
+                    className="w-full bg-slate-50 border border-slate-350 rounded-lg p-2.5 font-sans"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Private Comments to Editor (Confidential)</label>
+                  <input
+                    type="text"
+                    value={reviewPrivate}
+                    onChange={(e) => setReviewPrivate(e.target.value)}
+                    placeholder="Add direct recommendation insights for editorial eyes only..."
+                    className="w-full bg-slate-50 border border-slate-350 rounded-lg p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Referee Consensus Recommendation *</label>
+                  <select
+                    value={reviewRecommend}
+                    onChange={(e) => setReviewRecommend(e.target.value as any)}
+                    className="w-full bg-teal-50 border border-teal-350 rounded-lg p-2.5 font-bold text-teal-800"
+                  >
+                    <option value="accept">Accept Manuscript Unedited</option>
+                    <option value="minor-revision">Accept with Minor Revisions</option>
+                    <option value="major-revision">Re-evaluate after Major Revisions</option>
+                    <option value="reject">Decline / Reject Submission</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-2 pt-3">
+                  <button
+                    onClick={() => handleInviteAction(selectedManuscript, 'completed')}
+                    className="flex-1 bg-teal-700 hover:bg-teal-800 text-white font-semibold py-2 rounded-lg text-xs"
+                  >
+                    Submit Advisory Review Block
+                  </button>
+                  <button
+                    onClick={() => handleInviteAction(selectedManuscript, 'declined')}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 border p-2 rounded-lg text-xs font-semibold"
+                  >
+                    Decline Review Invitation
+                  </button>
+                </div>
+              </div>
+
+              {/* View inline paper button */}
+              <div className="border-t pt-3">
+                <ManuscriptPreview manuscript={selectedManuscript} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Render Editor Workspace
+  const renderEditorWorkspace = () => {
+    const filtered = manuscripts.filter((m) => {
+      const matchSearch = m.title.toLowerCase().includes(searchQuery.toLowerCase()) || m.id.toLowerCase().includes(searchQuery.toLowerCase());
+      if (activeTab === 'pending') return matchSearch && m.status === 'Submitted';
+      if (activeTab === 'reviewed') return matchSearch && m.reviewerAssignments.some(ra => ra.status === 'completed');
+      return matchSearch;
+    });
+
+    const handleAssignReviewer = (m: Manuscript, reviewerId: string) => {
+      const reviewerObj = DB.getUsers().find(u => u.id === reviewerId);
+      if (!reviewerObj) return;
+
+      const updated = manuscripts.map(item => {
+        if (item.id === m.id) {
+          const exists = item.reviewerAssignments.some(ra => ra.reviewerId === reviewerId);
+          if (exists) {
+            onShowNotification('Reviewer already assigned to this paper.', 'error');
+            return item;
+          }
+          return {
+            ...item,
+            status: 'Under Review' as any,
+            reviewerAssignments: [
+              ...item.reviewerAssignments,
+              {
+                reviewerId,
+                reviewerName: `${reviewerObj.firstName} ${reviewerObj.lastName}`,
+                status: 'assigned' as const,
+                assignedAt: new Date().toISOString()
+              }
+            ]
+          };
+        }
+        return item;
+      });
+      onUpdateManuscripts(updated);
+      setSelectedManuscript(updated.find(item => item.id === m.id) || null);
+      onShowNotification(`Assigned independent peer referee ${reviewerObj.firstName} ${reviewerObj.lastName}!`, 'success');
+
+      DB.addAuditLog({
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        action: 'REVIEWER_INVITED',
+        targetId: m.id,
+        details: `Dispatched peer-review assignment alert to ${reviewerObj.email}`
+      });
+    };
+
+    const handleCommitEditorialDecision = (m: Manuscript, decision: 'accept' | 'minor-revision' | 'major-revision' | 'reject' | 'publish') => {
+      const statusMap: { [key: string]: string } = {
+        'accept': 'Accepted',
+        'minor-revision': 'Revision Requested',
+        'major-revision': 'Revision Requested',
+        'reject': 'Rejected',
+        'publish': 'Published'
+      };
+
+      const updated = manuscripts.map(item => {
+        if (item.id === m.id) {
+          return {
+            ...item,
+            status: statusMap[decision] as any,
+            editorDecisionLog: [
+              ...item.editorDecisionLog,
+              {
+                editorId: currentUser.id,
+                decision: decision,
+                comments: editorComments || 'No remarks logged.',
+                timestamp: new Date().toISOString()
+              }
+            ]
+          };
+        }
+        return item;
+      });
+      onUpdateManuscripts(updated);
+      setSelectedManuscript(updated.find(item => item.id === m.id) || null);
+      setShowDecisionModal(false);
+      setEditorComments('');
+      onShowNotification(`Editorial decision of ${decision.toUpperCase()} recorded and transmitted!`, 'success');
+
+      DB.addAuditLog({
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        action: `DECISION_${decision.toUpperCase()}`,
+        targetId: m.id,
+        details: `Assigned status ${statusMap[decision]} with details: ${editorComments}`
+      });
+    };
+
+    return (
+      <div id="editor-workspace" className="space-y-6">
+        
+        {/* Statistics deck */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 no-print">
+          <div className="bg-white border p-4 rounded-xl shadow-xs text-center">
+            <h5 className="text-[11px] font-bold text-slate-400 uppercase">Submissions Volume</h5>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{totalSubmissions}</p>
+          </div>
+          <div className="bg-white border p-4 rounded-xl shadow-xs text-center">
+            <h5 className="text-[11px] font-bold text-amber-500 uppercase">Referee Active Pipeline</h5>
+            <p className="text-2xl font-bold text-amber-600 mt-1">{underReviewCount}</p>
+          </div>
+          <div className="bg-white border p-4 rounded-xl shadow-xs text-center">
+            <h5 className="text-[11px] font-bold text-blue-500 uppercase">Awaiting Action</h5>
+            <p className="text-2xl font-bold text-blue-600 mt-1">{decisionPendingCount}</p>
+          </div>
+          <div className="bg-white border p-4 rounded-xl shadow-xs text-center">
+            <h5 className="text-[11px] font-bold text-emerald-500 uppercase">Accepted Papers</h5>
+            <p className="text-2xl font-bold text-emerald-600 mt-1">{acceptedCount}</p>
+          </div>
+        </div>
+
+        {/* Dashboard Panels */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4 no-print">
+            <div className="flex justify-between items-center pb-2 border-b">
+              <h4 className="font-bold text-sm text-slate-700">Manuscript Store</h4>
+              <Sliders className="h-4 w-4 text-slate-400" />
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex gap-1.5 bg-slate-100 p-1 rounded-lg text-xs font-semibold text-slate-600">
+              <button 
+                onClick={() => setActiveTab('all')}
+                className={`flex-1 py-1 px-2 rounded-md ${activeTab === 'all' ? 'bg-white text-teal-800 font-bold shadow-xs' : 'hover:bg-white/55'}`}
+              >
+                All
+              </button>
+              <button 
+                onClick={() => setActiveTab('pending')}
+                className={`flex-1 py-1 px-2 rounded-md ${activeTab === 'pending' ? 'bg-white text-teal-800 font-bold shadow-xs' : 'hover:bg-white/55'}`}
+              >
+                Pending
+              </button>
+              <button 
+                onClick={() => setActiveTab('reviewed')}
+                className={`flex-1 py-1 px-2 rounded-md ${activeTab === 'reviewed' ? 'bg-white text-teal-800 font-bold shadow-xs' : 'hover:bg-white/55'}`}
+              >
+                Reviewed
+              </button>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search ID or Title..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg py-1.5 pl-8 pr-3 text-xs focus:ring-1 focus:ring-teal-600 focus:outline-hidden"
+              />
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+            </div>
+
+            {/* Manuscripts roster list */}
+            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+              {filtered.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-6">No matching submissions found.</p>
+              ) : (
+                filtered.map((m) => (
+                  <div 
+                    key={m.id}
+                    onClick={() => { setSelectedManuscript(m); setDecisionManuscriptId(m.id); }}
+                    className={`p-3 border rounded-xl text-left cursor-pointer transition-all ${
+                      selectedManuscript?.id === m.id ? 'bg-teal-50 border-teal-500 shadow-xs' : 'bg-slate-50 border-slate-220 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono font-bold text-teal-800">{m.id}</span>
+                      {renderStatusBadge(m.status)}
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-800 mt-1.5 line-clamp-2">{m.title}</h5>
+                    <p className="text-[10px] text-slate-400 mt-1">Submitted: {new Date(m.createdAt).toLocaleDateString()}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* ACTIVE DECISION/REVIEW WORKPLANE */}
+          <div className="lg:col-span-8 space-y-4">
+            {selectedManuscript ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+                
+                <div id="editor-action-header" className="flex flex-wrap justify-between items-center gap-2 border-b pb-4 no-print">
+                  <div>
+                    <h3 className="font-bold text-md text-slate-800 flex items-center gap-1.5">
+                      <FileText className="h-5 w-5 text-teal-700" />
+                      Manuscript Pipeline Review
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Evaluate credentials, financial clearance, IRBs, and draft recommendations.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowDecisionModal(true)}
+                      className="bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all"
+                    >
+                      Issue Formal Decision
+                    </button>
+                  </div>
+                </div>
+
+                {/* Submitting author specs */}
+                <div id="editor-submission-author-card" className="bg-slate-50 border p-4 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-4 text-xs no-print">
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Primary Author</span>
+                    <span className="font-medium text-slate-700">
+                      {selectedManuscript.authors[0]?.firstName} {selectedManuscript.authors[0]?.lastName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block">ORCID Identification</span>
+                    <span className="font-mono text-teal-700">{selectedManuscript.authors[0]?.orcidId || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Ethics Release (IRB)</span>
+                    <span className={selectedManuscript.ethics.humanSubjectsApproved === 'yes' ? 'text-green-700 font-semibold' : 'text-slate-600'}>
+                      {selectedManuscript.ethics.humanSubjectsApproved.toUpperCase()} ({selectedManuscript.ethics.irbApprovalNumber || 'Exempt'})
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Payment Clearance</span>
+                    <span className="inline-flex items-center gap-1 font-bold text-green-700">
+                       {selectedManuscript.payment.status.toUpperCase()} ({selectedManuscript.payment.invoiceNumber})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Assigned Reviewer Stats & comments matrix */}
+                <div id="editor-reviewer-pipeline" className="border-t pt-4 space-y-3 no-print">
+                  <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                    <Users className="h-4 w-4 text-teal-700" />
+                    Reviewers Assigned Index
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Add Reviewer */}
+                    <div className="bg-slate-50 p-3 rounded-lg border text-xs space-y-2">
+                      <span className="font-bold block text-slate-800">Delegate Peer Referee:</span>
+                      <select 
+                        onChange={(e) => {
+                          if (e.target.value) handleAssignReviewer(selectedManuscript, e.target.value);
+                          e.target.value = '';
+                        }}
+                        className="w-full bg-white border border-slate-300 rounded p-1.5 focus:outline-hidden"
+                      >
+                        <option value="">-- Choose Academic Referee --</option>
+                        {DB.getUsers().filter(u => u.role === 'Reviewer').map(rev => (
+                          <option key={rev.id} value={rev.id}>
+                            {rev.firstName} {rev.lastName} ({rev.institution})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Check Reviewers progress */}
+                    <div className="space-y-2">
+                      {selectedManuscript.reviewerAssignments.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No reviewers delegated yet. Use selector to allocate independent assessment.</p>
+                      ) : (
+                        selectedManuscript.reviewerAssignments.map((ra) => (
+                          <div key={ra.reviewerId} className="bg-amber-50/44 border border-amber-100 p-2 text-xs rounded-sm">
+                            <div className="flex justify-between">
+                              <span className="font-bold text-slate-800">{ra.reviewerName}</span>
+                              <span className="font-semibold text-teal-800 uppercase text-[9px]">{ra.status}</span>
+                            </div>
+                            {ra.comments && (
+                              <div className="mt-1.5 border-t border-amber-200/55 pt-1 space-y-1">
+                                <p className="italic">"{ra.comments.constructiveComments}"</p>
+                                <p className="font-semibold text-[10px]">Recommendation: <span className="text-rose-700 uppercase">{ra.comments.recommendation}</span></p>
+                              </div>
+                            )}
+                          </div>
+                      )))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actual Paper Display Frame */}
+                <div className="border-t pt-6">
+                  <ManuscriptPreview manuscript={selectedManuscript} onShowNotification={onShowNotification} />
+                </div>
+
+                {/* Issue Decision Modal Content */}
+                {showDecisionModal && (
+                  <div className="bg-white border border-teal-500 rounded-xl p-4 mt-4 space-y-4 shadow-xl no-print animate-fade-in text-xs">
+                    <h5 className="font-bold text-sm text-teal-850">Submit Final Editorial Office Verdict</h5>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block font-semibold mb-1">Constructive feedback / reasons for author *</label>
+                        <textarea
+                          rows={4}
+                          value={editorComments}
+                          onChange={(e) => setEditorComments(e.target.value)}
+                          placeholder="Provide specific notes regarding structural, statistical, or formatting revisions requested..."
+                          className="w-full bg-slate-50 border p-2 rounded"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleCommitEditorialDecision(selectedManuscript, 'accept')}
+                          className="flex-1 bg-green-700 text-white font-semibold py-2 rounded shadow-xs cursor-pointer text-center"
+                        >
+                          Accept Manuscript
+                        </button>
+                        <button
+                          onClick={() => handleCommitEditorialDecision(selectedManuscript, 'minor-revision')}
+                          className="flex-1 bg-amber-600 text-white font-semibold py-2 rounded shadow-xs cursor-pointer text-center"
+                        >
+                          Request Revisions
+                        </button>
+                        <button
+                          onClick={() => handleCommitEditorialDecision(selectedManuscript, 'reject')}
+                          className="flex-1 bg-rose-700 text-white font-semibold py-2 rounded shadow-xs cursor-pointer text-center"
+                        >
+                          Decline Paper
+                        </button>
+                        <button
+                          onClick={() => handleCommitEditorialDecision(selectedManuscript, 'publish')}
+                          className="flex-1 bg-teal-800 text-white font-semibold py-2 rounded shadow-xs cursor-pointer text-center"
+                        >
+                          Publish Live Online
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setShowDecisionModal(false)}
+                        className="w-full text-center text-xs text-slate-400 hover:underline mt-2"
+                      >
+                        Cancel verdict and return
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            ) : (
+              <div className="bg-white border-2 border-dashed rounded-2xl h-96 flex flex-col items-center justify-center text-slate-400">
+                <FileText className="h-10 w-10 mb-2 opacity-50" />
+                <p>Select a submitted manuscript from the side-deck to inspect the full package.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </div>
+    );
+  };
+
+  // Render Managing Editor Pane
+  const renderManagingEditorWorkspace = () => {
+    const handleVerifyPayment = (m: Manuscript, verified: 'verified' | 'rejected') => {
+      const updated = manuscripts.map(item => {
+        if (item.id === m.id) {
+          return {
+            ...item,
+            payment: {
+              ...item.payment,
+              status: verified
+            }
+          };
+        }
+        return item;
+      });
+      onUpdateManuscripts(updated);
+      onShowNotification(`Invoice Payment Status: ${verified.toUpperCase()}!`, 'success');
+
+      DB.addAuditLog({
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        action: `FINANCIAL_${verified.toUpperCase()}`,
+        targetId: m.id,
+        details: `Managing Editor checked financial bank slip reference: ${m.payment.referenceId}. Status: ${verified}`
+      });
+    };
+
+    return (
+      <div id="managing-editor-dash" className="space-y-6">
+        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+          <h3 className="text-lg font-display font-bold text-slate-800 flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-teal-700" />
+            Financial Management & Platform Auditing
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Reconcile author processing charges (APC), audit system security logs, and review CC-BY journal settings.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Billing queue */}
+          <div className="bg-white border p-5 rounded-2xl space-y-4 shadow-xs">
+            <h4 className="font-bold text-sm text-slate-700 flex items-center gap-1.5 border-b pb-2">
+              <FileSpreadsheet className="h-4 w-4" /> Submission Invoice Verification Queue
+            </h4>
+
+            {manuscripts.filter(m => m.payment.fileName).length === 0 ? (
+              <p className="text-xs text-slate-400 py-4 text-center">No payment transactions registered.</p>
+            ) : (
+              <div className="space-y-3">
+                {manuscripts.filter(m => m.payment.fileName).map((m) => (
+                  <div key={m.id} className="p-3 bg-slate-50 border rounded-xl flex justify-between items-center text-xs">
+                    <div className="space-y-0.5">
+                      <p className="font-bold text-slate-800">Paper ID: {m.id}</p>
+                      <p className="text-slate-500">Invoice: {m.payment.invoiceNumber}</p>
+                      <p className="text-slate-500">Bank Code: {m.payment.referenceId}</p>
+                      <p className="text-[10px] text-slate-400">Attached wire: <span className="underline select-all">{m.payment.fileName}</span></p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5">
+                      <span className={`px-2 py-0.5 font-bold text-[9px] rounded-sm tracking-wide ${
+                        m.payment.status === 'verified' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {m.payment.status.toUpperCase()}
+                      </span>
+                      {m.payment.status === 'pending' && (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleVerifyPayment(m, 'verified')}
+                            className="bg-green-655 hover:bg-green-700 text-green-800 bg-green-50 text-[10px] border px-2 py-0.5 font-bold rounded"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleVerifyPayment(m, 'rejected')}
+                            className="bg-red-50 text-red-800 text-[10px] border px-2 py-0.5 font-bold rounded"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Central Security Auditing console */}
+          <div className="bg-white border p-5 rounded-2xl shadow-xs space-y-4">
+            <h4 className="font-bold text-sm text-slate-700 flex items-center gap-1.5 border-b pb-2">
+              <AlertCircle className="h-4 w-4 text-red-500" /> Secure Audit Console log
+            </h4>
+            <div className="bg-slate-900 text-emerald-400 font-mono text-[10px] p-4 rounded-xl h-64 overflow-y-auto space-y-2 select-text">
+              <div className="text-white border-b border-slate-700 pb-1 mb-2">SECURE SHAL-256 EVENT STREAM</div>
+              {DB.getAuditLogs().map((log) => (
+                <div key={log.id} className="leading-snug">
+                  <span className="text-slate-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span>{' '}
+                  <span className="text-teal-400 font-bold">{log.action}</span> -{' '}
+                  <span className="text-slate-300">{log.details}</span> <span className="text-slate-500 font-bold">(ID: {log.targetId})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render Administrator Panel
+  const renderAdministratorPanel = () => {
+    return (
+      <div id="admin-hub" className="space-y-6">
+        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
+          <h3 className="text-lg font-display font-bold text-slate-800 flex items-center gap-2">
+            <Settings2 className="h-5 w-5 text-teal-700" />
+            Central Administrator Hub
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Override submission parameters, calibrate article quotas, and assign editorial user ranks.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Users Roster editor */}
+          <div className="lg:col-span-2 bg-white border p-5 rounded-2xl space-y-4 shadow-xs">
+            <h4 className="font-bold text-sm text-slate-700 border-b pb-2">Central Scholar Roster Directory</h4>
+            <div className="overflow-x-auto text-xs text-left">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead>
+                  <tr className="bg-slate-50 font-bold text-slate-600">
+                    <th className="p-2">Name</th>
+                    <th className="p-2">Email</th>
+                    <th className="p-2">System Role</th>
+                    <th className="p-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {adminUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-slate-50">
+                      <td className="p-2 font-semibold text-slate-850">
+                        {user.firstName} {user.lastName}
+                      </td>
+                      <td className="p-2 text-slate-600">{user.email}</td>
+                      <td className="p-2">
+                        <select
+                          value={user.role}
+                          onChange={(e) => handleUpdateUserRole(user.id, e.target.value)}
+                          className={`p-1.5 rounded font-bold text-[10px] uppercase border ${
+                            user.role === 'Author' ? 'bg-indigo-50 border-indigo-200 text-indigo-800' :
+                            user.role === 'Editor' ? 'bg-teal-50 border-teal-200 text-teal-800' :
+                            user.role === 'Reviewer' ? 'bg-yellow-50 border-yellow-250 text-yellow-850' :
+                            'bg-slate-50 border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <option value="Author">Author</option>
+                          <option value="Editor">Editor</option>
+                          <option value="Managing Editor">Managing Editor</option>
+                          <option value="Reviewer">Reviewer</option>
+                          <option value="Administrator">Administrator</option>
+                        </select>
+                      </td>
+                      <td className="p-2">
+                        <button
+                          onClick={() => {
+                            const confirmBlock = window.confirm(`Restrict administrative privileges for ${user.firstName}?`);
+                            if (confirmBlock) onShowNotification('Scholar profile credentials locked.', 'info');
+                          }}
+                          className="text-[10px] font-bold text-rose-600 hover:underline"
+                        >
+                          Lock Account
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Article configurations limits panel */}
+          <div className="bg-white border p-5 rounded-2xl shadow-xs space-y-4">
+            <h4 className="font-bold text-sm text-slate-700 border-b pb-2">Article Spec Quotas</h4>
+            <div className="space-y-3 font-sans text-xs max-h-96 overflow-y-auto pr-1">
+              {Object.values(ARTICLE_TYPES).map((type) => (
+                <div key={type.key} className="p-3 bg-slate-50 rounded-lg border text-xs space-y-1">
+                  <div className="flex justify-between font-bold text-slate-800">
+                    <span>{type.name}</span>
+                    <span className="text-teal-800">${type.submissionFeeUSD} USD Offset</span>
+                  </div>
+                  <p className="text-slate-500 italic text-[11px] leading-tight">{type.description}</p>
+                  <div className="grid grid-cols-2 gap-2 text-[10px] pt-1.5 text-slate-600 border-t border-slate-200/55">
+                    <span>Max Words: <strong>{type.maxWordCount}</strong></span>
+                    <span>Max Refs: <strong>{type.maxReferences}</strong></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div id="central-role-dashboards" className="space-y-6">
+      {currentUser.role === 'Editor' && renderEditorWorkspace()}
+      {currentUser.role === 'Reviewer' && renderReviewerDashboard()}
+      {currentUser.role === 'Managing Editor' && renderManagingEditorWorkspace()}
+      {currentUser.role === 'Administrator' && renderAdministratorPanel()}
+    </div>
+  );
+}

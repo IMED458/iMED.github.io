@@ -1,0 +1,6 @@
+{
+  "name": "Georgian Biomedical and Medical Nexus (GBMN) Platform",
+  "description": "An enterprise-grade, structured academic manuscript submission, generation, and peer review tracking system for the Georgian Biomedical and Medical Nexus (GBMN) / Georgian Biomedical News.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
