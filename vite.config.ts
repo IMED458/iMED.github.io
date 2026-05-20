@@ -5,7 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/gbmnsubnmit/',
+    base: '/gbmnsubmit.github.io/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
