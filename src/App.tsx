@@ -16,12 +16,16 @@ import {
   LogOut, 
   Bell, 
   Sparkles, 
-  AlertCircle 
+  AlertCircle,
+  FileText,
+  Plus,
+  Clock
 } from 'lucide-react';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [manuscripts, setManuscripts] = useState<Manuscript[]>([]);
+  const [selectedManuscriptId, setSelectedManuscriptId] = useState<string | null>(null);
   const [activeStep, setActiveStep] = useState<string>('getting-started');
   
   // Real-time toast alert state
@@ -65,9 +69,13 @@ export default function App() {
   };
 
   const handleUpdateManuscript = (updated: Manuscript) => {
-    const list = manuscripts.map(m => m.id === updated.id ? updated : m);
+    const exists = manuscripts.some(m => m.id === updated.id);
+    const list = exists
+      ? manuscripts.map(m => m.id === updated.id ? updated : m)
+      : [...manuscripts, updated];
     setManuscripts(list);
     DB.setManuscripts(list);
+    setSelectedManuscriptId(updated.id);
   };
 
   const handleUpdateManuscriptsList = (newList: Manuscript[]) => {
@@ -81,12 +89,10 @@ export default function App() {
     triggerNotification('Logged out from publishing dashboard.', 'info');
   };
 
-  // Get active editing draft or create an empty one if author has none
-  const activeManuscript = manuscripts.find(m => m.authorId === currentUser?.id) || (() => {
-    const fallbackDraft: Manuscript = {
-      id: `GBMN-2026-${Math.floor(Math.random() * 900) + 100}`,
+  const createEmptyDraft = (authorId: string): Manuscript => ({
+      id: `GBMN-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`,
       status: 'Draft',
-      authorId: currentUser?.id || 'anonymous',
+      authorId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       title: '',
@@ -132,22 +138,32 @@ export default function App() {
       editorFiles: [],
       reviewerAssignments: [],
       editorDecisionLog: []
-    };
-    return fallbackDraft;
-  })();
+  });
 
-  const triggerPrecreateDraft = () => {
-    const list = [...manuscripts, activeManuscript];
+  const authorManuscripts = currentUser?.role === 'Author'
+    ? manuscripts.filter(m => m.authorId === currentUser.id)
+    : [];
+
+  const activeManuscript = currentUser?.role === 'Author'
+    ? authorManuscripts.find(m => m.id === selectedManuscriptId) || authorManuscripts[0] || null
+    : null;
+
+  const createAuthorDraft = () => {
+    if (!currentUser) return;
+    const draft = createEmptyDraft(currentUser.id);
+    const list = [...manuscripts, draft];
     setManuscripts(list);
     DB.setManuscripts(list);
+    setSelectedManuscriptId(draft.id);
+    setActiveStep('title-meta');
+    triggerNotification('New draft created. You can stop and continue later.', 'success');
   };
 
-  // Ensure manuscript list contains the newly created fallback if empty list
   useEffect(() => {
-    if (currentUser?.role === 'Author' && manuscripts.length === 0) {
-      triggerPrecreateDraft();
+    if (currentUser?.role === 'Author' && authorManuscripts.length > 0 && !selectedManuscriptId) {
+      setSelectedManuscriptId(authorManuscripts[0].id);
     }
-  }, [currentUser, manuscripts]);
+  }, [currentUser, authorManuscripts.length, selectedManuscriptId]);
 
   return (
     <div id="gbmn-application" className="min-h-screen flex flex-col font-sans bg-slate-50 antialiased selection:bg-teal-700 selection:text-white">
@@ -262,25 +278,61 @@ export default function App() {
         ) : currentUser.role === 'Author' ? (
           
           /* AUTHOR STEP-BY-STEP SUBMISSION FLOW VIEWER */
-          <div id="author-submission-layout" className="flex flex-col md:flex-row gap-8">
-            <SidebarWorkflow 
-              manuscript={activeManuscript} 
-              activeStep={activeStep} 
-              onStepSelected={(stepId) => {
-                setActiveStep(stepId);
-                triggerNotification(`Switched section to: ${stepId.replace('-', ' ')}`, 'info');
-              }}
-            />
-            <div className="flex-1">
-              <SubmissionWorkflow 
-                manuscript={activeManuscript}
-                onUpdateManuscript={handleUpdateManuscript}
-                activeStep={activeStep}
-                onStepChange={setActiveStep}
-                onShowNotification={triggerNotification}
-              />
+          <div id="author-submission-layout" className="space-y-6">
+            <section className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm no-print">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-display font-bold text-slate-900">Author Profile & Manuscripts</h2>
+                  <p className="text-xs text-slate-500">{currentUser.firstName} {currentUser.lastName} · {currentUser.email} · {currentUser.institution}</p>
+                </div>
+                <button onClick={createAuthorDraft} className="inline-flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-4 py-2 rounded-lg">
+                  <Plus className="h-4 w-4" /> New Manuscript
+                </button>
+              </div>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                {authorManuscripts.length === 0 ? (
+                  <button onClick={createAuthorDraft} className="col-span-full border-2 border-dashed border-slate-250 rounded-xl p-6 text-sm text-slate-500 hover:border-teal-500 hover:text-teal-700">
+                    No manuscripts yet. Create your first draft.
+                  </button>
+                ) : authorManuscripts.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => { setSelectedManuscriptId(m.id); setActiveStep('getting-started'); }}
+                    className={`text-left border rounded-xl p-3 transition ${activeManuscript?.id === m.id ? 'border-teal-600 bg-teal-50' : 'border-slate-200 bg-slate-50 hover:bg-white'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-slate-500">
+                      <span>{m.id}</span>
+                      <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {m.status}</span>
+                    </div>
+                    <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-2">{m.title || 'Untitled draft'}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Updated {new Date(m.updatedAt).toLocaleDateString()}</p>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {activeManuscript && (
+              <div className="flex flex-col md:flex-row gap-8">
+                <SidebarWorkflow 
+                  manuscript={activeManuscript} 
+                  activeStep={activeStep} 
+                  onStepSelected={(stepId) => {
+                    setActiveStep(stepId);
+                    triggerNotification(`Switched section to: ${stepId.replace('-', ' ')}`, 'info');
+                  }}
+                />
+                <div className="flex-1">
+                  <SubmissionWorkflow 
+                    manuscript={activeManuscript}
+                    onUpdateManuscript={handleUpdateManuscript}
+                    activeStep={activeStep}
+                    onStepChange={setActiveStep}
+                    onShowNotification={triggerNotification}
+                  />
+                </div>
+              </div>
+            )}
             </div>
-          </div>
         ) : (
           
           /* INTERACTIVE MULTI-ROLE OFFICE DASHBOARDS */

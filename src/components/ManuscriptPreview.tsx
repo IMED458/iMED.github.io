@@ -84,6 +84,12 @@ function RenderMediaItem({ item, index }: { item: Manuscript['figuresAndTables']
   );
 }
 
+function orcidUrl(orcidId?: string) {
+  if (!orcidId) return undefined;
+  const clean = orcidId.replace(/^https?:\/\/orcid\.org\//, '').trim();
+  return `https://orcid.org/${clean}`;
+}
+
 export default function ManuscriptPreview({ manuscript, onShowNotification }: ManuscriptPreviewProps) {
   const articleConfig = ARTICLE_TYPES[manuscript.articleType];
 
@@ -200,7 +206,13 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
                 <span key={a.id}>
                   {a.firstName} {a.middleInitial ? `${a.middleInitial}. ` : ''}{a.lastName}
                   {a.isCorresponding && <span className="text-teal-700 ml-0.5" title="Corresponding">✉</span>}
-                  <sup className="text-teal-700 font-semibold ml-0.5">{i + 1}</sup>
+                  {orcidUrl(a.orcidId) ? (
+                    <a href={orcidUrl(a.orcidId)} target="_blank" rel="noreferrer" className="text-teal-700 font-semibold ml-0.5 align-super text-[9px] hover:underline">
+                      {i + 1}
+                    </a>
+                  ) : (
+                    <sup className="text-teal-700 font-semibold ml-0.5">{i + 1}</sup>
+                  )}
                   {i < manuscript.authors.length - 1 && ', '}
                 </span>
               ))

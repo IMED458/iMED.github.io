@@ -138,6 +138,35 @@ export default function SubmissionWorkflow({
     reader.readAsDataURL(file);
   };
 
+  const readFileAsDataUrl = (file: File) => new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsDataURL(file);
+  });
+
+  const fileSizeLabel = (file: File) => {
+    if (file.size < 1024 * 1024) return `${Math.max(1, Math.round(file.size / 1024))} KB`;
+    return `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const downloadWordTemplate = (fileName: string, title: string, body: string) => {
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:Calibri,Arial,sans-serif;line-height:1.5">${body}</body></html>`;
+    const blob = new Blob([html], { type: 'application/msword;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const attachEditorFile = async (file: File, type: string) => {
+    const fileUrl = await readFileAsDataUrl(file);
+    const item = { id: `${type}-${Date.now()}`, fileName: file.name, type, fileUrl, uploadedAt: new Date().toISOString() };
+    const editorFiles = manuscript.editorFiles.filter(existing => existing.type !== type);
+    updateField('editorFiles', [...editorFiles, item]);
+    onShowNotification(`${type.replace('-', ' ')} uploaded: ${file.name}`, 'success');
+  };
+
   // 4. Citation Form States
   const [citationType, setCitationType] = useState<'journal' | 'book' | 'web'>('journal');
   const [citeAuthors, setCiteAuthors] = useState('');
@@ -299,6 +328,9 @@ export default function SubmissionWorkflow({
     setCiteUrl('');
   };
 
+  const [suppFileUrl, setSuppFileUrl] = useState('');
+  const [suppFileSize, setSuppFileSize] = useState('');
+
   const handleAddSupplementary = (e: React.FormEvent) => {
     e.preventDefault();
     if (!suppName) return;
@@ -307,7 +339,8 @@ export default function SubmissionWorkflow({
       id: `supp-${Date.now()}`,
       fileName: suppName,
       description: suppDesc,
-      fileSize: '1.2 MB',
+      fileSize: suppFileSize || 'Attached',
+      fileUrl: suppFileUrl,
       uploadedAt: new Date().toISOString()
     };
 
@@ -315,6 +348,8 @@ export default function SubmissionWorkflow({
     onShowNotification('Dataset supplementary file registered.', 'success');
     setSuppName('');
     setSuppDesc('');
+    setSuppFileUrl('');
+    setSuppFileSize('');
   };
 
   const articleConfig = ARTICLE_TYPES[manuscript.articleType];
@@ -669,7 +704,8 @@ export default function SubmissionWorkflow({
               {Object.values(ARTICLE_TYPES).map((type) => {
                 const isSelected = manuscript.articleType === type.key;
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={type.key}
                     onClick={() => updateField('articleType', type.key)}
                     className={`p-4 border-2 rounded-xl text-left cursor-pointer transition-all ${
@@ -684,7 +720,7 @@ export default function SubmissionWorkflow({
                       <span>Max Words: <strong>{type.maxWordCount}</strong></span>
                       <span>Max Refs: <strong>{type.maxReferences}</strong></span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -758,171 +794,13 @@ export default function SubmissionWorkflow({
 
         {/* 10. FIGURES & TABLES */}
         {activeStep === 'figures' && (
-          <div className="space-y-6 text-xs animate-fade-in">
-            
-            {/* Registered list review */}
-            <div className="bg-slate-50 p-4 border rounded-xl space-y-2">
-              <h4 className="font-bold text-slate-800 text-xs uppercase">Uploaded materials list ({manuscript.figuresAndTables.length})</h4>
-              {manuscript.figuresAndTables.length === 0 ? (
-                <p className="text-slate-400 italic">No illustration uploads or charts built yet.</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-3">
-                  {manuscript.figuresAndTables.map((item, idx) => (
-                    <div key={item.id} className="bg-white p-3 border rounded-lg flex justify-between items-center text-[11px]">
-                      <div>
-                        <span className="font-bold text-teal-800 uppercase block">[{item.type.toUpperCase()}]: {item.title}</span>
-                        <p className="text-slate-550 truncate max-w-xs">{item.caption}</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const updated = manuscript.figuresAndTables.filter(ft => ft.id !== item.id);
-                          updateField('figuresAndTables', updated);
-                          onShowNotification('Scientific item removed.', 'info');
-                        }}
-                        className="text-red-650 hover:underline font-bold"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+          <div className="space-y-4 text-xs animate-fade-in">
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-5">
+              <h4 className="font-bold text-teal-900 text-sm">Figures, tables, and diagrams are inserted inside the manuscript text.</h4>
+              <p className="mt-2 text-teal-800 leading-relaxed">
+                Open <strong>Manuscript Sections</strong>, click exactly where the figure/table/diagram should appear, then use the image, table, or diagram toolbar buttons. You can cut and paste inserted blocks to rearrange them anywhere in the text.
+              </p>
             </div>
-
-            {/* Upload console or table-builder */}
-            <form onSubmit={handleAddMedia} className="bg-white border p-5 rounded-xl space-y-4">
-              <h4 className="font-bold text-slate-850 text-sm border-b pb-1.5">Asset Registration console</h4>
-              
-              <div className="flex gap-4">
-                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
-                  <input
-                    type="radio" name="media-type-sel" checked={mediaType === 'figure'} onChange={() => setMediaType('figure')}
-                  />
-                  <span>Figure Asset (Image/TIFF)</span>
-                </label>
-                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
-                  <input
-                    type="radio" name="media-type-sel" checked={mediaType === 'table'} onChange={() => setMediaType('table')}
-                  />
-                  <span>Table / Paste from Excel</span>
-                </label>
-                <label className="flex items-center gap-1.5 font-bold cursor-pointer">
-                  <input
-                    type="radio" name="media-type-sel" checked={mediaType === 'diagram'} onChange={() => setMediaType('diagram')}
-                  />
-                  <span>Diagram Paste</span>
-                </label>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <div>
-                  <label className="block font-semibold mb-1">Illustration/Table numbering Title *</label>
-                  <input
-                    type="text" required value={mediaTitle} onChange={(e) => setMediaTitle(e.target.value)}
-                    placeholder="e.g., Figure 1: Cytokine Concentration profiles" className="w-full bg-slate-50 border p-1.5 rounded"
-                  />
-                </div>
-                {mediaType === 'figure' ? (
-                  <div>
-                    <label className="block font-semibold mb-1">Upload File</label>
-                    <input
-                      id={`fig-upload-${Date.now()}`}
-                      type="file"
-                      accept="image/*,.tiff,.tif,.pdf"
-                      className="w-full bg-slate-50 border p-1.5 rounded text-slate-700 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleMediaFileSelected(file);
-                      }}
-                    />
-                    {mediaFileName && <p className="text-[10px] text-teal-700 mt-1 font-mono">{mediaFileName}</p>}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <label className="block font-semibold mb-1">Rows quota</label>
-                      <input
-                        type="number" value={tableRows} onChange={(e) => setTableRows(Math.max(2, Number(e.target.value)))}
-                        className="w-full bg-slate-50 border p-1 rounded"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-semibold mb-1">Columns quota</label>
-                      <input
-                        type="number" value={tableCols} onChange={(e) => setTableCols(Math.max(2, Number(e.target.value)))}
-                        className="w-full bg-slate-50 border p-1 rounded"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {mediaType === 'table' && (
-                <div className="bg-slate-50 p-3 rounded border space-y-3">
-                  <div>
-                    <span className="font-bold text-[11px] block text-slate-700">Paste table from Excel, Word, PowerPoint, or HTML:</span>
-                    <textarea
-                      rows={4}
-                      value={mediaPasteContent}
-                      onChange={(e) => setMediaPasteContent(e.target.value)}
-                      placeholder="Paste copied cells here. If empty, the grid below will be used."
-                      className="mt-1 w-full bg-white border border-slate-300 rounded p-2 font-mono text-[11px]"
-                    />
-                  </div>
-                  <span className="font-bold text-[11px] block text-slate-700">Fill Scientific data directly into cells matrix:</span>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-xs text-left border-collapse border border-slate-300 bg-white">
-                      <tbody>
-                        {Array.from({ length: tableRows }).map((_, rIdx) => (
-                          <tr key={rIdx}>
-                            {Array.from({ length: tableCols }).map((_, cIdx) => (
-                              <td key={cIdx} className="p-1.5 border border-slate-300">
-                                <input
-                                  type="text"
-                                  value={tempTableData[rIdx]?.[cIdx] || ''}
-                                  onChange={(e) => handleCellChange(rIdx, cIdx, e.target.value)}
-                                  className="w-full bg-slate-50 p-0.5 border-none outline-hidden"
-                                  placeholder={`Row_${rIdx} Col_${cIdx}`}
-                                />
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {mediaType === 'diagram' && (
-                <div className="bg-slate-50 p-3 rounded border space-y-2">
-                  <span className="font-bold text-[11px] block text-slate-700">Paste diagram content:</span>
-                  <textarea
-                    rows={6}
-                    value={mediaPasteContent}
-                    onChange={(e) => setMediaPasteContent(e.target.value)}
-                    placeholder="Paste SVG/HTML exported from PowerPoint, Word, charts, or any diagram text here..."
-                    className="w-full bg-white border border-slate-300 rounded p-2 font-mono text-[11px]"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block font-semibold mb-1">Caption subtitle / descriptive legend *</label>
-                <textarea
-                  rows={2} required value={mediaCaption} onChange={(e) => setMediaCaption(e.target.value)}
-                  placeholder="Summarize variables and statistics representativeness in index legends..."
-                  className="w-full bg-slate-50 border p-2 rounded"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="bg-teal-700 hover:bg-teal-800 text-white font-semibold py-2 px-4 rounded-lg shadow-xs cursor-pointer"
-              >
-                + Append Illustration asset
-              </button>
-            </form>
           </div>
         )}
 
@@ -987,7 +865,24 @@ export default function SubmissionWorkflow({
                         setCiteIssue(w.issue || '');
                         setCitePages(w.page || '');
                         setCitationType('journal');
-                        onShowNotification('DOI metadata loaded successfully!', 'success');
+                        const newRef: ReferenceItem = {
+                          id: `ref-${Date.now()}`,
+                          type: 'journal',
+                          authors: authList,
+                          title: w.title?.[0] || '',
+                          journalOrBook: w['container-title']?.[0] || w.publisher || '',
+                          year: String(w.published?.['date-parts']?.[0]?.[0] || ''),
+                          volume: w.volume || undefined,
+                          issue: w.issue || undefined,
+                          pages: w.page || undefined,
+                          doi: citeDoi.trim()
+                        };
+                        if (newRef.authors && newRef.title && newRef.journalOrBook && newRef.year) {
+                          updateField('references', [...manuscript.references, newRef]);
+                          onShowNotification('DOI metadata loaded and reference added.', 'success');
+                        } else {
+                          onShowNotification('DOI metadata loaded. Review fields and click Add Reference.', 'info');
+                        }
                       } catch {
                         onShowNotification('Could not fetch DOI. Fill fields manually.', 'error');
                       }
@@ -1121,9 +1016,13 @@ export default function SubmissionWorkflow({
                   <input
                     type="file"
                     className="w-full bg-slate-50 border p-1.5 rounded cursor-pointer"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
-                      if (file) setSuppName(file.name);
+                      if (file) {
+                        setSuppName(file.name);
+                        setSuppFileSize(fileSizeLabel(file));
+                        setSuppFileUrl(await readFileAsDataUrl(file));
+                      }
                     }}
                   />
                   {suppName && <p className="text-[10px] text-teal-700 mt-1 font-mono">{suppName}</p>}
@@ -1220,10 +1119,10 @@ export default function SubmissionWorkflow({
                 id="ethics-statement-file-input"
                 type="file"
                 className="hidden"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (file) {
-                    const ethics = { ...manuscript.ethics, ethicsStatementFileName: file.name };
+                    const ethics = { ...manuscript.ethics, ethicsStatementFileName: file.name, ethicsStatementUploadedUrl: await readFileAsDataUrl(file) };
                     updateField('ethics', ethics);
                     onShowNotification('Signed Ethics IRB approval registered!', 'success');
                   }
@@ -1302,13 +1201,13 @@ export default function SubmissionWorkflow({
                   <p className="text-[10px] text-slate-400">Download, complete, sign, and upload proof</p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => {
-                    const downloadAnchor = document.createElement('a');
-                    downloadAnchor.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent("Georgian Biomedical News - Conflicts of Interest Mandate form"));
-                    downloadAnchor.setAttribute("download", "GBMN_COI_Form.txt");
-                    document.body.appendChild(downloadAnchor);
-                    downloadAnchor.click();
-                    downloadAnchor.remove();
+                    downloadWordTemplate(
+                      'GBMN_COI_Form.doc',
+                      'GBMN Conflict of Interest Form',
+                      '<h1>Georgian Biomedical News - Conflicts of Interest Form</h1><p>Manuscript title: ________________________________</p><p>Authors: ________________________________</p><p>Please disclose all financial, institutional, or industry relationships relevant to this manuscript.</p><p>Signature: __________________ Date: ____________</p>'
+                    );
                     onShowNotification('Downloaded GBMN Conflict Disclosure Template form.', 'success');
                   }}
                   className="bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold border px-3 py-1.5 rounded text-[11px]"
@@ -1323,10 +1222,10 @@ export default function SubmissionWorkflow({
                   id="coi-file-upload-input"
                   type="file"
                   className="hidden"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      const updated = { ...manuscript.conflictDisclosure, signedCoiFormName: file.name };
+                      const updated = { ...manuscript.conflictDisclosure, signedCoiFormName: file.name, signedCoiFormUrl: await readFileAsDataUrl(file) };
                       updateField('conflictDisclosure', updated);
                       onShowNotification('Signed COI form registered.', 'success');
                     }
@@ -1448,12 +1347,13 @@ export default function SubmissionWorkflow({
                 id="payment-receipt-upload"
                 type="file"
                 className="hidden"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (file) {
                     const p = { 
                       ...manuscript.payment, 
                       fileName: file.name,
+                      uploadedUrl: await readFileAsDataUrl(file),
                       status: 'pending' as any,
                       uploadedAt: new Date().toISOString()
                     };
@@ -1489,11 +1389,11 @@ export default function SubmissionWorkflow({
                 <button
                   type="button"
                   onClick={() => {
-                    const content = `COVER LETTER\n\nGeorgian Biomedical News (GBMN)\nEditorial Office\n\nDate: ${new Date().toLocaleDateString()}\n\nDear Editor,\n\nWe are pleased to submit our manuscript entitled "[MANUSCRIPT TITLE]" for consideration for publication in the Georgian Biomedical News.\n\n[Describe the significance of your work, why it is suitable for GBMN, and any other relevant information for the editors.]\n\nWe confirm that this manuscript has not been published elsewhere and is not under consideration by another journal. All authors have approved the manuscript and agree with its submission to GBMN.\n\nCorresponding Author:\nName:\nAffiliation:\nEmail:\nPhone:\n\nSincerely,\n[Author Name(s)]`;
-                    const a = document.createElement('a');
-                    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
-                    a.download = 'GBMN_Cover_Letter_Template.txt';
-                    a.click();
+                    downloadWordTemplate(
+                      'GBMN_Cover_Letter_Template.doc',
+                      'GBMN Cover Letter',
+                      `<h1>Cover Letter</h1><p><strong>Georgian Biomedical News (GBMN)</strong><br>Editorial Office</p><p>Date: ${new Date().toLocaleDateString()}</p><p>Dear Editor,</p><p>We are pleased to submit our manuscript entitled "<strong>[MANUSCRIPT TITLE]</strong>" for consideration for publication in Georgian Biomedical News.</p><p>[Describe the significance of your work and why it is suitable for GBMN.]</p><p>We confirm that this manuscript has not been published elsewhere and is not under consideration by another journal. All authors approve this submission.</p><p>Corresponding Author:<br>Name:<br>Affiliation:<br>Email:<br>Phone:</p><p>Sincerely,<br>[Author Name(s)]</p>`
+                    );
                     onShowNotification('Cover letter template downloaded.', 'success');
                   }}
                   className="bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold border border-teal-200 px-3 py-1.5 rounded text-[11px]"
@@ -1507,10 +1407,10 @@ export default function SubmissionWorkflow({
                   id="cover-letter-upload"
                   type="file"
                   className="hidden"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      onShowNotification(`Cover letter uploaded: ${file.name}`, 'success');
+                      await attachEditorFile(file, 'cover-letter');
                     }
                   }}
                 />
@@ -1519,7 +1419,7 @@ export default function SubmissionWorkflow({
                   onClick={() => document.getElementById('cover-letter-upload')?.click()}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-700 border font-bold px-3 py-1.5 rounded"
                 >
-                  Upload File
+                  {manuscript.editorFiles.find(f => f.type === 'cover-letter')?.fileName || 'Upload File'}
                 </button>
               </div>
             </div>
@@ -1536,11 +1436,11 @@ export default function SubmissionWorkflow({
                 <button
                   type="button"
                   onClick={() => {
-                    const content = `COPYRIGHT TRANSFER FORM\n\nGeorgian Biomedical News (GBMN)\n\nManuscript Title: ________________________________\n\nThe undersigned Author(s) hereby transfer(s) to the Georgian Biomedical News (GBMN) all copyright ownership of the manuscript identified above. The Author(s) warrant(s) that the article is original, is not under consideration elsewhere, has not been previously published, and that the Author(s) have full power to make this transfer.\n\nIn accordance with the Creative Commons Attribution (CC BY 4.0) license, authors retain the right to:\n- Share and adapt the material for any purpose\n- Use the work for teaching purposes\n- Include the work in a thesis or dissertation\n\nAuthor Signatures:\n\n1. _________________________ Date: ____________\n   (Print Name): _________________________\n\n2. _________________________ Date: ____________\n   (Print Name): _________________________\n\n3. _________________________ Date: ____________\n   (Print Name): _________________________`;
-                    const a = document.createElement('a');
-                    a.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(content);
-                    a.download = 'GBMN_Copyright_Form.txt';
-                    a.click();
+                    downloadWordTemplate(
+                      'GBMN_Copyright_Transfer_Form.doc',
+                      'GBMN Copyright Transfer Form',
+                      '<h1>Copyright Transfer Form</h1><p><strong>Georgian Biomedical News (GBMN)</strong></p><p>Manuscript Title: ________________________________</p><p>The undersigned author(s) warrant that the article is original, is not under consideration elsewhere, and has not been previously published.</p><p>Author signatures:</p><p>1. _________________________ Date: ____________</p><p>2. _________________________ Date: ____________</p><p>3. _________________________ Date: ____________</p>'
+                    );
                     onShowNotification('Copyright form downloaded.', 'success');
                   }}
                   className="bg-teal-50 hover:bg-teal-100 text-teal-800 font-bold border border-teal-200 px-3 py-1.5 rounded text-[11px]"
@@ -1554,10 +1454,10 @@ export default function SubmissionWorkflow({
                   id="copyright-form-upload"
                   type="file"
                   className="hidden"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      onShowNotification(`Copyright form uploaded: ${file.name}`, 'success');
+                      await attachEditorFile(file, 'copyright-transfer');
                     }
                   }}
                 />
@@ -1566,7 +1466,7 @@ export default function SubmissionWorkflow({
                   onClick={() => document.getElementById('copyright-form-upload')?.click()}
                   className="bg-slate-100 hover:bg-slate-200 text-slate-700 border font-bold px-3 py-1.5 rounded"
                 >
-                  Upload File
+                  {manuscript.editorFiles.find(f => f.type === 'copyright-transfer')?.fileName || 'Upload File'}
                 </button>
               </div>
             </div>
@@ -1685,6 +1585,18 @@ export default function SubmissionWorkflow({
           className="text-xs font-semibold px-4 py-2 border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg cursor-pointer transition-all disabled:opacity-45"
         >
           &larr; Save and Back
+        </button>
+
+        <button
+          id="save-current-draft-btn"
+          type="button"
+          onClick={() => {
+            onUpdateManuscript({ ...manuscript, updatedAt: new Date().toISOString() });
+            onShowNotification('Draft saved. You can safely continue later.', 'success');
+          }}
+          className="text-xs font-bold px-5 py-2.5 bg-white hover:bg-slate-50 text-teal-800 rounded-lg border border-teal-200 shadow-xs cursor-pointer transition-all"
+        >
+          Save
         </button>
 
         <button

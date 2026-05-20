@@ -95,6 +95,7 @@ export interface SupplementaryFile {
   fileName: string;
   description: string;
   fileSize: string;
+  fileUrl?: string;
   uploadedAt: string;
 }
 
@@ -197,7 +198,7 @@ export interface Manuscript {
   payment: PaymentReceipt;
 
   // Additional Reviewer/Editorial attachments
-  editorFiles: { id: string; fileName: string; type: string }[];
+  editorFiles: { id: string; fileName: string; type: string; fileUrl?: string; uploadedAt?: string }[];
   reviewerAssignments: {
     reviewerId: string;
     reviewerName: string;
