@@ -6,6 +6,7 @@
 import { Manuscript } from '../types';
 import { ARTICLE_TYPES, formatAMAReference } from '../utils';
 import { Printer, Download, BookOpen, Clock, HeartHandshake, CheckCircle2, Award } from 'lucide-react';
+import { downloadManuscriptDocx } from '../docxExport';
 
 interface ManuscriptPreviewProps {
   manuscript: Manuscript;
@@ -125,43 +126,20 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
     }
   };
 
-  const handleDownloadWord = () => {
-    const sheet = document.getElementById('academic-manuscript-sheet');
-    if (!sheet) return;
-    const html = `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>${manuscript.title || 'GBMN Manuscript'}</title>
-<style>
-@page WordSection1 { size: 8.27in 11.69in; margin: .75in .51in 1.18in .51in; }
-body { font-family: "Times New Roman", serif; color: #111; }
-#academic-manuscript-sheet { width: 7.27in; margin: 0 auto; box-shadow: none !important; padding: 0 !important; }
-.gbmn-body-columns { column-count: 2; column-gap: .236in; font-size: 11pt; line-height: 1.5; text-align: justify; }
-.gbmn-section-heading { color: #2F6B5A; font-family: "Times New Roman", serif; font-size: 12pt; font-weight: 700; text-transform: uppercase; margin: 20pt 0 10pt; }
-.gbmn-abstract .preview-rich { font-size: 11pt; line-height: 1.5; }
-.preview-rich { font-size: 11pt; line-height: 1.5; text-align: justify; }
-.preview-rich p { text-indent: .5in; margin: 0 0 6pt; }
-.preview-rich-dropcap p:first-child:first-letter, .preview-rich-dropcap:first-letter { float: left; font-size: 42pt; line-height: 34pt; margin: 3pt 4pt 0 0; }
-.gbmn-inline-media { break-inside: avoid; page-break-inside: avoid; margin: 12px 0 20px; }
-.gbmn-inline-media figcaption, .gbmn-table-title { font-family: "Times New Roman", serif; font-size: 8pt; color: #222; margin: 0 0 5pt; }
-.gbmn-inline-table { width: 100%; border-collapse: collapse; font-size: 10pt; border: 1px solid #A8C28F; }
-.gbmn-inline-table th, .gbmn-inline-table td { border: 1px solid #A8C28F; padding: 4pt 5pt; text-align: center; }
-.gbmn-inline-table th { background: #DCE8D0; font-weight: 700; }
-.gbmn-inline-table tr:nth-child(even) td { background: #D9E3D1; }
-a { color: #007f7f; }
-</style>
-</head>
-<body>${sheet.outerHTML}</body>
-</html>`;
-    const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `GBMN_Manuscript_${manuscript.id || 'Draft'}.doc`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    if (onShowNotification) onShowNotification('Word-editable manuscript downloaded.', 'success');
+  const handleDownloadWord = async () => {
+    try {
+      await downloadManuscriptDocx(manuscript);
+      if (onShowNotification) onShowNotification('Publication-ready DOCX downloaded with Word columns and GBMN formatting.', 'success');
+    } catch (error) {
+      console.error(error);
+      if (onShowNotification) onShowNotification('DOCX export failed. Please try again after checking media files.', 'error');
+    }
   };
+
+  const abstractEntries = Object.entries(manuscript.abstractContents)
+    .filter(([, value]) => stripHtml(value || ''));
+  const abstractHtml = manuscript.abstractContents['text']
+    || abstractEntries.map(([label, value]) => `<p><strong>${label}:</strong> ${value}</p>`).join('');
 
   const abstractWordCount = Object.values(manuscript.abstractContents)
     .reduce((sum, text) => sum + stripHtml(text || '').split(/\s+/).filter(Boolean).length, 0);
@@ -208,7 +186,7 @@ a { color: #007f7f; }
             className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer shadow-xs"
           >
             <Download className="h-4 w-4" />
-            Download Word
+            Download DOCX
           </button>
           <button
             onClick={() => {
@@ -277,10 +255,10 @@ a { color: #007f7f; }
           </div>
 
           <h1
-            className="font-bold text-left leading-tight mb-3 uppercase"
-            style={{ fontFamily: 'Times New Roman, Georgia, serif', fontSize: '20pt', color: '#222222' }}
+            className="font-bold text-center leading-tight mb-3"
+            style={{ fontFamily: 'Times New Roman, Georgia, serif', fontSize: '20pt', color: '#0E8B8B' }}
           >
-            {manuscript.title ? toGbmnTitleCase(manuscript.title).toUpperCase() : '[ARTICLE TITLE]'}
+            {manuscript.title ? toGbmnTitleCase(manuscript.title) : '[Article Title]'}
           </h1>
 
           {/* AUTHORS — centered, normal weight */}
@@ -328,8 +306,8 @@ a { color: #007f7f; }
             <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
               ABSTRACT
             </h2>
-            {manuscript.abstractContents['text'] ? (
-              <RichContent html={manuscript.abstractContents['text']} references={manuscript.references} />
+            {abstractHtml ? (
+              <RichContent html={abstractHtml} references={manuscript.references} />
             ) : (
               <p className="text-slate-400 italic text-xs">
                 [Abstract not yet entered. Fill in Step 7.]
