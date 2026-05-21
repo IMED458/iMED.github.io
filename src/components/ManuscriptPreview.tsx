@@ -134,18 +134,21 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 <meta charset="utf-8">
 <title>${manuscript.title || 'GBMN Manuscript'}</title>
 <style>
-@page WordSection1 { size: 8.27in 11.69in; margin: .58in .5in .58in .5in; }
+@page WordSection1 { size: 8.27in 11.69in; margin: .75in .51in 1.18in .51in; }
 body { font-family: "Times New Roman", serif; color: #111; }
 #academic-manuscript-sheet { width: 7.27in; margin: 0 auto; box-shadow: none !important; padding: 0 !important; }
-.gbmn-body-columns { column-count: 2; column-gap: .25in; font-size: 10pt; line-height: 1.35; text-align: justify; }
-.gbmn-section-heading { color: #e00000; font-family: Arial, sans-serif; font-size: 12pt; font-weight: 400; text-transform: uppercase; margin: 14pt 0 4pt; }
-.gbmn-abstract .preview-rich { font-size: 9pt; line-height: 1.32; }
-.preview-rich { font-size: 10pt; line-height: 1.35; text-align: justify; }
+.gbmn-body-columns { column-count: 2; column-gap: .236in; font-size: 11pt; line-height: 1.5; text-align: justify; }
+.gbmn-section-heading { color: #2F6B5A; font-family: "Times New Roman", serif; font-size: 12pt; font-weight: 700; text-transform: uppercase; margin: 20pt 0 10pt; }
+.gbmn-abstract .preview-rich { font-size: 11pt; line-height: 1.5; }
+.preview-rich { font-size: 11pt; line-height: 1.5; text-align: justify; }
+.preview-rich p { text-indent: .5in; margin: 0 0 6pt; }
 .preview-rich-dropcap p:first-child:first-letter, .preview-rich-dropcap:first-letter { float: left; font-size: 42pt; line-height: 34pt; margin: 3pt 4pt 0 0; }
-.gbmn-inline-media { break-inside: avoid; page-break-inside: avoid; margin: 8pt 0; }
-.gbmn-inline-media figcaption, .gbmn-table-title { font-family: Arial, sans-serif; font-size: 8pt; color: #333; margin: 0 0 3pt; }
-.gbmn-inline-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
-.gbmn-inline-table th, .gbmn-inline-table td { border: .5pt solid #aaa; padding: 2pt 3pt; }
+.gbmn-inline-media { break-inside: avoid; page-break-inside: avoid; margin: 12px 0 20px; }
+.gbmn-inline-media figcaption, .gbmn-table-title { font-family: "Times New Roman", serif; font-size: 8pt; color: #222; margin: 0 0 5pt; }
+.gbmn-inline-table { width: 100%; border-collapse: collapse; font-size: 10pt; border: 1px solid #A8C28F; }
+.gbmn-inline-table th, .gbmn-inline-table td { border: 1px solid #A8C28F; padding: 4pt 5pt; text-align: center; }
+.gbmn-inline-table th { background: #DCE8D0; font-weight: 700; }
+.gbmn-inline-table tr:nth-child(even) td { background: #D9E3D1; }
 a { color: #007f7f; }
 </style>
 </head>
@@ -169,8 +172,8 @@ a { color: #007f7f; }
     ...Object.values(manuscript.abstractContents),
     ...Object.values(manuscript.sections),
   ].join(' ');
-  const inlineFigureCount = (combinedHtml.match(/gbmn-inline-media-figure/g) || []).length + manuscript.figuresAndTables.filter(item => item.type === 'figure').length;
-  const inlineTableCount = (combinedHtml.match(/gbmn-inline-media-table/g) || []).length + manuscript.figuresAndTables.filter(item => item.type === 'table').length;
+  const inlineFigureCount = (combinedHtml.match(/gbmn-inline-media-figure/g) || []).length;
+  const inlineTableCount = (combinedHtml.match(/gbmn-inline-media-table/g) || []).length;
   const mentionedFigures = Array.from(combinedHtml.matchAll(/\bFig\.?\s*(\d+)/gi)).map(match => Number(match[1]));
   const mentionedTables = Array.from(combinedHtml.matchAll(/\bTable\s*(\d+)/gi)).map(match => Number(match[1]));
   const missingMediaWarnings = [
@@ -247,7 +250,7 @@ a { color: #007f7f; }
       <div
         id="academic-manuscript-sheet"
         className="bg-white shadow-2xl mx-auto font-serif text-[#111] leading-relaxed select-text relative"
-        style={{ fontFamily: 'Times New Roman, Times, serif', width: 794, minHeight: 1123, padding: '58px 48px' }}
+        style={{ fontFamily: 'Times New Roman, Georgia, serif', width: 794, minHeight: 1123, padding: '72px 49px 113px' }}
       >
         <div className="bg-white">
           <div className="flex items-start gap-3 mb-5">
@@ -274,16 +277,16 @@ a { color: #007f7f; }
           </div>
 
           <h1
-            className="font-normal text-center leading-tight mb-4"
-            style={{ fontFamily: 'Arial, sans-serif', fontSize: '24pt', color: '#00827f' }}
+            className="font-bold text-left leading-tight mb-3 uppercase"
+            style={{ fontFamily: 'Times New Roman, Georgia, serif', fontSize: '20pt', color: '#222222' }}
           >
-            {manuscript.title ? toGbmnTitleCase(manuscript.title) : '[Article Title]'}
+            {manuscript.title ? toGbmnTitleCase(manuscript.title).toUpperCase() : '[ARTICLE TITLE]'}
           </h1>
 
           {/* AUTHORS — centered, normal weight */}
           <div
             className="text-center text-[#777] mb-5"
-            style={{ fontFamily: 'Arial, sans-serif', fontSize: '14pt', lineHeight: 1.35 }}
+            style={{ fontFamily: 'Times New Roman, Georgia, serif', fontSize: '11pt', lineHeight: 1.35 }}
           >
             {manuscript.authors.length === 0 ? (
               <span className="italic text-slate-400">Author Name¹, Author Name²…</span>
@@ -307,7 +310,7 @@ a { color: #007f7f; }
 
           {/* AFFILIATIONS */}
           {manuscript.authors.length > 0 && (
-            <div className="text-center text-slate-600 space-y-0.5 mb-5" style={{ fontFamily: 'Arial, sans-serif', fontSize: '10pt', lineHeight: 1.35 }}>
+            <div className="text-left text-[#666666] space-y-0.5 mb-6" style={{ fontFamily: 'Times New Roman, Georgia, serif', fontSize: '10pt', lineHeight: 1.35 }}>
               {manuscript.authors.map((a, i) => (
                 <p key={a.id}>
                   <sup className="text-teal-700 font-semibold">{i + 1}</sup>{' '}
@@ -321,7 +324,7 @@ a { color: #007f7f; }
 
         {/* ABSTRACT — single column */}
         {articleConfig?.abstractType !== 'none' && (
-          <div className="gbmn-abstract border-t border-b border-black py-3 mb-7">
+          <div className="gbmn-abstract mb-7">
             <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
               ABSTRACT
             </h2>
@@ -365,22 +368,8 @@ a { color: #007f7f; }
           ))}
         </div>
 
-        {/* FIGURES & TABLES — full width */}
-        {manuscript.figuresAndTables.length > 0 && (
-          <div className="pt-4">
-            <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
-              FIGURES AND TABLES
-            </h2>
-            <div>
-              {manuscript.figuresAndTables.map((item, idx) => (
-                <RenderMediaItem key={item.id} item={item} index={idx} />
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* DECLARATIONS */}
-        <div className="border-t border-slate-200 pt-3 mt-3 text-[8.5px] space-y-2" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <div className="border-t border-slate-200 pt-3 mt-3 text-[10pt] leading-snug space-y-2" style={{ fontFamily: 'Times New Roman, Georgia, serif' }}>
           {/* Funding */}
           {manuscript.fundingDetails.fundingAgency && (
             <div>
@@ -425,7 +414,7 @@ a { color: #007f7f; }
               [No references yet. Add in Step 11.]
             </p>
           ) : (
-            <ol className="list-decimal pl-5 space-y-1.5 text-[8.5px] leading-snug" style={{ fontFamily: 'Arial, sans-serif' }}>
+            <ol className="gbmn-references list-decimal pl-5 space-y-1.5 text-[10pt] leading-snug" style={{ fontFamily: 'Times New Roman, Georgia, serif' }}>
               {manuscript.references.map((ref) => (
                 <li key={ref.id} className="pl-1">
                   {referenceUrl(ref) ? (
@@ -457,31 +446,39 @@ a { color: #007f7f; }
         .gbmn-body-columns {
           column-count: 2;
           column-width: 3.5in;
-          column-gap: 0.25in;
-          font-size: 10pt;
-          line-height: 1.35;
+          column-gap: 0.6cm;
+          font-size: 11pt;
+          line-height: 1.5;
           text-align: justify;
         }
         .gbmn-section-heading {
-          color: #e00000;
+          color: #2F6B5A;
           font-size: 12pt;
-          font-weight: 400;
+          font-weight: 700;
           letter-spacing: 0;
-          margin: 13px 0 5px;
+          margin: 20pt 0 10pt;
           text-transform: uppercase;
         }
         .preview-rich {
-          color: #111;
-          font-family: "Times New Roman", Times, serif;
-          font-size: 10pt;
-          line-height: 1.35;
+          color: #222222;
+          font-family: "Times New Roman", Georgia, serif;
+          font-size: 11pt;
+          line-height: 1.5;
           text-align: justify;
         }
         .gbmn-abstract .preview-rich {
-          font-size: 9pt;
-          line-height: 1.32;
+          font-size: 11pt;
+          line-height: 1.5;
         }
-        .preview-rich p { margin: 0 0 5px; }
+        .preview-rich p {
+          margin: 0 0 6pt;
+          text-indent: 1.27cm;
+        }
+        .gbmn-abstract .preview-rich p,
+        .preview-rich .gbmn-inline-media + p,
+        .preview-rich p:first-child {
+          text-indent: 0;
+        }
         .preview-rich-dropcap p:first-child:first-letter,
         .preview-rich-dropcap:first-letter {
           float: left;
@@ -502,13 +499,19 @@ a { color: #007f7f; }
         .preview-rich ol { list-style: decimal; padding-left: 1.5em; }
         .preview-rich strong { font-weight: bold; }
         .preview-rich em { font-style: italic; }
+        .gbmn-references li {
+          padding-left: 0.2in;
+          text-indent: -0.2in;
+          margin-bottom: 4pt;
+        }
         .gbmn-inline-media {
           break-inside: avoid;
           page-break-inside: avoid;
-          margin: 10px 0 12px;
-          padding: 6px 0;
-          font-family: Arial, sans-serif;
+          margin: 12px 0 20px;
+          padding: 0;
+          font-family: "Times New Roman", Georgia, serif;
           font-size: 8pt;
+          background: #ffffff;
         }
         .gbmn-inline-media img {
           display: block;
@@ -519,7 +522,7 @@ a { color: #007f7f; }
         }
         .gbmn-media-placeholder {
           height: 150px;
-          border: 0.5px solid #cbd5e1;
+          border: 1px solid #A8C28F;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -529,43 +532,81 @@ a { color: #007f7f; }
           margin-bottom: 4px;
         }
         .gbmn-inline-media figcaption {
-          color: #334155;
+          color: #222222;
           font-size: 8pt;
           line-height: 1.45;
-          margin: 0 0 4px;
+          margin: 0 0 5px;
         }
         .gbmn-table-title {
-          color: #334155;
+          color: #222222;
           font-size: 8pt;
+          font-weight: 700;
+          margin: 0 0 5px;
+        }
+        .gbmn-inline-media-table figcaption {
           font-weight: 400;
-          margin: 0 0 3px;
+        }
+        .gbmn-inline-media-table figcaption strong,
+        .gbmn-inline-media-figure figcaption strong,
+        .gbmn-inline-media-diagram figcaption strong {
+          font-weight: 700;
         }
         .gbmn-inline-table {
           width: 100%;
           border-collapse: collapse;
-          border-top: 0.5px solid #334155;
-          border-bottom: 0.5px solid #334155;
-          font-size: 8pt;
+          border: 1px solid #A8C28F;
+          font-size: 10pt;
+          margin: 0;
         }
         .gbmn-inline-table th, .gbmn-inline-table td {
-          padding: 3px 4px;
-          border-bottom: 0.5px solid #cbd5e1;
-          text-align: left;
+          padding: 4px 6px;
+          border: 1px solid #A8C28F;
+          text-align: center;
         }
         .gbmn-inline-table th {
+          background: #DCE8D0;
           font-weight: 700;
           text-align: center;
         }
+        .gbmn-inline-table tr:nth-child(even) td {
+          background: #D9E3D1;
+        }
+        .gbmn-inline-media svg {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          background: #ffffff;
+          color: #333333;
+        }
+        .gbmn-inline-media svg text {
+          fill: #333333;
+          font-family: "Times New Roman", Georgia, serif;
+        }
+        .gbmn-inline-media svg path,
+        .gbmn-inline-media svg polyline {
+          stroke-linecap: round;
+          stroke-linejoin: round;
+        }
         .gbmn-inline-media-diagram pre {
           white-space: pre-wrap;
-          background: #f8fafc;
-          border: 0.5px solid #cbd5e1;
+          background: #ffffff;
+          border: 1px solid #A8C28F;
           padding: 6px;
           font-size: 8pt;
         }
         @media print {
           .no-print { display: none !important; }
-          #academic-manuscript-sheet { border: none; box-shadow: none; width: 210mm; min-height: 297mm; padding: 15mm 13mm !important; }
+          #academic-manuscript-sheet { border: none; box-shadow: none; width: 210mm; min-height: 297mm; padding: 19mm 13mm 30mm !important; }
+        }
+        @media (max-width: 860px) {
+          #academic-manuscript-sheet {
+            width: 100% !important;
+            min-height: auto !important;
+            padding: 24px 18px !important;
+          }
+          .gbmn-body-columns {
+            column-count: 1;
+          }
         }
       `}</style>
     </div>
