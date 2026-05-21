@@ -26,7 +26,39 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
   const [orcidId, setOrcidId] = useState('');
   const [institution, setInstitution] = useState('');
   const [role, setRole] = useState<UserRole>('Author');
+  const [isOrcidLookup, setIsOrcidLookup] = useState(false);
   const demoPassword = 'password';
+
+  const normalizeOrcid = (value: string) => value.replace(/^https?:\/\/orcid\.org\//i, '').trim();
+
+  const autofillFromOrcid = async () => {
+    const clean = normalizeOrcid(orcidId);
+    if (!clean) return;
+    setIsOrcidLookup(true);
+    try {
+      const response = await fetch(`https://pub.orcid.org/v3.0/${clean}/record`, {
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) throw new Error('ORCID lookup failed');
+      const record = await response.json();
+      const name = record?.person?.name;
+      const given = name?.['given-names']?.value || '';
+      const family = name?.['family-name']?.value || '';
+      const emails = record?.person?.emails?.email || [];
+      const employments = record?.['activities-summary']?.employments?.['affiliation-group'] || [];
+      const orgName = employments?.[0]?.summaries?.[0]?.['employment-summary']?.organization?.name || '';
+      if (given && !firstName) setFirstName(given);
+      if (family && !lastName) setLastName(family);
+      if (emails[0]?.email && !email) setEmail(emails[0].email);
+      if (orgName && !institution) setInstitution(orgName);
+      setOrcidId(clean);
+      onShowNotification('ORCID profile details imported where available.', 'success');
+    } catch {
+      onShowNotification('Could not import ORCID details. You can still complete the fields manually.', 'error');
+    } finally {
+      setIsOrcidLookup(false);
+    }
+  };
 
   const handleAction = (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,9 +300,18 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
                     type="text"
                     value={orcidId}
                     onChange={(e) => setOrcidId(e.target.value)}
+                    onBlur={autofillFromOrcid}
                     placeholder="0000-xxxx-xxxx-xxxx"
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 px-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-teal-600 font-mono"
                   />
+                  <button
+                    type="button"
+                    onClick={autofillFromOrcid}
+                    disabled={!orcidId.trim() || isOrcidLookup}
+                    className="mt-2 text-[11px] font-bold text-teal-700 disabled:text-slate-400 hover:underline"
+                  >
+                    {isOrcidLookup ? 'Importing ORCID...' : 'Auto-fill from ORCID'}
+                  </button>
                 </div>
 
                 <div>

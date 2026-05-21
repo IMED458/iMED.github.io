@@ -4,9 +4,10 @@
  */
 
 import React, { useState, FormEvent } from 'react';
-import { User, UserRole, Manuscript, SystemAuditLog, JournalSettings, ReferenceItem, FigureTableItem } from '../types';
+import { User, UserRole, Manuscript, ManuscriptStatus, SystemAuditLog, JournalSettings, ReferenceItem, FigureTableItem } from '../types';
 import { DB, ARTICLE_TYPES } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
+import SubmissionWorkflow from './SubmissionWorkflow';
 import { 
   Users, 
   FileText, 
@@ -52,6 +53,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [editorComments, setEditorComments] = useState('');
   const [decisionManuscriptId, setDecisionManuscriptId] = useState('');
   const [showDecisionModal, setShowDecisionModal] = useState(false);
+  const [officeEditMode, setOfficeEditMode] = useState(false);
+  const [officeEditStep, setOfficeEditStep] = useState('title-meta');
 
   // Admin users edit state
   const [adminUsers, setAdminUsers] = useState<User[]>(() => DB.getUsers());
@@ -75,6 +78,13 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const underReviewCount = manuscripts.filter(m => m.status === 'Under Review').length;
   const decisionPendingCount = manuscripts.filter(m => m.status === 'Submitted').length;
   const acceptedCount = manuscripts.filter(m => m.status === 'Accepted' || m.status === 'Published').length;
+  const manuscriptStatuses: ManuscriptStatus[] = ['Draft', 'Submitted', 'Reviewer Assigned', 'Under Review', 'In Review', 'Revision Requested', 'Editorial Decision', 'Accepted', 'In Production', 'Completed', 'Rejected', 'Published'];
+
+  const updateSelectedManuscript = (updated: Manuscript) => {
+    const list = manuscripts.map(item => item.id === updated.id ? updated : item);
+    onUpdateManuscripts(list);
+    setSelectedManuscript(updated);
+  };
 
   const handleUpdateUserRole = (userId: string, newRole: any) => {
     const updatedUsers = adminUsers.map(u => u.id === userId ? { ...u, role: newRole as any } : u);
@@ -164,12 +174,22 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
         return <span className="bg-slate-100 text-slate-700 border border-slate-300 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Draft</span>;
       case 'Submitted':
         return <span className="bg-blue-50 text-blue-800 border border-blue-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Submitting Office</span>;
+      case 'Reviewer Assigned':
+        return <span className="bg-cyan-50 text-cyan-800 border border-cyan-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Reviewer Assigned</span>;
       case 'Under Review':
         return <span className="bg-yellow-50 text-yellow-800 border border-yellow-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Peer Reviewing</span>;
+      case 'In Review':
+        return <span className="bg-orange-50 text-orange-800 border border-orange-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">In Review</span>;
       case 'Revision Requested':
         return <span className="bg-amber-50 text-amber-805 border border-amber-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Revision Needed</span>;
+      case 'Editorial Decision':
+        return <span className="bg-purple-50 text-purple-800 border border-purple-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Editorial Decision</span>;
       case 'Accepted':
         return <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Accepted</span>;
+      case 'In Production':
+        return <span className="bg-lime-50 text-lime-800 border border-lime-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">In Production</span>;
+      case 'Completed':
+        return <span className="bg-green-50 text-green-800 border border-green-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Completed</span>;
       case 'Rejected':
         return <span className="bg-rose-50 text-rose-800 border border-rose-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">Declined</span>;
       case 'Published':
@@ -471,7 +491,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
           }
           return {
             ...item,
-            status: 'Under Review' as any,
+            status: 'Reviewer Assigned' as any,
             reviewerAssignments: [
               ...item.reviewerAssignments,
               {
@@ -647,12 +667,31 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   </div>
                   <div className="flex items-center gap-2">
                     <button
+                      onClick={() => setOfficeEditMode(!officeEditMode)}
+                      className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all"
+                    >
+                      {officeEditMode ? 'Return to Preview' : 'Edit Full Article'}
+                    </button>
+                    <button
                       onClick={() => setShowDecisionModal(true)}
                       className="bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all"
                     >
                       Issue Formal Decision
                     </button>
                   </div>
+                </div>
+
+                <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print">
+                  <label className="block font-bold text-slate-700 mb-1">Editorial status visible to author</label>
+                  <select
+                    value={selectedManuscript.status}
+                    onChange={(event) => updateSelectedManuscript({ ...selectedManuscript, status: event.target.value as ManuscriptStatus, updatedAt: new Date().toISOString() })}
+                    className="w-full bg-white border border-slate-300 rounded p-2 font-semibold text-slate-800"
+                  >
+                    {manuscriptStatuses.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Submitting author specs */}
@@ -730,10 +769,21 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   </div>
                 </div>
 
-                {/* Actual Paper Display Frame */}
-                <div className="border-t pt-6">
-                  <ManuscriptPreview manuscript={selectedManuscript} onShowNotification={onShowNotification} />
-                </div>
+                {officeEditMode ? (
+                  <div className="border-t pt-6">
+                    <SubmissionWorkflow
+                      manuscript={selectedManuscript}
+                      onUpdateManuscript={updateSelectedManuscript}
+                      activeStep={officeEditStep}
+                      onStepChange={setOfficeEditStep}
+                      onShowNotification={onShowNotification}
+                    />
+                  </div>
+                ) : (
+                  <div className="border-t pt-6">
+                    <ManuscriptPreview manuscript={selectedManuscript} onShowNotification={onShowNotification} />
+                  </div>
+                )}
 
                 {/* Issue Decision Modal Content */}
                 {showDecisionModal && (

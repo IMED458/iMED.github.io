@@ -4,7 +4,7 @@
  */
 
 import React, { ChangeEvent, ClipboardEvent, DragEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, Image, Table2, ChartNoAxesColumn, Superscript, Subscript, X, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, Image, Table2, ChartNoAxesColumn, Superscript, Subscript, X, Trash2, ArrowUp, ArrowDown, Undo2 } from 'lucide-react';
 
 interface RichTextEditorProps {
   label?: string;
@@ -31,9 +31,13 @@ export default function RichTextEditor({
   const isInternalUpdate = useRef(false);
   const draggedMediaRef = useRef<HTMLElement | null>(null);
   const insertionMarkerIdRef = useRef<string | null>(null);
+  const historyRef = useRef<string[]>([]);
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [showTablePaste, setShowTablePaste] = useState(false);
   const [showDiagramPaste, setShowDiagramPaste] = useState(false);
+  const [showImageUpload, setShowImageUpload] = useState(false);
+  const [imageUploadFile, setImageUploadFile] = useState<File | null>(null);
+  const [imageUploadPreview, setImageUploadPreview] = useState('');
   const [pasteBuffer, setPasteBuffer] = useState('');
   const [insertTitle, setInsertTitle] = useState('');
   const [insertLegend, setInsertLegend] = useState('');
@@ -59,6 +63,24 @@ export default function RichTextEditor({
   const execCmd = (command: string, value?: string) => {
     editorRef.current?.focus();
     document.execCommand(command, false, value);
+    handleInput();
+  };
+
+  const pushHistory = () => {
+    if (!editorRef.current) return;
+    historyRef.current = [...historyRef.current.slice(-24), editorRef.current.innerHTML];
+  };
+
+  const undoLast = () => {
+    if (!editorRef.current) return;
+    const previous = historyRef.current.pop();
+    if (previous === undefined) {
+      document.execCommand('undo');
+      handleInput();
+      return;
+    }
+    editorRef.current.innerHTML = previous;
+    setSelectedMediaId(null);
     handleInput();
   };
 
@@ -176,6 +198,7 @@ export default function RichTextEditor({
     }
     selection?.removeAllRanges();
     selection?.addRange(activeRange);
+    pushHistory();
     activeRange.deleteContents();
     const template = document.createElement('template');
     template.innerHTML = html;
@@ -238,18 +261,35 @@ export default function RichTextEditor({
     setShowDiagramPaste(false);
   };
 
-  const insertImageFile = (file: File) => {
+  const insertImageFile = (file: File, title?: string, legend?: string) => {
     const reader = new FileReader();
     reader.onload = () => {
-      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-figure" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption>${escapeHtml(file.name)}</figcaption><img src="${reader.result}" alt="${escapeHtml(file.name)}"></figure><p><br></p>`);
+      const caption = title?.trim() || file.name;
+      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-figure" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(caption)}</strong>${legend?.trim() ? ` — ${escapeHtml(legend)}` : ''}</figcaption><img src="${reader.result}" alt="${escapeHtml(caption)}"></figure><p><br></p>`);
     };
     reader.readAsDataURL(file);
   };
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) insertImageFile(file);
+    if (file) {
+      setImageUploadFile(file);
+      setInsertTitle(file.name);
+      const reader = new FileReader();
+      reader.onload = () => setImageUploadPreview(String(reader.result || ''));
+      reader.readAsDataURL(file);
+    }
     event.target.value = '';
+  };
+
+  const insertSelectedImage = () => {
+    if (!imageUploadFile || !insertTitle.trim()) return;
+    insertImageFile(imageUploadFile, insertTitle, insertLegend);
+    setImageUploadFile(null);
+    setImageUploadPreview('');
+    setInsertTitle('');
+    setInsertLegend('');
+    setShowImageUpload(false);
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
@@ -301,6 +341,7 @@ export default function RichTextEditor({
       neighbor = direction === 'up' ? neighbor.previousSibling : neighbor.nextSibling;
     }
     if (!neighbor) return;
+    pushHistory();
     if (direction === 'up') {
       media.parentNode.insertBefore(media, neighbor);
     } else {
@@ -314,6 +355,7 @@ export default function RichTextEditor({
     if (!editorRef.current || !selectedMediaId) return;
     const media = editorRef.current.querySelector<HTMLElement>(`.gbmn-inline-media[data-media-id="${selectedMediaId}"]`);
     if (!media) return;
+    pushHistory();
     const next = media.nextSibling;
     media.remove();
     if (next) placeCaretAfter(next);
@@ -333,12 +375,18 @@ export default function RichTextEditor({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+      event.preventDefault();
+      undoLast();
+      return;
+    }
     if (event.key !== 'Backspace' && event.key !== 'Delete') return;
     const media = selectedMediaId
       ? editorRef.current?.querySelector<HTMLElement>(`.gbmn-inline-media[data-media-id="${selectedMediaId}"]`)
       : selectedMediaFromSelection();
     if (!media) return;
     event.preventDefault();
+    pushHistory();
     media.remove();
     setSelectedMediaId(null);
     handleInput();
@@ -360,6 +408,7 @@ export default function RichTextEditor({
     const dragged = draggedMediaRef.current;
     if (!html || !dragged || !editorRef.current) return;
     event.preventDefault();
+    pushHistory();
     const dropRange = rangeFromPoint(event.clientX, event.clientY);
     if (!dropRange || !editorRef.current.contains(dropRange.commonAncestorContainer)) return;
     const template = document.createElement('template');
@@ -417,7 +466,10 @@ export default function RichTextEditor({
           <AlignLeft className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <div className="w-px bg-slate-300 mx-0.5" />
-        <ToolbarBtn title="Insert image at cursor" onClick={() => { saveSelection(); imageInputRef.current?.click(); }}>
+        <ToolbarBtn title="Undo" onClick={undoLast}>
+          <Undo2 className="h-3.5 w-3.5" />
+        </ToolbarBtn>
+        <ToolbarBtn title="Insert image at cursor" onClick={() => { saveSelection(); createInsertionMarker(); setShowImageUpload(true); setShowTablePaste(false); setShowDiagramPaste(false); }}>
           <Image className="h-3.5 w-3.5" />
         </ToolbarBtn>
         <ToolbarBtn title="Paste table at cursor" onClick={() => { saveSelection(); createInsertionMarker(); setShowTablePaste(true); setShowDiagramPaste(false); }}>
@@ -437,6 +489,43 @@ export default function RichTextEditor({
         </ToolbarBtn>
         <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
       </div>
+
+      {showImageUpload && (
+        <div className="fixed inset-0 z-60 bg-black/30 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-3xl rounded-sm shadow-2xl border border-slate-200">
+            <div className="flex items-start justify-between px-5 py-4 border-b">
+              <div>
+                <h3 className="text-xl text-slate-900">Insert Figure</h3>
+                <p className="text-sm text-slate-600 mt-1">Upload an image, add title and legend, then insert it exactly where the cursor was.</p>
+              </div>
+              <button type="button" onClick={() => { clearInsertionMarker(); setShowImageUpload(false); }} className="p-1 text-slate-500 hover:text-slate-900">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="border-2 border-dashed border-slate-300 rounded bg-slate-50 p-5 text-center">
+                {imageUploadPreview ? (
+                  <img src={imageUploadPreview} alt="Figure preview" className="max-h-56 mx-auto object-contain bg-white border" />
+                ) : (
+                  <p className="text-sm text-slate-500">Choose image file for the figure.</p>
+                )}
+                <button type="button" onClick={() => imageInputRef.current?.click()} className="mt-3 px-4 py-2 text-xs font-bold rounded bg-white border text-slate-700">
+                  {imageUploadFile ? imageUploadFile.name : 'Upload Image'}
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm text-slate-700 mb-1">Title <span className="text-red-600">*</span></label>
+                <input value={insertTitle} onChange={(event) => setInsertTitle(event.target.value)} placeholder="Figure 1. Descriptive title" className="w-full border border-slate-300 px-3 py-2 text-sm" />
+              </div>
+              <textarea value={insertLegend} onChange={(event) => setInsertLegend(event.target.value)} rows={4} placeholder="Legend (optional)" className="w-full border border-slate-300 p-3 text-sm" />
+            </div>
+            <div className="flex justify-end gap-3 p-4 border-t bg-slate-50">
+              <button type="button" onClick={() => { clearInsertionMarker(); setImageUploadFile(null); setImageUploadPreview(''); setInsertTitle(''); setInsertLegend(''); setShowImageUpload(false); }} className="px-5 py-2 text-sm font-semibold border rounded-md text-slate-600 bg-white">Cancel</button>
+              <button type="button" disabled={!imageUploadFile || !insertTitle.trim()} onClick={insertSelectedImage} className="px-5 py-2 text-sm font-semibold rounded-md bg-sky-300 text-white disabled:opacity-50 disabled:cursor-not-allowed">Insert</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(showTablePaste || showDiagramPaste) && (
         <div className="fixed inset-0 z-60 bg-black/30 flex items-center justify-center p-4">

@@ -133,7 +133,7 @@ export const SUBMISSION_STEPS: SubmissionStep[] = [
     icon: HeartHandshake,
     validator: (m) => {
       const isComplete = m.ethics.humanSubjectsApproved && m.ethics.informedConsentObtained;
-      if (isComplete && m.ethics.ethicsStatementFileName) return 'complete';
+      if (isComplete && (m.ethics.informedConsentObtained === 'no' || m.ethics.humanSubjectsApproved === 'not-applicable' || m.ethics.ethicsStatementFileName)) return 'complete';
       if (isComplete) return 'warning';
       return 'empty';
     },
@@ -142,7 +142,7 @@ export const SUBMISSION_STEPS: SubmissionStep[] = [
     id: 'conflicts',
     label: 'Conflict Disclosures',
     icon: ShieldCheck,
-    validator: (m) => m.conflictDisclosure.signedCoiFormName ? 'complete' : 'warning',
+    validator: (m) => !m.conflictDisclosure.hasConflict || m.conflictDisclosure.signedCoiFormName ? 'complete' : 'warning',
   },
   {
     id: 'funding',
@@ -193,7 +193,7 @@ function statusHelp(stepId: string, status: 'complete' | 'warning' | 'empty') {
     sections: 'Required manuscript body sections need content.',
     references: 'Add complete AMA references.',
     ethics: 'Ethics fields and IRB upload should be completed.',
-    conflicts: 'Signed conflict of interest form is required.',
+    conflicts: 'COI file is required only when conflicts are declared.',
     payment: 'Payment receipt upload is required before final submission.',
   };
   return messages[stepId] || '';

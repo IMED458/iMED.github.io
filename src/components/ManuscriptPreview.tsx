@@ -353,18 +353,14 @@ a { color: #007f7f; }
 
           {/* MANUSCRIPT SECTIONS */}
           {articleConfig?.requiredSections.filter(s => s !== 'Keywords').map((sectionName, sectionIndex) => (
-            <div key={sectionName} className="break-inside-avoid mb-5">
-              <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
-                {sectionName}
-              </h2>
-              {manuscript.sections[sectionName] ? (
+            manuscript.sections[sectionName]?.replace(/<[^>]+>/g, '').trim() ? (
+              <div key={sectionName} className="break-inside-avoid mb-5">
+                <h2 className="gbmn-section-heading" style={{ fontFamily: 'Arial, sans-serif' }}>
+                  {sectionName}
+                </h2>
                 <RichContent html={manuscript.sections[sectionName]} references={manuscript.references} dropCap={sectionIndex === 0} />
-              ) : (
-                <p className="text-slate-400 italic text-xs font-mono">
-                  [Section empty — edit in Step 9]
-                </p>
-              )}
-            </div>
+              </div>
+            ) : null
           ))}
         </div>
 

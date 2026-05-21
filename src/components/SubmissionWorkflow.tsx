@@ -391,7 +391,7 @@ export default function SubmissionWorkflow({
             {activeStep === 'policies' && '2. GBMN Ethics & Open Access Declarations'}
             {activeStep === 'checklist' && '3. Mandatory Peer Submitting Checklist'}
             {activeStep === 'title-meta' && '4. Title and Clinical Specialty Scope'}
-            {activeStep === 'authors' && '5. Cureus-Style Author Roster Management'}
+            {activeStep === 'authors' && '5. GBMN Author Roster Management'}
             {activeStep === 'article-type' && '6. Article Type Quota Configuration'}
             {activeStep === 'abstract' && '7. Structured abstract compilation'}
             {activeStep === 'keywords' && '8. Indexed indexing Keywords'}
@@ -1164,7 +1164,7 @@ export default function SubmissionWorkflow({
         {activeStep === 'conflicts' && (
           <div className="space-y-4 text-xs animate-fade-in text-slate-700">
             <div className="bg-slate-50 p-4 border rounded-xl space-y-3">
-              <h4 className="font-bold text-slate-800">Cureus-style Conflict of Interest disclosures</h4>
+              <h4 className="font-bold text-slate-800">GBMN Conflict of Interest disclosures</h4>
               <p className="leading-snug">
                 You must disclose all conflicts. Select the corresponding option:
               </p>
@@ -1211,6 +1211,7 @@ export default function SubmissionWorkflow({
             </div>
 
             {/* Form download */}
+            {manuscript.conflictDisclosure.hasConflict ? (
             <div className="bg-slate-50 p-4 border rounded-xl space-y-4">
               <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
                 <FileCode className="h-4 w-4 text-teal-700" />
@@ -1260,6 +1261,11 @@ export default function SubmissionWorkflow({
                 </button>
               </div>
             </div>
+            ) : (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-900">
+                <strong>No Conflicts to declare</strong> selected. A signed COI upload is not required for this manuscript.
+              </div>
+            )}
           </div>
         )}
 
@@ -1563,16 +1569,11 @@ export default function SubmissionWorkflow({
                     onShowNotification('Submission error: Minimum of 1 author affiliate matching credentials required.', 'error');
                     return;
                   }
-                  if (!manuscript.payment.fileName) {
-                    onShowNotification('Submission error: Proof of open access submission invoice payment receipt mandatory.', 'error');
-                    return;
-                  }
-
-                  updateField('status', 'Submitted');
+                  onUpdateManuscript({ ...manuscript, status: 'Submitted', updatedAt: new Date().toISOString() });
                   onStepChange('getting-started');
-                  onShowNotification('Manuscript GBMN Submission Successful! Transmitting to referee queue.', 'success');
+                  onShowNotification('Manuscript submitted to the editorial office. Confirmation recorded.', 'success');
                 }}
-                className="inline-flex items-center gap-1.5 bg-teal-850 hover:bg-teal-900 text-white font-bold py-3 px-8 rounded-xl shadow-lg cursor-pointer transition-all text-sm uppercase tracking-wide"
+                className="inline-flex items-center gap-2 bg-teal-900 hover:bg-teal-800 text-white font-bold py-4 px-8 rounded-xl shadow-lg cursor-pointer transition-all text-sm uppercase tracking-wide"
               >
                 <CheckCircle2 className="h-5 w-5" />
                 Submit Manuscript Package to Editorial office

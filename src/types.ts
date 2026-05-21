@@ -139,9 +139,14 @@ export interface ReviewerComment {
 export type ManuscriptStatus =
   | 'Draft'
   | 'Submitted'
+  | 'Reviewer Assigned'
   | 'Under Review'
+  | 'In Review'
   | 'Revision Requested'
+  | 'Editorial Decision'
   | 'Accepted'
+  | 'In Production'
+  | 'Completed'
   | 'Rejected'
   | 'Published';
 

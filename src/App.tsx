@@ -10,6 +10,7 @@ import AuthLayout from './components/AuthLayout';
 import SidebarWorkflow from './components/SidebarWorkflow';
 import SubmissionWorkflow from './components/SubmissionWorkflow';
 import RoleDashboards from './components/RoleDashboards';
+import ManuscriptPreview from './components/ManuscriptPreview';
 import { 
   GraduationCap, 
   User as UserIcon, 
@@ -100,7 +101,23 @@ export default function App() {
       specialty: 'Clinical Medicine',
       articleType: 'original-research',
       checklistAgreed: false,
-      authors: [],
+      authors: currentUser ? [{
+        id: `auth-${currentUser.id}`,
+        firstName: currentUser.firstName,
+        lastName: currentUser.lastName,
+        email: currentUser.email,
+        phone: '',
+        orcidId: currentUser.orcidId || '',
+        specialty: 'Clinical Medicine',
+        country: 'Georgia',
+        city: 'Tbilisi',
+        institution: currentUser.institution,
+        department: '',
+        affiliation: `${currentUser.institution}`,
+        academicTitle: '',
+        contributionRole: 'Corresponding Author',
+        isCorresponding: true
+      }] : [],
       abstractContents: {},
       sections: {},
       figuresAndTables: [],
@@ -147,6 +164,7 @@ export default function App() {
   const activeManuscript = currentUser?.role === 'Author'
     ? authorManuscripts.find(m => m.id === selectedManuscriptId) || authorManuscripts[0] || null
     : null;
+  const authorCanEditActive = !activeManuscript || ['Draft', 'Revision Requested'].includes(activeManuscript.status);
 
   const createAuthorDraft = () => {
     if (!currentUser) return;
@@ -282,7 +300,7 @@ export default function App() {
             <section className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm no-print">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-display font-bold text-slate-900">Author Profile & Manuscripts</h2>
+                  <h2 className="text-lg font-display font-bold text-slate-900">Home · My Manuscripts</h2>
                   <p className="text-xs text-slate-500">{currentUser.firstName} {currentUser.lastName} · {currentUser.email} · {currentUser.institution}</p>
                 </div>
                 <button onClick={createAuthorDraft} className="inline-flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-4 py-2 rounded-lg">
@@ -305,13 +323,19 @@ export default function App() {
                       <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {m.status}</span>
                     </div>
                     <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-2">{m.title || 'Untitled draft'}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">Updated {new Date(m.updatedAt).toLocaleDateString()}</p>
+                    <p className="mt-1 text-[11px] text-slate-500">Created {new Date(m.createdAt).toLocaleDateString()} · Updated {new Date(m.updatedAt).toLocaleDateString()}</p>
+                    {m.editorDecisionLog.length > 0 && (
+                      <p className="mt-1 text-[11px] text-amber-700 font-semibold line-clamp-1">
+                        Latest editor note: {m.editorDecisionLog[m.editorDecisionLog.length - 1].comments}
+                      </p>
+                    )}
                   </button>
                 ))}
               </div>
             </section>
 
             {activeManuscript && (
+              authorCanEditActive ? (
               <div className="flex flex-col md:flex-row gap-8">
                 <SidebarWorkflow 
                   manuscript={activeManuscript} 
@@ -331,6 +355,14 @@ export default function App() {
                   />
                 </div>
               </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+                    This manuscript is currently <strong>{activeManuscript.status}</strong>. Editing is locked until an editor returns it for revision.
+                  </div>
+                  <ManuscriptPreview manuscript={activeManuscript} onShowNotification={triggerNotification} />
+                </div>
+              )
             )}
             </div>
         ) : (
