@@ -23,9 +23,7 @@ import {
   BadgeAlert, 
   Database,
   Sliders,
-  DollarSign,
   AlertCircle,
-  FileSpreadsheet
 } from 'lucide-react';
 
 interface RoleDashboardsProps {
@@ -712,12 +710,6 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                       {selectedManuscript.ethics.humanSubjectsApproved.toUpperCase()} ({selectedManuscript.ethics.irbApprovalNumber || 'Exempt'})
                     </span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 font-semibold block">Payment Clearance</span>
-                    <span className="inline-flex items-center gap-1 font-bold text-green-700">
-                       {selectedManuscript.payment.status.toUpperCase()} ({selectedManuscript.payment.invoiceNumber})
-                    </span>
-                  </div>
                 </div>
 
                 {/* Assigned Reviewer Stats & comments matrix */}
@@ -852,91 +844,19 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
   // Render Managing Editor Pane
   const renderManagingEditorWorkspace = () => {
-    const handleVerifyPayment = (m: Manuscript, verified: 'verified' | 'rejected') => {
-      const updated = manuscripts.map(item => {
-        if (item.id === m.id) {
-          return {
-            ...item,
-            payment: {
-              ...item.payment,
-              status: verified
-            }
-          };
-        }
-        return item;
-      });
-      onUpdateManuscripts(updated);
-      onShowNotification(`Invoice Payment Status: ${verified.toUpperCase()}!`, 'success');
-
-      DB.addAuditLog({
-        userId: currentUser.id,
-        userEmail: currentUser.email,
-        action: `FINANCIAL_${verified.toUpperCase()}`,
-        targetId: m.id,
-        details: `Managing Editor checked financial bank slip reference: ${m.payment.referenceId}. Status: ${verified}`
-      });
-    };
-
     return (
       <div id="managing-editor-dash" className="space-y-6">
         <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xs">
           <h3 className="text-lg font-display font-bold text-slate-800 flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-teal-700" />
-            Financial Management & Platform Auditing
+            <Database className="h-5 w-5 text-teal-700" />
+            Platform Auditing
           </h3>
           <p className="text-xs text-slate-500 mt-1">
-            Reconcile author processing charges (APC), audit system security logs, and review CC-BY journal settings.
+            Audit system security logs and review CC-BY journal settings.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Billing queue */}
-          <div className="bg-white border p-5 rounded-2xl space-y-4 shadow-xs">
-            <h4 className="font-bold text-sm text-slate-700 flex items-center gap-1.5 border-b pb-2">
-              <FileSpreadsheet className="h-4 w-4" /> Submission Invoice Verification Queue
-            </h4>
-
-            {manuscripts.filter(m => m.payment.fileName).length === 0 ? (
-              <p className="text-xs text-slate-400 py-4 text-center">No payment transactions registered.</p>
-            ) : (
-              <div className="space-y-3">
-                {manuscripts.filter(m => m.payment.fileName).map((m) => (
-                  <div key={m.id} className="p-3 bg-slate-50 border rounded-xl flex justify-between items-center text-xs">
-                    <div className="space-y-0.5">
-                      <p className="font-bold text-slate-800">Paper ID: {m.id}</p>
-                      <p className="text-slate-500">Invoice: {m.payment.invoiceNumber}</p>
-                      <p className="text-slate-500">Bank Code: {m.payment.referenceId}</p>
-                      <p className="text-[10px] text-slate-400">Attached wire: <span className="underline select-all">{m.payment.fileName}</span></p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                      <span className={`px-2 py-0.5 font-bold text-[9px] rounded-sm tracking-wide ${
-                        m.payment.status === 'verified' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {m.payment.status.toUpperCase()}
-                      </span>
-                      {m.payment.status === 'pending' && (
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleVerifyPayment(m, 'verified')}
-                            className="bg-green-655 hover:bg-green-700 text-green-800 bg-green-50 text-[10px] border px-2 py-0.5 font-bold rounded"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleVerifyPayment(m, 'rejected')}
-                            className="bg-red-50 text-red-800 text-[10px] border px-2 py-0.5 font-bold rounded"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
+        <div className="grid grid-cols-1 gap-6">
           {/* Central Security Auditing console */}
           <div className="bg-white border p-5 rounded-2xl shadow-xs space-y-4">
             <h4 className="font-bold text-sm text-slate-700 flex items-center gap-1.5 border-b pb-2">

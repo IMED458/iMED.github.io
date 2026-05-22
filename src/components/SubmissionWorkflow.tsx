@@ -52,6 +52,12 @@ export default function SubmissionWorkflow({
     return () => clearInterval(saver);
   }, [manuscript]);
 
+  useEffect(() => {
+    if (activeStep === 'payment') {
+      onStepChange('editor-files');
+    }
+  }, [activeStep, onStepChange]);
+
   const updateField = (field: keyof Manuscript, value: any) => {
     onUpdateManuscript({
       ...manuscript,
@@ -401,10 +407,9 @@ export default function SubmissionWorkflow({
             {activeStep === 'ethics' && '12. Institutional Review Board (IRB) Clearance'}
             {activeStep === 'conflicts' && '13. Disclosure of Financial Conflicts (COI)'}
             {activeStep === 'funding' && '14. Rustaveli & Global Research Grants'}
-            {activeStep === 'payment' && '15. Author APC processing wire receipt'}
-            {activeStep === 'editor-files' && '16. Cover Letter & Referee Guidelines'}
-            {activeStep === 'preview' && '17. Pre-Publication Live Watermarked proof'}
-            {activeStep === 'summary-submit' && '18. Final Integrity Evaluation & Submitting'}
+            {activeStep === 'editor-files' && '15. Cover Letter & Referee Guidelines'}
+            {activeStep === 'preview' && '16. Pre-Publication Live Watermarked proof'}
+            {activeStep === 'summary-submit' && '17. Final Integrity Evaluation & Submitting'}
           </h2>
         </div>
 
@@ -1318,88 +1323,7 @@ export default function SubmissionWorkflow({
           </div>
         )}
 
-        {/* 16. PAYMENT RECEIPT */}
-        {activeStep === 'payment' && (
-          <div className="space-y-4 text-xs animate-fade-in text-slate-700">
-            <div className="bg-teal-50 border-l-4 border-teal-700 p-4 rounded-r-lg space-y-1">
-              <h4 className="font-bold text-teal-900">Georgian Biomedical News — Article Processing</h4>
-              <p className="leading-snug text-xs text-teal-850">
-                If an article processing charge (APC) applies to your submission, please transfer the payment and upload the receipt below.
-              </p>
-            </div>
-
-            {/* Ledger wire details */}
-            <div className="bg-slate-50 border p-4 rounded-xl space-y-2 font-mono text-[11px] leading-relaxed text-slate-650">
-              <span className="font-bold font-sans text-xs text-slate-800 block mb-1">Central Journal wire instructions:</span>
-              <p>Beneficiary: Georgian Medical News and Biomedical Nexus board</p>
-              <p>Bank: Bank of Georgia CORP / TBC Bank Tbilisi</p>
-              <p>IBAN: GE98BG000000088192834</p>
-              <p>Swift code: BAGAGE22</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold mb-1">Invoice Code identifier *</label>
-                <input
-                  type="text"
-                  value={manuscript.payment.invoiceNumber}
-                  onChange={(e) => {
-                    const p = { ...manuscript.payment, invoiceNumber: e.target.value };
-                    updateField('payment', p);
-                  }}
-                  placeholder="GBMN-INV-2026-xxxxx"
-                  className="w-full bg-slate-50 border p-1.5 rounded"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1 col-span-1">Bank transaction Reference Code *</label>
-                <input
-                  type="text"
-                  value={manuscript.payment.referenceId}
-                  onChange={(e) => {
-                    const p = { ...manuscript.payment, referenceId: e.target.value };
-                    updateField('payment', p);
-                  }}
-                  placeholder="TXN-BANKGEO-XXXXXX"
-                  className="w-full bg-slate-50 border p-1.5 rounded"
-                />
-              </div>
-            </div>
-
-            {/* Bill upload */}
-            <div className="border-2 border-dashed p-4 text-center rounded bg-white">
-              <span className="font-bold block text-slate-700 mb-1.5">Attach Bank Wire transfer proof receipt *</span>
-              <input
-                id="payment-receipt-upload"
-                type="file"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const p = { 
-                      ...manuscript.payment, 
-                      fileName: file.name,
-                      uploadedUrl: await readFileAsDataUrl(file),
-                      status: 'pending' as any,
-                      uploadedAt: new Date().toISOString()
-                    };
-                    updateField('payment', p);
-                    onShowNotification('Payment receipt draft linked successfully.', 'success');
-                  }
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => document.getElementById('payment-receipt-upload')?.click()}
-                className="bg-slate-100 hover:bg-slate-200 text-slate-705 border font-bold px-3 py-1.5 rounded"
-              >
-                {manuscript.payment.fileName ? `Change attachment (${manuscript.payment.fileName})` : 'Attach PDF/Copy of wire transaction'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 17. FILES FOR EDITOR REVIEW */}
+        {/* 15. FILES FOR EDITOR REVIEW */}
         {activeStep === 'editor-files' && (
           <div className="space-y-5 text-xs animate-fade-in text-slate-700">
             
@@ -1548,11 +1472,6 @@ export default function SubmissionWorkflow({
                   <span className={manuscript.ethics.humanSubjectsApproved ? 'text-slate-750 font-semibold' : 'text-slate-400'}>IRB statement of subjects disclosure</span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <CheckSquare className={manuscript.payment.fileName ? 'text-green-600 h-4 w-4' : 'text-slate-300 h-4 w-4'} />
-                  <span className={manuscript.payment.fileName ? 'text-slate-750 font-semibold' : 'text-slate-400'}>Invoice Wire transfer receipts attached</span>
-                </div>
-
               </div>
             </div>
 
@@ -1579,7 +1498,7 @@ export default function SubmissionWorkflow({
                 Submit Manuscript Package to Editorial office
               </button>
               <p className="text-[10px] text-slate-400 mt-2">
-                A confirmation automated receipt notification will be routed to your academic mailbox credentials.
+                A confirmation notification will be routed to your academic mailbox credentials.
               </p>
             </div>
           </div>
@@ -1596,7 +1515,7 @@ export default function SubmissionWorkflow({
             const steps = [
               'getting-started', 'policies', 'checklist', 'title-meta', 'authors', 'article-type',
               'abstract', 'keywords', 'sections', 'references', 'supplementary',
-              'ethics', 'conflicts', 'funding', 'payment', 'editor-files', 'preview', 'summary-submit'
+              'ethics', 'conflicts', 'funding', 'editor-files', 'preview', 'summary-submit'
             ];
             const currentIdx = steps.indexOf(activeStep);
             if (currentIdx > 0) onStepChange(steps[currentIdx - 1]);
@@ -1625,7 +1544,7 @@ export default function SubmissionWorkflow({
             const steps = [
               'getting-started', 'policies', 'checklist', 'title-meta', 'authors', 'article-type',
               'abstract', 'keywords', 'sections', 'references', 'supplementary',
-              'ethics', 'conflicts', 'funding', 'payment', 'editor-files', 'preview', 'summary-submit'
+              'ethics', 'conflicts', 'funding', 'editor-files', 'preview', 'summary-submit'
             ];
             const currentIdx = steps.indexOf(activeStep);
             if (currentIdx < steps.length - 1) onStepChange(steps[currentIdx + 1]);

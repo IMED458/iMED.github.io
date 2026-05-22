@@ -151,12 +151,6 @@ export const SUBMISSION_STEPS: SubmissionStep[] = [
     validator: () => 'complete', // Optional field
   },
   {
-    id: 'payment',
-    label: 'Payment Receipt',
-    icon: DollarSign,
-    validator: (m) => m.payment.fileName ? 'complete' : 'warning',
-  },
-  {
     id: 'editor-files',
     label: 'Files for Editorial Office',
     icon: FileCheck2,
@@ -194,7 +188,6 @@ function statusHelp(stepId: string, status: 'complete' | 'warning' | 'empty') {
     references: 'Add complete AMA references.',
     ethics: 'Ethics fields and IRB upload should be completed.',
     conflicts: 'COI file is required only when conflicts are declared.',
-    payment: 'Payment receipt upload is required before final submission.',
   };
   return messages[stepId] || '';
 }

@@ -319,12 +319,12 @@ export const SAMPLE_MANUSCRIPT: Manuscript = {
     explanation: 'Sustenance and biochemical reagents funding was funded exclusively by Rustaveli Scientific Grant FR-24-9128.'
   },
   payment: {
-    invoiceNumber: 'GBMN-INV-2026-0089',
-    referenceId: 'TXN-BANKGEO-559281',
-    paymentNote: 'Wire transfer payment for Original Article submission fee.',
-    fileName: 'tbc_bank_wire_receipt_250usd.pdf',
-    status: 'verified',
-    uploadedAt: '2026-04-12T10:14:00Z'
+    invoiceNumber: '',
+    referenceId: '',
+    paymentNote: '',
+    fileName: '',
+    status: 'pending',
+    uploadedAt: ''
   },
   editorFiles: [],
   reviewerAssignments: [
@@ -416,9 +416,9 @@ export const DB = {
           timestamp: '2026-04-12T10:14:00Z',
           userId: 'user-auth-1',
           userEmail: 'author@gbmn.edu',
-          action: 'PAYMENT_RECEIPT_UPLOADED',
+          action: 'MANUSCRIPT_DRAFT_CREATED',
           targetId: 'GBMN-2026-0142',
-          details: 'Uploaded payment bill for original article (250 USD) verified by bank code TXN-BANKGEO-559281.'
+          details: 'Author created an original article draft and started submission metadata review.'
         },
         {
           id: 'log-2',
