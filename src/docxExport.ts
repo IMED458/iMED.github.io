@@ -22,26 +22,39 @@ import {
 import { Manuscript } from './types';
 import { ARTICLE_TYPES, formatAMAReference } from './utils';
 
+// ─────────────────────────────────────────────────────────
+// DESIGN TOKENS — must match ManuscriptPreview.tsx exactly
+// ─────────────────────────────────────────────────────────
 const COLORS = {
-  teal: '0E8B8B',
-  darkGreen: '2F6B5A',
-  lightGreen: 'DCE8D0',
-  stripeGreen: 'D9E3D1',
-  borderGreen: 'A8C28F',
-  body: '222222',
-  gray: '666666',
-  red: 'C62828',
+  teal:        '0E8B8B',   // --gbmn-teal
+  darkGreen:   '2596be',   // --gbmn-section-heading
+  lightGreen:  'DCE8D0',   // --gbmn-light-green
+  stripeGreen: 'D9E3D1',   // --gbmn-stripe-green
+  borderGreen: 'A8C28F',   // --gbmn-border-green
+  body:        '222222',   // --gbmn-body
+  gray:        '666666',   // --gbmn-gray
+  lightGray:   '777777',   // --gbmn-light-gray
+  black:       '000000',
+  logoTeal:    '3b8790',
 };
 
-const A4 = { width: 11906, height: 16838 };
-const MARGINS = { top: 1077, right: 737, bottom: 1701, left: 737, header: 420, footer: 420 };
-const BODY_WIDTH = A4.width - MARGINS.left - MARGINS.right;
-const COLUMN_GAP = 340;
-const COLUMN_WIDTH = Math.floor((BODY_WIDTH - COLUMN_GAP) / 2);
+// ─────────────────────────────────────────────────────────
+// PAGE GEOMETRY (A4, all values in DXA: 1440 DXA = 1 inch)
+// Top: 1.9cm → ~1077 DXA
+// Bottom: 3cm → ~1701 DXA
+// Left/Right: 1.3cm → ~737 DXA
+// ─────────────────────────────────────────────────────────
+const A4         = { width: 11906, height: 16838 };
+const MARGINS    = { top: 1077, right: 737, bottom: 1701, left: 737, header: 420, footer: 420 };
+const BODY_WIDTH = A4.width - MARGINS.left - MARGINS.right;  // ≈10432
+const COLUMN_GAP = 340;   // 0.6cm
+const COLUMN_WIDTH = Math.floor((BODY_WIDTH - COLUMN_GAP) / 2);  // ≈5046
 
 type DocxChild = Paragraph | Table;
 
-function text(value?: string) {
+// ─── Helpers ──────────────────────────────────────────────
+
+function textContent(value?: string) {
   return (value || '').replace(/\s+/g, ' ').trim();
 }
 
@@ -49,47 +62,58 @@ function stripHtml(html?: string) {
   if (!html) return '';
   const container = document.createElement('div');
   container.innerHTML = html;
-  return text(container.textContent || '');
+  return textContent(container.textContent || '');
 }
 
 function sanitizeFileName(name: string) {
   return name.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '') || 'GBMN_Manuscript';
 }
 
-function cmParagraph(options: any) {
+/** Base paragraph with GBMN line-spacing */
+function baseParagraph(options: any) {
   return new Paragraph({
     ...options,
-    spacing: { before: 0, after: 120, line: 360, lineRule: LineRuleType.AUTO, ...options.spacing },
+    spacing: {
+      before: 0,
+      after: 120,   // 6pt after each paragraph
+      line: 360,    // 1.5 line-height in DXA
+      lineRule: LineRuleType.AUTO,
+      ...options.spacing,
+    },
   });
 }
 
+/** Standard body text run */
 function run(value: string, options: any = {}) {
   return new TextRun({
     text: value,
     font: 'Times New Roman',
     color: COLORS.body,
-    size: 22,
+    size: 22,          // 11pt = 22 half-points
     ...options,
   });
 }
 
+/** Section heading paragraph */
 function heading(value: string) {
   return new Paragraph({
     heading: HeadingLevel.HEADING_2,
     keepNext: true,
-    spacing: { before: 400, after: 200 },
+    spacing: { before: 360, after: 160, line: 360, lineRule: LineRuleType.AUTO },
     children: [
       run(value.toUpperCase(), {
+        font: 'Arial',
         bold: true,
-        size: 24,
+        size: 22,
         color: COLORS.darkGreen,
       }),
     ],
   });
 }
 
+/** Justified body paragraph, optionally with first-line indent */
 function bodyParagraph(children: any[], firstLine = true) {
-  return cmParagraph({
+  return baseParagraph({
     alignment: AlignmentType.JUSTIFIED,
     indent: firstLine ? { firstLine: 720 } : undefined,
     children: children.length ? children : [run('')],
@@ -108,7 +132,7 @@ function orcidUrl(orcidId?: string) {
 }
 
 function toGbmnTitleCase(title: string) {
-  const minor = new Set(['a', 'an', 'and', 'as', 'at', 'by', 'for', 'from', 'if', 'in', 'into', 'on', 'or', 'of', 'the', 'to', 'with']);
+  const minor = new Set(['a','an','and','as','at','by','for','from','if','in','into','on','or','of','the','to','with']);
   return title.split(/\s+/).map((word, index) => {
     const lower = word.toLowerCase();
     if (index > 0 && minor.has(lower)) return lower;
@@ -122,7 +146,7 @@ function dataUrlToImage(dataUrl: string) {
   const type = match[1].toLowerCase() === 'jpeg' ? 'jpg' : match[1].toLowerCase();
   const binary = atob(match[2]);
   const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return { type: type as 'png' | 'jpg' | 'gif' | 'bmp', bytes };
 }
 
@@ -139,6 +163,8 @@ function measureImage(src: string): Promise<{ width: number; height: number }> {
   });
 }
 
+// ─── Inline run parser (bold / italic / sup / sub / links) ─
+
 function parseInlineRuns(node: Node, inherited: any = {}): any[] {
   if (node.nodeType === Node.TEXT_NODE) {
     const value = node.textContent || '';
@@ -150,46 +176,47 @@ function parseInlineRuns(node: Node, inherited: any = {}): any[] {
   const next = { ...inherited };
   if (tag === 'strong' || tag === 'b') next.bold = true;
   if (tag === 'em' || tag === 'i') next.italics = true;
-  if (tag === 'sup') {
-    next.superScript = true;
-    next.size = 16;
-    next.color = COLORS.teal;
-  }
-  if (tag === 'sub') {
-    next.subScript = true;
-    next.size = 16;
-  }
+  if (tag === 'sup') { next.superScript = true; next.size = 16; next.color = COLORS.teal; }
+  if (tag === 'sub') { next.subScript = true; next.size = 16; }
   if (tag === 'br') return [run('\n', inherited)];
   if (tag === 'a') {
     const href = element.getAttribute('href');
-    const children = Array.from(element.childNodes).flatMap(child => parseInlineRuns(child, { ...next, color: COLORS.teal, underline: {} }));
+    const children = Array.from(element.childNodes).flatMap(c => parseInlineRuns(c, { ...next, color: COLORS.teal, underline: {} }));
     return href ? [new ExternalHyperlink({ link: href, children })] : children;
   }
-  return Array.from(element.childNodes).flatMap(child => parseInlineRuns(child, next));
+  return Array.from(element.childNodes).flatMap(c => parseInlineRuns(c, next));
 }
+
+// ─── Table borders ─────────────────────────────────────────
 
 function tableBorders() {
   const border = { style: BorderStyle.SINGLE, color: COLORS.borderGreen, size: 4 };
-  return {
-    top: border,
-    bottom: border,
-    left: border,
-    right: border,
-    insideHorizontal: border,
-    insideVertical: border,
-  };
+  return { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border };
 }
 
-function docxTableFromElement(table: HTMLTableElement) {
+const TableBordersNone = {
+  top:              { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
+  bottom:           { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
+  left:             { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
+  right:            { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
+  insideHorizontal: { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
+  insideVertical:   { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
+};
+
+// ─── Build a DOCX table from an HTMLTableElement ────────────
+
+function docxTableFromElement(table: HTMLTableElement, availableWidth = COLUMN_WIDTH) {
   const rows = Array.from(table.rows);
   const columnCount = Math.max(1, ...rows.map(row => row.cells.length));
-  const columnWidth = Math.floor(COLUMN_WIDTH / columnCount);
+  const columnWidth = Math.floor(availableWidth / columnCount);
+  const totalWidth = columnWidth * columnCount;
+
   return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
+    width: { size: totalWidth, type: WidthType.DXA },
     layout: TableLayoutType.FIXED,
     columnWidths: Array(columnCount).fill(columnWidth),
     borders: tableBorders(),
-    margins: { top: 80, bottom: 80, left: 90, right: 90 },
+    margins: { top: 60, bottom: 60, left: 90, right: 90 },
     rows: rows.map((row, rowIndex) => new TableRow({
       tableHeader: rowIndex === 0,
       children: Array.from(row.cells).map(cell => new TableCell({
@@ -199,12 +226,12 @@ function docxTableFromElement(table: HTMLTableElement) {
           ? { type: ShadingType.CLEAR, fill: COLORS.lightGreen, color: 'auto' }
           : rowIndex % 2 === 0
             ? { type: ShadingType.CLEAR, fill: COLORS.stripeGreen, color: 'auto' }
-            : undefined,
+            : { type: ShadingType.CLEAR, fill: 'FFFFFF', color: 'auto' },
         children: [
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 0 },
-            children: [run(text(cell.textContent || ''), { size: 20, bold: rowIndex === 0 })],
+            spacing: { before: 0, after: 0, line: 240, lineRule: LineRuleType.AUTO },
+            children: [run(textContent(cell.textContent || ''), { size: 18, bold: rowIndex === 0 })],
           }),
         ],
       })),
@@ -212,23 +239,25 @@ function docxTableFromElement(table: HTMLTableElement) {
   });
 }
 
+// ─── Extract figure/image blocks ────────────────────────────
+
 async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
   const children: DocxChild[] = [];
-  const caption = text(figure.querySelector('figcaption')?.textContent || '');
-  const table = figure.querySelector('table');
+  const caption = textContent(figure.querySelector('figcaption')?.textContent || '');
+  const tableEl = figure.querySelector('table');
   const img = figure.querySelector('img');
 
   if (caption) {
     children.push(new Paragraph({
       keepNext: true,
-      spacing: { before: 180, after: 80 },
-      children: [run(caption, { size: 16, bold: true, color: COLORS.body })],
+      spacing: { before: 160, after: 80, line: 240, lineRule: LineRuleType.AUTO },
+      children: [run(caption, { font: 'Times New Roman', size: 16, bold: false, color: COLORS.body })],
     }));
   }
 
-  if (table) {
-    children.push(docxTableFromElement(table));
-    children.push(new Paragraph({ spacing: { before: 0, after: 160 }, children: [run('')] }));
+  if (tableEl) {
+    children.push(docxTableFromElement(tableEl));
+    children.push(new Paragraph({ spacing: { before: 0, after: 140 }, children: [run('')] }));
     return children;
   }
 
@@ -238,17 +267,13 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
       const dimensions = await measureImage(img.src);
       children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 0, after: 180 },
+        spacing: { before: 0, after: 160 },
         children: [
           new ImageRun({
             type: parsed.type,
             data: parsed.bytes,
             transformation: dimensions,
-            altText: {
-              title: caption || img.alt || 'Figure',
-              description: caption || img.alt || 'GBMN figure',
-              name: caption || img.alt || 'Figure',
-            },
+            altText: { title: caption || img.alt || 'Figure', description: caption || '', name: caption || 'Figure' },
           }),
         ],
       }));
@@ -261,6 +286,8 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
   return children;
 }
 
+// ─── Convert HTML section content → DOCX paragraphs ─────────
+
 async function htmlToDocxChildren(html: string, { dropCap = false } = {}): Promise<DocxChild[]> {
   const container = document.createElement('div');
   container.innerHTML = html || '';
@@ -269,14 +296,13 @@ async function htmlToDocxChildren(html: string, { dropCap = false } = {}): Promi
 
   for (const node of Array.from(container.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) {
-      const value = text(node.textContent || '');
+      const value = textContent(node.textContent || '');
       if (value) {
         children.push(bodyParagraph([run(value)], firstParagraph));
         firstParagraph = false;
       }
       continue;
     }
-
     if (node.nodeType !== Node.ELEMENT_NODE) continue;
     const element = node as HTMLElement;
     const tag = element.tagName.toLowerCase();
@@ -286,13 +312,11 @@ async function htmlToDocxChildren(html: string, { dropCap = false } = {}): Promi
       firstParagraph = true;
       continue;
     }
-
     if (tag === 'table') {
       children.push(docxTableFromElement(element as HTMLTableElement));
       firstParagraph = true;
       continue;
     }
-
     if (tag === 'ul' || tag === 'ol') {
       for (const li of Array.from(element.querySelectorAll(':scope > li'))) {
         children.push(new Paragraph({
@@ -306,14 +330,14 @@ async function htmlToDocxChildren(html: string, { dropCap = false } = {}): Promi
     }
 
     const runs = parseInlineRuns(element);
-    if (runs.length || text(element.textContent || '')) {
+    if (runs.length || textContent(element.textContent || '')) {
       if (dropCap && firstParagraph) {
-        const plain = text(element.textContent || '');
+        const plain = textContent(element.textContent || '');
         if (plain.length > 1) {
-          children.push(cmParagraph({
+          children.push(baseParagraph({
             alignment: AlignmentType.JUSTIFIED,
             children: [
-              run(plain.charAt(0), { size: 56, bold: true }),
+              run(plain.charAt(0), { size: 64, bold: false }),   // drop cap ~32pt
               run(plain.slice(1)),
             ],
           }));
@@ -330,128 +354,151 @@ async function htmlToDocxChildren(html: string, { dropCap = false } = {}): Promi
   return children;
 }
 
+// ─── Footer ─────────────────────────────────────────────────
+
 function footer() {
   return new Footer({
     children: [
       new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { before: 0, after: 0 },
-        children: [
-          run('Georgian Biomedical News\nISSN (Online): 2720-8796 ISSN (Print): 2720-7994\nDownloaded from gbmn.org. For personal use only. No other uses without permission.', {
-            font: 'Arial',
-            size: 14,
-            bold: true,
-            color: '000000',
-          }),
-        ],
+        children: [run('Georgian Biomedical News', { font: 'Arial', size: 14, bold: true, color: COLORS.black })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0 },
+        children: [run('ISSN (Online): 2720-8796  ISSN (Print): 2720-7994', { font: 'Arial', size: 14, color: COLORS.black })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0 },
+        children: [run('Downloaded from gbmn.org. For personal use only. No other uses without permission.', { font: 'Arial', size: 14, color: COLORS.black })],
       }),
     ],
   });
 }
 
-function journalHeader() {
+// ─── Journal header (logo + rule) ──────────────────────────
+
+function journalHeader(): DocxChild[] {
   const logoCell = new TableCell({
-    width: { size: 3800, type: WidthType.DXA },
+    width: { size: 4200, type: WidthType.DXA },
     borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
     children: [
       new Paragraph({
         spacing: { before: 0, after: 0 },
         children: [
-          run('gbmn', { font: 'Arial', size: 74, bold: true, color: COLORS.teal }),
-          run('  GEORGIAN\nBIOMEDICAL\nNEWS', { font: 'Arial', size: 30, bold: true, color: '000000' }),
+          // "gbmn" logo text in teal
+          run('gbmn', { font: 'Arial', size: 74, bold: true, color: COLORS.logoTeal }),
+          run('  GEORGIAN', { font: 'Arial', size: 28, bold: true, color: COLORS.black }),
         ],
+      }),
+      new Paragraph({
+        spacing: { before: 0, after: 0 },
+        children: [run('BIOMEDICAL', { font: 'Arial', size: 28, bold: true, color: COLORS.black })],
+      }),
+      new Paragraph({
+        spacing: { before: 0, after: 0 },
+        children: [run('NEWS', { font: 'Arial', size: 28, bold: true, color: COLORS.black })],
       }),
     ],
   });
 
   const issueCell = new TableCell({
-    width: { size: BODY_WIDTH - 3800, type: WidthType.DXA },
+    width: { size: BODY_WIDTH - 4200, type: WidthType.DXA },
     verticalAlign: VerticalAlign.CENTER,
     borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
     children: [
       new Paragraph({
         alignment: AlignmentType.RIGHT,
         spacing: { before: 0, after: 0 },
-        children: [run(`VOLUME X ISSUE X. ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()}`, { font: 'Arial', size: 20, bold: true, color: '000000' })],
+        children: [run(
+          `VOLUME X ISSUE X. ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()}`,
+          { font: 'Arial', size: 20, bold: true, color: COLORS.black }
+        )],
       }),
     ],
   });
 
   return [
     new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: BODY_WIDTH, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
+      columnWidths: [4200, BODY_WIDTH - 4200],
       borders: TableBordersNone,
       rows: [new TableRow({ children: [logoCell, issueCell] })],
     }),
+    // Double teal rule beneath header
     new Paragraph({
-      border: {
-        bottom: { color: COLORS.teal, style: BorderStyle.DOUBLE, size: 8 },
-      },
-      spacing: { before: 0, after: 380 },
+      border: { bottom: { color: COLORS.teal, style: BorderStyle.DOUBLE, size: 8 } },
+      spacing: { before: 0, after: 360 },
       children: [run('')],
     }),
   ];
 }
 
-const TableBordersNone = {
-  top: { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
-  bottom: { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
-  left: { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
-  right: { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
-  insideHorizontal: { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
-  insideVertical: { style: BorderStyle.NONE, color: 'FFFFFF', size: 0 },
-};
+// ─── Title / author / affiliation block ─────────────────────
 
 function titleBlock(manuscript: Manuscript): DocxChild[] {
   const title = manuscript.title ? toGbmnTitleCase(manuscript.title) : '[Article Title]';
+
   const authorRuns: any[] = [];
   manuscript.authors.forEach((author, index) => {
-    if (index > 0) authorRuns.push(run(', ', { color: '777777' }));
-    authorRuns.push(run(`${author.firstName} ${author.middleInitial ? `${author.middleInitial}. ` : ''}${author.lastName}`, { size: 22, color: '777777' }));
+    if (index > 0) authorRuns.push(run(', ', { color: COLORS.lightGray }));
+    authorRuns.push(run(
+      `${author.firstName}${author.middleInitial ? ' ' + author.middleInitial + '.' : ''} ${author.lastName}`,
+      { size: 22, color: COLORS.lightGray }
+    ));
+    if (author.isCorresponding) {
+      authorRuns.push(run('✉', { color: COLORS.teal, size: 18 }));
+    }
     const url = orcidUrl(author.orcidId);
-    const numberRun = run(String(index + 1), { size: 16, superScript: true, color: COLORS.teal, underline: {} });
-    authorRuns.push(url ? new ExternalHyperlink({ link: url, children: [numberRun] }) : numberRun);
+    const numRun = run(String(index + 1), { size: 16, superScript: true, color: COLORS.teal });
+    authorRuns.push(url ? new ExternalHyperlink({ link: url, children: [numRun] }) : numRun);
   });
 
   const affiliations = manuscript.authors.map((author, index) => {
     const corresponding = author.isCorresponding ? ` — Corresponding: ${author.email}` : '';
     return new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 80 },
+      spacing: { before: 0, after: 80, line: 280, lineRule: LineRuleType.AUTO },
       children: [
         run(String(index + 1), { size: 14, superScript: true, color: COLORS.teal }),
-        run(` ${author.affiliation}${corresponding}`, {
-          size: 20,
-          color: COLORS.gray,
-          italics: author.isCorresponding,
-        }),
+        run(` ${author.affiliation}${corresponding}`, { size: 18, color: COLORS.gray, italics: author.isCorresponding }),
       ],
     });
   });
 
   return [
+    // Article title — teal, bold, 18pt, centred
     new Paragraph({
       alignment: AlignmentType.CENTER,
       keepNext: true,
-      spacing: { before: 0, after: 160 },
-      children: [run(title, { size: 40, bold: true, color: COLORS.teal })],
+      spacing: { before: 0, after: 180, line: 300, lineRule: LineRuleType.AUTO },
+      children: [run(title, { size: 36, bold: true, color: COLORS.teal })],
     }),
+    // Authors — light gray, normal weight
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 200 },
-      children: authorRuns.length ? authorRuns : [run('Author Name¹, Author Name²', { size: 22, color: '777777' })],
+      spacing: { before: 0, after: 160, line: 280, lineRule: LineRuleType.AUTO },
+      children: authorRuns.length
+        ? authorRuns
+        : [run('Author Name¹, Author Name²…', { size: 22, color: COLORS.lightGray })],
     }),
+    // Affiliations
     ...affiliations,
   ];
 }
+
+// ─── Abstract block ──────────────────────────────────────────
 
 async function abstractBlock(manuscript: Manuscript): Promise<DocxChild[]> {
   const config = ARTICLE_TYPES[manuscript.articleType];
   if (config?.abstractType === 'none') return [];
 
-  const entries = Object.entries(manuscript.abstractContents).filter(([, value]) => stripHtml(value));
+  const entries = Object.entries(manuscript.abstractContents).filter(([, v]) => stripHtml(v));
   if (!entries.length) return [];
+
   const abstractHtml = entries.length === 1
     ? entries[0][1]
     : entries.map(([label, value]) => `<p><strong>${label}:</strong> ${value}</p>`).join('');
@@ -459,6 +506,7 @@ async function abstractBlock(manuscript: Manuscript): Promise<DocxChild[]> {
   return [
     heading('ABSTRACT'),
     ...await htmlToDocxChildren(abstractHtml),
+    // Separator rule
     new Paragraph({
       border: { bottom: { color: '999999', style: BorderStyle.SINGLE, size: 6 } },
       spacing: { before: 80, after: 240 },
@@ -467,24 +515,28 @@ async function abstractBlock(manuscript: Manuscript): Promise<DocxChild[]> {
   ];
 }
 
+// ─── Keywords ────────────────────────────────────────────────
+
 function keywordsBlock(manuscript: Manuscript): DocxChild[] {
   const keywords = stripHtml(manuscript.sections.Keywords);
   if (!keywords) return [];
   return [
     new Paragraph({
-      spacing: { before: 0, after: 260 },
+      spacing: { before: 0, after: 240, line: 280, lineRule: LineRuleType.AUTO },
       children: [
-        run('KEYWORDS: ', { font: 'Arial', bold: true, size: 20, color: '000000' }),
+        run('KEYWORDS: ', { font: 'Arial', bold: true, size: 20, color: COLORS.black }),
         run(keywords, { size: 20, color: COLORS.body }),
       ],
     }),
   ];
 }
 
+// ─── Body sections ───────────────────────────────────────────
+
 async function bodyBlocks(manuscript: Manuscript): Promise<DocxChild[]> {
   const config = ARTICLE_TYPES[manuscript.articleType];
   const body: DocxChild[] = [];
-  const sections = (config?.requiredSections || Object.keys(manuscript.sections)).filter(section => section !== 'Keywords');
+  const sections = (config?.requiredSections || Object.keys(manuscript.sections)).filter(s => s !== 'Keywords');
   let firstSection = true;
 
   for (const section of sections) {
@@ -494,41 +546,51 @@ async function bodyBlocks(manuscript: Manuscript): Promise<DocxChild[]> {
     firstSection = false;
   }
 
+  // Declarations
+  const declSeparator = new Paragraph({
+    border: { top: { color: 'cbd5e1', style: BorderStyle.SINGLE, size: 4 } },
+    spacing: { before: 240, after: 80 },
+    children: [run('')],
+  });
+  body.push(declSeparator);
+
   if (manuscript.fundingDetails.fundingAgency) {
-    body.push(heading('Funding'));
     body.push(bodyParagraph([
-      run(`This work was supported by ${manuscript.fundingDetails.fundingAgency}${manuscript.fundingDetails.grantNumber ? ` [grant number ${manuscript.fundingDetails.grantNumber}]` : ''}.`),
+      run('FUNDING: ', { font: 'Arial', bold: true, size: 20, color: '475569' }),
+      run(`This work was supported by ${manuscript.fundingDetails.fundingAgency}${manuscript.fundingDetails.grantNumber ? ` [grant number ${manuscript.fundingDetails.grantNumber}]` : ''}.`, { size: 20, color: '64748b' }),
     ], false));
   }
 
-  if (manuscript.conflictDisclosure.hasConflict && text(manuscript.conflictDisclosure.conflictDetails)) {
-    body.push(heading('Conflict of Interest Statement'));
-    body.push(bodyParagraph([run(manuscript.conflictDisclosure.conflictDetails)], false));
-  } else {
-    body.push(heading('Conflict of Interest Statement'));
-    body.push(bodyParagraph([run('The authors declare that the research was conducted in the absence of any commercial or financial relationships that could be construed as a potential conflict of interest.')], false));
-  }
+  const conflictText = manuscript.conflictDisclosure.hasConflict
+    ? manuscript.conflictDisclosure.conflictDetails
+    : 'The authors declare that the research was conducted in the absence of any commercial or financial relationships that could be construed as a potential conflict of interest.';
+  body.push(bodyParagraph([
+    run('CONFLICT OF INTEREST STATEMENT: ', { font: 'Arial', bold: true, size: 20, color: '475569' }),
+    run(conflictText, { size: 20, color: '64748b', italics: true }),
+  ], false));
 
   if (manuscript.ethics.humanSubjectsApproved !== 'not-applicable') {
-    body.push(heading('Ethics Statement'));
+    const ethicsText = manuscript.ethics.humanSubjectsApproved === 'yes'
+      ? `The study was approved by ${manuscript.ethics.irbInstitution || 'the Institutional Review Board'} (${manuscript.ethics.irbApprovalNumber || 'approval number pending'}).`
+      : `Ethics approval: ${manuscript.ethics.humanSubjectsApproved}.`;
     body.push(bodyParagraph([
-      run(manuscript.ethics.humanSubjectsApproved === 'yes'
-        ? `The study was approved by ${manuscript.ethics.irbInstitution || 'the Institutional Review Board'} (${manuscript.ethics.irbApprovalNumber || 'approval number pending'}).`
-        : `Ethics approval: ${manuscript.ethics.humanSubjectsApproved}.`),
+      run('ETHICS STATEMENT: ', { font: 'Arial', bold: true, size: 20, color: '475569' }),
+      run(ethicsText, { size: 20, color: '64748b' }),
     ], false));
   }
 
+  // References
   if (manuscript.references.length) {
-    body.push(heading('References'));
+    body.push(heading('REFERENCES'));
     manuscript.references.forEach((ref, index) => {
       const url = referenceUrl(ref);
       const citationText = `${index + 1}. ${formatAMAReference(ref).replace(/\*/g, '')}`;
-      const citationRun = run(citationText, { size: 20, color: COLORS.body });
+      const citRun = run(citationText, { size: 20, color: COLORS.body });
       body.push(new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
         spacing: { before: 0, after: 80, line: 240, lineRule: LineRuleType.AUTO },
         indent: { hanging: 280, left: 280 },
-        children: url ? [new ExternalHyperlink({ link: url, children: [citationRun] })] : [citationRun],
+        children: url ? [new ExternalHyperlink({ link: url, children: [citRun] })] : [citRun],
       }));
     });
   }
@@ -536,8 +598,10 @@ async function bodyBlocks(manuscript: Manuscript): Promise<DocxChild[]> {
   return body.length ? body : [bodyParagraph([run('No article body has been entered yet.')], false)];
 }
 
+// ─── MAIN EXPORT ─────────────────────────────────────────────
+
 export async function downloadManuscriptDocx(manuscript: Manuscript) {
-  const frontMatter = [
+  const frontMatter: DocxChild[] = [
     ...journalHeader(),
     ...titleBlock(manuscript),
     ...await abstractBlock(manuscript),
@@ -563,12 +627,13 @@ export async function downloadManuscriptDocx(manuscript: Manuscript) {
           basedOn: 'Normal',
           next: 'Normal',
           quickFormat: true,
-          run: { font: 'Times New Roman', size: 24, bold: true, color: COLORS.darkGreen },
-          paragraph: { spacing: { before: 400, after: 200 }, keepNext: true },
+          run: { font: 'Arial', size: 22, bold: true, color: COLORS.darkGreen },
+          paragraph: { spacing: { before: 360, after: 160 }, keepNext: true },
         },
       ],
     },
     sections: [
+      // Section 1: single-column front matter
       {
         properties: {
           page: { size: A4, margin: MARGINS },
@@ -577,6 +642,7 @@ export async function downloadManuscriptDocx(manuscript: Manuscript) {
         footers: { default: footer() },
         children: frontMatter.length ? frontMatter : [new Paragraph('')],
       },
+      // Section 2: two-column body (continuous from section 1)
       {
         properties: {
           type: SectionType.CONTINUOUS,
