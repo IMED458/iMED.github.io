@@ -183,6 +183,19 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
               break-inside: avoid !important;
               page-break-inside: avoid !important;
             }
+            .gbmn-inline-media-table {
+              break-inside: auto !important;
+              page-break-inside: auto !important;
+              display: block !important;
+            }
+            .gbmn-inline-table {
+              break-inside: auto !important;
+              page-break-inside: auto !important;
+            }
+            .gbmn-inline-table tr {
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+            }
             .no-print { display: none !important; }
           </style>
         </head>
@@ -712,6 +725,10 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           font-size: 8pt;
           background: #ffffff;
         }
+        .gbmn-inline-media-table {
+          break-inside: auto;
+          page-break-inside: auto;
+        }
         .gbmn-inline-media img {
           display: block;
           max-width: 100%;
@@ -912,6 +929,19 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
             display: contents !important;
           }
           .gbmn-inline-media {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          .gbmn-inline-media-table {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+            display: block !important;
+          }
+          .gbmn-inline-table {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+          }
+          .gbmn-inline-table tr {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
