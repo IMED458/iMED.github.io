@@ -118,10 +118,102 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
   const articleConfig = ARTICLE_TYPES[manuscript.articleType];
 
   const handlePrint = () => {
-    window.print();
-    if (onShowNotification) {
-      onShowNotification('Opening print dialog. Use "Save as PDF" to download.', 'success');
+    const sheet = document.getElementById('academic-manuscript-sheet');
+    if (!sheet) {
+      if (onShowNotification) onShowNotification('Print preview is not ready yet. Please try again.', 'error');
+      return;
     }
+
+    const printWindow = window.open('', '_blank', 'width=980,height=1200');
+    if (!printWindow) {
+      window.print();
+      if (onShowNotification) onShowNotification('Opening print dialog. Use "Save as PDF" to download.', 'success');
+      return;
+    }
+
+    const styles = Array.from(document.querySelectorAll('style'))
+      .map(style => style.outerHTML)
+      .join('\n');
+
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>${stripHtml(manuscript.title || 'GBMN Manuscript')}</title>
+          ${styles}
+          <style>
+            @page { size: A4 portrait; margin: 19mm 13mm 30mm 13mm; }
+            html, body {
+              margin: 0 !important;
+              padding: 0 !important;
+              background: #ffffff !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            #academic-manuscript-sheet {
+              width: auto !important;
+              min-height: auto !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              box-shadow: none !important;
+              border: none !important;
+              font-size: 11pt !important;
+              line-height: 1.36 !important;
+            }
+            .gbmn-journal-header { margin-top: 0 !important; }
+            .gbmn-body-columns {
+              columns: 2 !important;
+              -webkit-columns: 2 !important;
+              column-count: 2 !important;
+              -webkit-column-count: 2 !important;
+              column-gap: 0.6cm !important;
+              -webkit-column-gap: 0.6cm !important;
+              column-fill: auto !important;
+              display: block !important;
+              width: 100% !important;
+            }
+            .gbmn-section-block {
+              break-inside: auto !important;
+              page-break-inside: auto !important;
+              display: contents !important;
+            }
+            .gbmn-inline-media {
+              break-inside: avoid !important;
+              page-break-inside: avoid !important;
+            }
+            .no-print { display: none !important; }
+          </style>
+        </head>
+        <body>${sheet.outerHTML}</body>
+      </html>`);
+    printWindow.document.close();
+
+    const printNow = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+
+    const images = Array.from(printWindow.document.images);
+    if (!images.length) {
+      window.setTimeout(printNow, 250);
+    } else {
+      let pending = images.length;
+      const done = () => {
+        pending -= 1;
+        if (pending <= 0) window.setTimeout(printNow, 250);
+      };
+      images.forEach(img => {
+        if (img.complete) done();
+        else {
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        }
+      });
+    }
+
+    if (onShowNotification) onShowNotification('Opening clean GBMN print preview.', 'success');
   };
 
   const handleDownloadWord = async () => {
