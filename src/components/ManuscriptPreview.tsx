@@ -549,12 +549,23 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         /* ── BODY COLUMNS ────────────────────────────── */
         .gbmn-body-columns {
           column-count: 2;
+          -webkit-column-count: 2;
           column-gap: 0.6cm;
+          -webkit-column-gap: 0.6cm;
+          column-fill: auto;
           font-size: 11pt;
           line-height: 1.36;
           text-align: justify;
         }
-        .gbmn-section-block { break-inside: avoid-column; margin-bottom: 8pt; }
+        .gbmn-section-block {
+          break-inside: auto;
+          page-break-inside: auto;
+          margin-bottom: 8pt;
+        }
+        .gbmn-section-heading {
+          break-after: avoid;
+          page-break-after: avoid;
+        }
 
         /* ── BODY TEXT ───────────────────────────────── */
         .preview-rich {
@@ -779,12 +790,19 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           /* Column layout must work in print */
           .gbmn-body-columns {
             column-count: 2 !important;
+            -webkit-column-count: 2 !important;
             column-gap: 0.6cm !important;
+            -webkit-column-gap: 0.6cm !important;
+            column-fill: auto !important;
           }
 
-          /* Keep figures/tables together */
-          .gbmn-inline-media,
+          /* Let article sections flow across both columns; keep media blocks together */
           .gbmn-section-block {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+            display: block !important;
+          }
+          .gbmn-inline-media {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
