@@ -749,6 +749,15 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
            All colours are forced through -webkit-print-color-adjust.
         ═══════════════════════════════════════════════ */
         @media print {
+          html,
+          body {
+            width: auto !important;
+            min-width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+          }
+
           /* Hide everything except the manuscript sheet without hiding React root */
           body * { visibility: hidden !important; }
           #academic-manuscript-sheet,
@@ -766,17 +775,21 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
             margin: 0 !important;
             padding: 0 !important;
             background: none !important;
+            position: static !important;
           }
 
           /* The sheet becomes the page */
           #academic-manuscript-sheet {
-            width: 210mm !important;
-            min-height: 297mm !important;
-            padding: 19mm 13mm 30mm 13mm !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            min-height: auto !important;
+            padding: 0 !important;
             margin: 0 !important;
             box-shadow: none !important;
             border: none !important;
-            page-break-after: always;
+            page-break-after: auto !important;
             font-size: 11pt !important;
             line-height: 1.36 !important;
           }
@@ -784,23 +797,27 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           /* Force A4 page size */
           @page {
             size: A4 portrait;
-            margin: 0;
+            margin: 19mm 13mm 30mm 13mm;
           }
 
           /* Column layout must work in print */
           .gbmn-body-columns {
+            columns: 2 !important;
+            -webkit-columns: 2 !important;
             column-count: 2 !important;
             -webkit-column-count: 2 !important;
             column-gap: 0.6cm !important;
             -webkit-column-gap: 0.6cm !important;
             column-fill: auto !important;
+            width: 100% !important;
+            display: block !important;
           }
 
           /* Let article sections flow across both columns; keep media blocks together */
           .gbmn-section-block {
             break-inside: auto !important;
             page-break-inside: auto !important;
-            display: block !important;
+            display: contents !important;
           }
           .gbmn-inline-media {
             break-inside: avoid !important;
