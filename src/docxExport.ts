@@ -42,11 +42,11 @@ const COLORS = {
 // ─────────────────────────────────────────────────────────
 // PAGE GEOMETRY (A4, all values in DXA: 1440 DXA = 1 inch)
 // Top: 1.9cm → ~1077 DXA
-// Bottom: 3cm → ~1701 DXA
+// Bottom: 2.9cm → ~1644 DXA
 // Left/Right: 1.3cm → ~737 DXA
 // ─────────────────────────────────────────────────────────
 const A4         = { width: 11906, height: 16838 };
-const MARGINS    = { top: 1077, right: 737, bottom: 1701, left: 737, header: 420, footer: 420 };
+const MARGINS    = { top: 1077, right: 737, bottom: 1644, left: 737, header: 420, footer: 420 };
 const BODY_WIDTH = A4.width - MARGINS.left - MARGINS.right;  // ≈10432
 const COLUMN_GAP = 340;   // 0.6cm
 const COLUMN_WIDTH = Math.floor((BODY_WIDTH - COLUMN_GAP) / 2);  // ≈5046

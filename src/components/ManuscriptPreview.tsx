@@ -144,7 +144,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           <title>${stripHtml(manuscript.title || 'GBMN Manuscript')}</title>
           ${styles}
           <style>
-            @page { size: A4 portrait; margin: 19mm 13mm 30mm 13mm; }
+            @page { size: A4 portrait; margin: 19mm 13mm 29mm 13mm; }
             html, body {
               margin: 0 !important;
               padding: 0 !important;
@@ -522,7 +522,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           line-height: 1.36;
           width: 794px;          /* 210mm at 96dpi screen */
           min-height: 1123px;    /* 297mm at 96dpi screen */
-          padding: 72px 49px 113px;   /* top 1.9cm | sides 1.3cm | bottom 3cm */
+          padding: 72px 49px 110px;   /* top 1.9cm | sides 1.3cm | bottom 2.9cm */
           margin: 0 auto;
           box-shadow: 0 4px 32px rgba(0,0,0,0.12);
         }
@@ -889,7 +889,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           /* Force A4 page size */
           @page {
             size: A4 portrait;
-            margin: 19mm 13mm 30mm 13mm;
+            margin: 19mm 13mm 29mm 13mm;
           }
 
           /* Column layout must work in print */
