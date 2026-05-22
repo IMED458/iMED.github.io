@@ -27,7 +27,8 @@ import { ARTICLE_TYPES, formatAMAReference } from './utils';
 // ─────────────────────────────────────────────────────────
 const COLORS = {
   teal:        '0E8B8B',   // --gbmn-teal
-  darkGreen:   '2596be',   // --gbmn-section-heading
+  darkGreen:   '2F6B5A',   // --gbmn-dark-green
+  headingRed:  'D72626',   // --gbmn-heading-red
   lightGreen:  'DCE8D0',   // --gbmn-light-green
   stripeGreen: 'D9E3D1',   // --gbmn-stripe-green
   borderGreen: 'A8C28F',   // --gbmn-border-green
@@ -75,8 +76,8 @@ function baseParagraph(options: any) {
     ...options,
     spacing: {
       before: 0,
-      after: 120,   // 6pt after each paragraph
-      line: 360,    // 1.5 line-height in DXA
+      after: 80,    // 4pt after each paragraph
+      line: 326,    // ~1.36 line-height in DXA
       lineRule: LineRuleType.AUTO,
       ...options.spacing,
     },
@@ -99,13 +100,13 @@ function heading(value: string) {
   return new Paragraph({
     heading: HeadingLevel.HEADING_2,
     keepNext: true,
-    spacing: { before: 360, after: 160, line: 360, lineRule: LineRuleType.AUTO },
+    spacing: { before: 280, after: 160, line: 326, lineRule: LineRuleType.AUTO },
     children: [
       run(value.toUpperCase(), {
         font: 'Arial',
         bold: true,
-        size: 22,
-        color: COLORS.darkGreen,
+        size: 24,
+        color: COLORS.headingRed,
       }),
     ],
   });
@@ -216,7 +217,7 @@ function docxTableFromElement(table: HTMLTableElement, availableWidth = COLUMN_W
     layout: TableLayoutType.FIXED,
     columnWidths: Array(columnCount).fill(columnWidth),
     borders: tableBorders(),
-    margins: { top: 60, bottom: 60, left: 90, right: 90 },
+    margins: { top: 40, bottom: 40, left: 70, right: 70 },
     rows: rows.map((row, rowIndex) => new TableRow({
       tableHeader: rowIndex === 0,
       children: Array.from(row.cells).map(cell => new TableCell({
@@ -230,7 +231,7 @@ function docxTableFromElement(table: HTMLTableElement, availableWidth = COLUMN_W
         children: [
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 0, after: 0, line: 240, lineRule: LineRuleType.AUTO },
+            spacing: { before: 0, after: 0, line: 220, lineRule: LineRuleType.AUTO },
             children: [run(textContent(cell.textContent || ''), { size: 18, bold: rowIndex === 0 })],
           }),
         ],
@@ -250,14 +251,14 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
   if (caption) {
     children.push(new Paragraph({
       keepNext: true,
-      spacing: { before: 160, after: 80, line: 240, lineRule: LineRuleType.AUTO },
+      spacing: { before: 120, after: 60, line: 220, lineRule: LineRuleType.AUTO },
       children: [run(caption, { font: 'Times New Roman', size: 16, bold: false, color: COLORS.body })],
     }));
   }
 
   if (tableEl) {
     children.push(docxTableFromElement(tableEl));
-    children.push(new Paragraph({ spacing: { before: 0, after: 140 }, children: [run('')] }));
+    children.push(new Paragraph({ spacing: { before: 0, after: 100 }, children: [run('')] }));
     return children;
   }
 
@@ -267,7 +268,7 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
       const dimensions = await measureImage(img.src);
       children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { before: 0, after: 160 },
+        spacing: { before: 0, after: 120 },
         children: [
           new ImageRun({
             type: parsed.type,
@@ -320,7 +321,7 @@ async function htmlToDocxChildren(html: string, { dropCap = false } = {}): Promi
     if (tag === 'ul' || tag === 'ol') {
       for (const li of Array.from(element.querySelectorAll(':scope > li'))) {
         children.push(new Paragraph({
-          spacing: { before: 0, after: 120, line: 360, lineRule: LineRuleType.AUTO },
+          spacing: { before: 0, after: 80, line: 326, lineRule: LineRuleType.AUTO },
           indent: { left: 360, hanging: 180 },
           children: [run(tag === 'ol' ? '1. ' : '• ', { bold: true }), ...parseInlineRuns(li)],
         }));
@@ -431,7 +432,7 @@ function journalHeader(): DocxChild[] {
     // Double teal rule beneath header
     new Paragraph({
       border: { bottom: { color: COLORS.teal, style: BorderStyle.DOUBLE, size: 8 } },
-      spacing: { before: 0, after: 360 },
+      spacing: { before: 0, after: 240 },
       children: [run('')],
     }),
   ];
@@ -461,7 +462,7 @@ function titleBlock(manuscript: Manuscript): DocxChild[] {
     const corresponding = author.isCorresponding ? ` — Corresponding: ${author.email}` : '';
     return new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 80, line: 280, lineRule: LineRuleType.AUTO },
+      spacing: { before: 0, after: 60, line: 260, lineRule: LineRuleType.AUTO },
       children: [
         run(String(index + 1), { size: 14, superScript: true, color: COLORS.teal }),
         run(` ${author.affiliation}${corresponding}`, { size: 18, color: COLORS.gray, italics: author.isCorresponding }),
@@ -474,13 +475,13 @@ function titleBlock(manuscript: Manuscript): DocxChild[] {
     new Paragraph({
       alignment: AlignmentType.CENTER,
       keepNext: true,
-      spacing: { before: 0, after: 180, line: 300, lineRule: LineRuleType.AUTO },
-      children: [run(title, { size: 36, bold: true, color: COLORS.teal })],
+      spacing: { before: 0, after: 140, line: 270, lineRule: LineRuleType.AUTO },
+      children: [run(title, { size: 40, bold: true, color: COLORS.teal })],
     }),
     // Authors — light gray, normal weight
     new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 0, after: 160, line: 280, lineRule: LineRuleType.AUTO },
+      spacing: { before: 0, after: 120, line: 260, lineRule: LineRuleType.AUTO },
       children: authorRuns.length
         ? authorRuns
         : [run('Author Name¹, Author Name²…', { size: 22, color: COLORS.lightGray })],
@@ -509,7 +510,7 @@ async function abstractBlock(manuscript: Manuscript): Promise<DocxChild[]> {
     // Separator rule
     new Paragraph({
       border: { bottom: { color: '999999', style: BorderStyle.SINGLE, size: 6 } },
-      spacing: { before: 80, after: 240 },
+      spacing: { before: 60, after: 160 },
       children: [run('')],
     }),
   ];
@@ -522,7 +523,7 @@ function keywordsBlock(manuscript: Manuscript): DocxChild[] {
   if (!keywords) return [];
   return [
     new Paragraph({
-      spacing: { before: 0, after: 240, line: 280, lineRule: LineRuleType.AUTO },
+      spacing: { before: 0, after: 160, line: 260, lineRule: LineRuleType.AUTO },
       children: [
         run('KEYWORDS: ', { font: 'Arial', bold: true, size: 20, color: COLORS.black }),
         run(keywords, { size: 20, color: COLORS.body }),
@@ -549,7 +550,7 @@ async function bodyBlocks(manuscript: Manuscript): Promise<DocxChild[]> {
   // Declarations
   const declSeparator = new Paragraph({
     border: { top: { color: 'cbd5e1', style: BorderStyle.SINGLE, size: 4 } },
-    spacing: { before: 240, after: 80 },
+    spacing: { before: 160, after: 60 },
     children: [run('')],
   });
   body.push(declSeparator);
@@ -588,7 +589,7 @@ async function bodyBlocks(manuscript: Manuscript): Promise<DocxChild[]> {
       const citRun = run(citationText, { size: 20, color: COLORS.body });
       body.push(new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
-        spacing: { before: 0, after: 80, line: 240, lineRule: LineRuleType.AUTO },
+        spacing: { before: 0, after: 60, line: 240, lineRule: LineRuleType.AUTO },
         indent: { hanging: 280, left: 280 },
         children: url ? [new ExternalHyperlink({ link: url, children: [citRun] })] : [citRun],
       }));
@@ -617,7 +618,7 @@ export async function downloadManuscriptDocx(manuscript: Manuscript) {
       default: {
         document: {
           run: { font: 'Times New Roman', size: 22, color: COLORS.body },
-          paragraph: { spacing: { after: 120, line: 360, lineRule: LineRuleType.AUTO } },
+          paragraph: { spacing: { after: 80, line: 326, lineRule: LineRuleType.AUTO } },
         },
       },
       paragraphStyles: [
@@ -627,8 +628,8 @@ export async function downloadManuscriptDocx(manuscript: Manuscript) {
           basedOn: 'Normal',
           next: 'Normal',
           quickFormat: true,
-          run: { font: 'Arial', size: 22, bold: true, color: COLORS.darkGreen },
-          paragraph: { spacing: { before: 360, after: 160 }, keepNext: true },
+          run: { font: 'Arial', size: 24, bold: true, color: COLORS.headingRed },
+          paragraph: { spacing: { before: 280, after: 160 }, keepNext: true },
         },
       ],
     },

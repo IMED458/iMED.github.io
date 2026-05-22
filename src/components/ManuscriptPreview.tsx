@@ -407,7 +407,8 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         /* ── COLOUR TOKENS ───────────────────────────── */
         :root {
           --gbmn-teal:        #0E8B8B;
-          --gbmn-dark-green:  #2596be;
+          --gbmn-dark-green:  #2F6B5A;
+          --gbmn-heading-red: #D72626;
           --gbmn-light-green: #DCE8D0;
           --gbmn-stripe-green:#D9E3D1;
           --gbmn-border-green:#A8C28F;
@@ -426,7 +427,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           color: var(--gbmn-body);
           font-family: "Times New Roman", Georgia, serif;
           font-size: 11pt;
-          line-height: 1.5;
+          line-height: 1.36;
           width: 794px;          /* 210mm at 96dpi screen */
           min-height: 1123px;    /* 297mm at 96dpi screen */
           padding: 72px 49px 113px;   /* top 1.9cm | sides 1.3cm | bottom 3cm */
@@ -435,13 +436,13 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         }
 
         /* ── JOURNAL HEADER ──────────────────────────── */
-        .gbmn-journal-header { margin-bottom: 28px; }
+        .gbmn-journal-header { margin-bottom: 18px; }
 
         .gbmn-logo-row {
           display: flex;
           align-items: flex-start;
           gap: 10px;
-          margin-bottom: 14px;
+          margin-bottom: 10px;
         }
         .gbmn-logo-box {
           background: #3b8790;
@@ -481,23 +482,25 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         }
 
         /* ── TITLE BLOCK ─────────────────────────────── */
-        .gbmn-title-block { margin-bottom: 24px; }
+        .gbmn-title-block { margin-bottom: 16px; }
         .gbmn-article-title {
           font-family: "Times New Roman", Georgia, serif;
-          font-size: 18pt;
+          font-size: 20pt;
           font-weight: 700;
           color: var(--gbmn-teal);
           text-align: center;
-          line-height: 1.25;
-          margin: 0 0 10px;
+          line-height: 1.12;
+          margin: 0 auto 8px;
+          max-width: 96%;
+          text-wrap: balance;
         }
         .gbmn-authors {
           font-family: "Times New Roman", Georgia, serif;
           font-size: 11pt;
           color: var(--gbmn-light-gray);
           text-align: center;
-          line-height: 1.35;
-          margin-bottom: 16px;
+          line-height: 1.22;
+          margin-bottom: 10px;
         }
         .gbmn-authors-placeholder { font-style: italic; color: #94a3b8; }
         .gbmn-corresponding-mark { color: var(--gbmn-teal); margin-left: 2px; }
@@ -515,17 +518,17 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           font-family: "Times New Roman", Georgia, serif;
           font-size: 10pt;
           color: var(--gbmn-gray);
-          line-height: 1.35;
+          line-height: 1.2;
         }
-        .gbmn-affiliation-line { margin: 0 0 3px; }
+        .gbmn-affiliation-line { margin: 0 0 2px; }
         .gbmn-affiliation-corresponding { margin-left: 6px; font-style: italic; }
 
         /* ── ABSTRACT ────────────────────────────────── */
-        .gbmn-abstract-block { margin-bottom: 24px; }
+        .gbmn-abstract-block { margin-bottom: 14px; }
 
         /* ── KEYWORDS ────────────────────────────────── */
         .gbmn-keywords-block {
-          margin-bottom: 24px;
+          margin-bottom: 14px;
           font-family: Arial, sans-serif;
           font-size: 10pt;
         }
@@ -535,11 +538,11 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         /* ── SECTION HEADINGS ────────────────────────── */
         .gbmn-section-heading {
           font-family: Arial, sans-serif;
-          font-size: 11pt;
+          font-size: 12pt;
           font-weight: 700;
-          color: var(--gbmn-dark-green);
+          color: var(--gbmn-heading-red);
           text-transform: uppercase;
-          margin: 18pt 0 8pt;
+          margin: 14pt 0 8pt;
           letter-spacing: 0;
         }
 
@@ -548,21 +551,21 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           column-count: 2;
           column-gap: 0.6cm;
           font-size: 11pt;
-          line-height: 1.5;
+          line-height: 1.36;
           text-align: justify;
         }
-        .gbmn-section-block { break-inside: avoid-column; margin-bottom: 14pt; }
+        .gbmn-section-block { break-inside: avoid-column; margin-bottom: 8pt; }
 
         /* ── BODY TEXT ───────────────────────────────── */
         .preview-rich {
           color: var(--gbmn-body);
           font-family: "Times New Roman", Georgia, serif;
           font-size: 11pt;
-          line-height: 1.5;
+          line-height: 1.36;
           text-align: justify;
         }
         .preview-rich p {
-          margin: 0 0 6pt;
+          margin: 0 0 4pt;
           text-indent: 1.27cm;
         }
         /* No indent: first paragraph of section, after media, inside abstract */
@@ -601,7 +604,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         .gbmn-inline-media {
           break-inside: avoid;
           page-break-inside: avoid;
-          margin: 10px 0 18px;
+          margin: 8px 0 12px;
           font-family: "Times New Roman", Georgia, serif;
           font-size: 8pt;
           background: #ffffff;
@@ -627,14 +630,14 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         .gbmn-inline-media figcaption {
           color: var(--gbmn-body);
           font-size: 8pt;
-          line-height: 1.45;
-          margin: 0 0 5px;
+          line-height: 1.25;
+          margin: 0 0 4px;
         }
         .gbmn-table-title {
           color: var(--gbmn-body);
           font-size: 8pt;
           font-weight: 700;
-          margin: 0 0 5px;
+          margin: 0 0 4px;
         }
         .gbmn-inline-table {
           width: 100%;
@@ -646,9 +649,10 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         }
         .gbmn-inline-table th,
         .gbmn-inline-table td {
-          padding: 4px 6px;
+          padding: 2px 4px;
           border: 1px solid var(--gbmn-border-green);
           text-align: center;
+          line-height: 1.2;
         }
         .gbmn-inline-table th {
           background: var(--gbmn-light-green);
@@ -719,12 +723,12 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         .gbmn-page-footer {
           border-top: 1px solid #cbd5e1;
           padding-top: 10px;
-          margin-top: 24px;
+          margin-top: 14px;
           text-align: center;
           font-family: Arial, sans-serif;
-          font-size: 7pt;
-          color: #94a3b8;
-          line-height: 1.6;
+          font-size: 8pt;
+          color: #000000;
+          line-height: 1.25;
         }
         .gbmn-placeholder { color: #94a3b8; font-style: italic; font-size: 10pt; }
 
@@ -763,7 +767,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
             border: none !important;
             page-break-after: always;
             font-size: 11pt !important;
-            line-height: 1.5 !important;
+            line-height: 1.36 !important;
           }
 
           /* Force A4 page size */
@@ -787,7 +791,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
           /* Force all colours — no browser stripping */
           .gbmn-article-title  { color: #0E8B8B !important; }
-          .gbmn-section-heading { color: #2596be !important; }
+          .gbmn-section-heading { color: #D72626 !important; }
           .gbmn-inline-table th { background: #DCE8D0 !important; }
           .gbmn-inline-table tr:nth-child(even) td { background: #D9E3D1 !important; }
           .gbmn-inline-table th,
