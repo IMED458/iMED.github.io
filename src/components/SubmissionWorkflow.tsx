@@ -524,6 +524,23 @@ export default function SubmissionWorkflow({
   };
 
   const articleConfig = ARTICLE_TYPES[manuscript.articleType];
+  const manuscriptSectionNames = (articleConfig?.requiredSections || []).filter(section => section !== 'Keywords');
+  const sectionNamesKey = manuscriptSectionNames.join('|');
+  const [activeManuscriptSection, setActiveManuscriptSection] = useState('');
+  const activeSectionIndex = Math.max(0, manuscriptSectionNames.indexOf(activeManuscriptSection));
+  const activeSectionName = manuscriptSectionNames[activeSectionIndex] || manuscriptSectionNames[0] || '';
+  const workflowSteps = [
+    'getting-started', 'policies', 'checklist', 'title-meta', 'authors', 'article-type',
+    'abstract', 'keywords', 'sections', 'references', 'supplementary',
+    'ethics', 'conflicts', 'funding', 'editor-files', 'preview', 'summary-submit'
+  ];
+
+  useEffect(() => {
+    if (activeStep !== 'sections' || !manuscriptSectionNames.length) return;
+    if (!activeManuscriptSection || !manuscriptSectionNames.includes(activeManuscriptSection)) {
+      setActiveManuscriptSection(manuscriptSectionNames[0]);
+    }
+  }, [activeStep, sectionNamesKey, activeManuscriptSection, manuscriptSectionNames]);
 
   return (
     <div id="author-submission-panel" className="bg-white border border-slate-200 rounded-2xl p-6 md:p-8 shadow-sm space-y-6">
@@ -1036,20 +1053,57 @@ export default function SubmissionWorkflow({
         {/* 9. MANUSCRIPT SECTIONS */}
         {activeStep === 'sections' && (
           <div className="space-y-5 text-xs animate-fade-in">
-            <p className="text-slate-500 italic">Dynamically loaded segments based on your article constraints ({articleConfig?.name}):</p>
-            {articleConfig?.requiredSections.filter(s => s !== 'Keywords').map((section) => (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wide">Manuscript subsections</h4>
+                  <p className="text-slate-500 italic mt-1">Fill one subsection at a time for {articleConfig?.name}. Preview generation keeps the journal order unchanged.</p>
+                </div>
+                {activeSectionName && (
+                  <span className="text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-100 rounded-full px-3 py-1">
+                    {activeSectionIndex + 1} / {manuscriptSectionNames.length}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {manuscriptSectionNames.map((section, index) => {
+                  const savedText = (manuscript.sections[section] || '').replace(/<[^>]*>/g, ' ').trim();
+                  const isActive = section === activeSectionName;
+                  return (
+                    <button
+                      key={section}
+                      type="button"
+                      onClick={() => setActiveManuscriptSection(section)}
+                      className={`text-left rounded-lg border px-3 py-2 transition-all ${
+                        isActive
+                          ? 'border-teal-600 bg-white shadow-sm text-teal-900'
+                          : 'border-slate-200 bg-white/70 hover:bg-white text-slate-700'
+                      }`}
+                    >
+                      <span className="block text-[10px] uppercase font-bold text-slate-400">Section {index + 1}</span>
+                      <span className="block font-bold text-xs">{section}</span>
+                      <span className={`block text-[10px] mt-1 ${savedText ? 'text-emerald-700' : 'text-amber-700'}`}>
+                        {savedText ? 'Saved content' : 'Empty'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {activeSectionName && (
               <RichTextEditor
-                key={section}
-                label={`${section} *`}
-                value={manuscript.sections[section] || ''}
+                key={activeSectionName}
+                label={`${activeSectionName} *`}
+                value={manuscript.sections[activeSectionName] || ''}
                 onChange={(val) => {
-                  const updatedSecs = { ...manuscript.sections, [section]: val };
+                  const updatedSecs = { ...manuscript.sections, [activeSectionName]: val };
                   updateField('sections', updatedSecs);
                 }}
-                placeholder={`Write the full structured ${section.toLowerCase()} of the study...`}
+                placeholder={`Write the full structured ${activeSectionName.toLowerCase()} of the study...`}
                 showWordCount
               />
-            ))}
+            )}
           </div>
         )}
 
@@ -1737,13 +1791,12 @@ export default function SubmissionWorkflow({
           id="prev-nav-step-btn"
           disabled={activeStep === 'getting-started'}
           onClick={() => {
-            const steps = [
-              'getting-started', 'policies', 'checklist', 'title-meta', 'authors', 'article-type',
-              'abstract', 'keywords', 'sections', 'references', 'supplementary',
-              'ethics', 'conflicts', 'funding', 'editor-files', 'preview', 'summary-submit'
-            ];
-            const currentIdx = steps.indexOf(activeStep);
-            if (currentIdx > 0) onStepChange(steps[currentIdx - 1]);
+            if (activeStep === 'sections' && activeSectionIndex > 0) {
+              setActiveManuscriptSection(manuscriptSectionNames[activeSectionIndex - 1]);
+              return;
+            }
+            const currentIdx = workflowSteps.indexOf(activeStep);
+            if (currentIdx > 0) onStepChange(workflowSteps[currentIdx - 1]);
           }}
           className="text-xs font-semibold px-4 py-2 border border-slate-300 text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-lg cursor-pointer transition-all disabled:opacity-45"
         >
@@ -1766,17 +1819,19 @@ export default function SubmissionWorkflow({
           id="next-nav-step-btn"
           disabled={activeStep === 'summary-submit'}
           onClick={() => {
-            const steps = [
-              'getting-started', 'policies', 'checklist', 'title-meta', 'authors', 'article-type',
-              'abstract', 'keywords', 'sections', 'references', 'supplementary',
-              'ethics', 'conflicts', 'funding', 'editor-files', 'preview', 'summary-submit'
-            ];
-            const currentIdx = steps.indexOf(activeStep);
-            if (currentIdx < steps.length - 1) onStepChange(steps[currentIdx + 1]);
+            if (activeStep === 'sections' && activeSectionIndex < manuscriptSectionNames.length - 1) {
+              onUpdateManuscript({ ...manuscript, updatedAt: new Date().toISOString() });
+              const nextSection = manuscriptSectionNames[activeSectionIndex + 1];
+              setActiveManuscriptSection(nextSection);
+              onShowNotification(`${activeSectionName} saved. Continue with ${nextSection}.`, 'success');
+              return;
+            }
+            const currentIdx = workflowSteps.indexOf(activeStep);
+            if (currentIdx < workflowSteps.length - 1) onStepChange(workflowSteps[currentIdx + 1]);
           }}
           className="text-xs font-bold px-5 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-lg shadow-xs cursor-pointer transition-all disabled:opacity-45"
         >
-          Save and Continue &rarr;
+          {activeStep === 'sections' && activeSectionIndex < manuscriptSectionNames.length - 1 ? 'Save and Continue Section →' : 'Save and Continue →'}
         </button>
       </div>
 

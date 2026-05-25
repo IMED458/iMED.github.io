@@ -53,7 +53,12 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       onUserChanged(user);
       onShowNotification('Google sign-in completed.', 'success');
     } catch (error) {
-      onShowNotification(error instanceof Error ? error.message : 'Google sign-in is not available yet.', 'error');
+      const rawMessage = error instanceof Error ? error.message : '';
+      const host = window.location.hostname;
+      const message = rawMessage.includes('auth/unauthorized-domain')
+        ? `Firebase Authorized domains-ში დაამატე ${host}. Firebase Console → Authentication → Settings → Authorized domains.`
+        : rawMessage || 'Google sign-in is not available yet.';
+      onShowNotification(message, 'error');
     }
   };
 
