@@ -38,10 +38,12 @@ export default function RichTextEditor({
   const [showImageUpload, setShowImageUpload] = useState(false);
   const [imageUploadFile, setImageUploadFile] = useState<File | null>(null);
   const [imageUploadPreview, setImageUploadPreview] = useState('');
+  const [imageExistingSrc, setImageExistingSrc] = useState('');
   const [pasteBuffer, setPasteBuffer] = useState('');
   const [insertTitle, setInsertTitle] = useState('');
   const [insertLegend, setInsertLegend] = useState('');
   const [insertLayout, setInsertLayout] = useState<'two-column' | 'one-column'>('two-column');
+  const [editingMediaId, setEditingMediaId] = useState<string | null>(null);
 
   // Sync incoming value into contenteditable (only if different to avoid cursor jump)
   useEffect(() => {
@@ -187,6 +189,26 @@ export default function RichTextEditor({
 
   const insertHtml = (html: string) => {
     if (!editorRef.current) return;
+    if (editingMediaId) {
+      const media = editorRef.current.querySelector<HTMLElement>(`.gbmn-inline-media[data-media-id="${editingMediaId}"]`);
+      if (media) {
+        pushHistory();
+        const template = document.createElement('template');
+        template.innerHTML = html;
+        const replacement = template.content.firstElementChild;
+        const spacer = template.content.querySelector('p');
+        if (replacement) {
+          media.replaceWith(replacement);
+          if (spacer && replacement.parentNode) replacement.parentNode.insertBefore(spacer, replacement.nextSibling);
+          setSelectedMediaId((replacement as HTMLElement).dataset.mediaId || null);
+          placeCaretAfter(replacement);
+          setEditingMediaId(null);
+          handleInput();
+          saveSelection();
+        }
+      }
+      return;
+    }
     editorRef.current.focus();
     const savedRange = savedRangeRef.current;
     const selection = window.getSelection();
@@ -236,6 +258,23 @@ export default function RichTextEditor({
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
+  const mediaActionsHtml = () => '<div class="gbmn-media-actions" contenteditable="false"><button type="button" data-media-action="edit" title="Edit"><span>Edit</span></button><button type="button" data-media-action="delete" title="Delete"><span>Delete</span></button></div>';
+
+  const resetInsertState = () => {
+    clearInsertionMarker();
+    setPasteBuffer('');
+    setImageUploadFile(null);
+    setImageUploadPreview('');
+    setImageExistingSrc('');
+    setInsertTitle('');
+    setInsertLegend('');
+    setInsertLayout('two-column');
+    setEditingMediaId(null);
+    setShowImageUpload(false);
+    setShowTablePaste(false);
+    setShowDiagramPaste(false);
+  };
+
   const tableFromDelimitedText = (text: string) => {
     const rows = text.trim().split(/\r?\n/).filter(Boolean).map(row => row.split(/\t|,/).map(cell => cell.trim()));
     if (rows.length === 0) return '';
@@ -249,12 +288,9 @@ export default function RichTextEditor({
       ? pasteBuffer
       : tableFromDelimitedText(pasteBuffer);
     if (!html) return;
-    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(insertTitle || 'Table')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${html}</figure><p><br></p>`);
-    setPasteBuffer('');
-    setInsertTitle('');
-    setInsertLegend('');
-    setInsertLayout('two-column');
-    setShowTablePaste(false);
+    const mediaId = editingMediaId || crypto.randomUUID();
+    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${mediaId}">${mediaActionsHtml()}<figcaption><strong>${escapeHtml(insertTitle || 'Table')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${html}</figure><p><br></p>`);
+    resetInsertState();
   };
 
   const insertDiagramFromText = () => {
@@ -262,17 +298,15 @@ export default function RichTextEditor({
     const content = pasteBuffer.includes('<svg') || pasteBuffer.includes('<img') || pasteBuffer.includes('<table')
       ? pasteBuffer
       : `<pre>${escapeHtml(pasteBuffer)}</pre>`;
-    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-diagram gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(insertTitle || 'Diagram')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${content}</figure><p><br></p>`);
-    setPasteBuffer('');
-    setInsertTitle('');
-    setInsertLegend('');
-    setInsertLayout('two-column');
-    setShowDiagramPaste(false);
+    const mediaId = editingMediaId || crypto.randomUUID();
+    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-diagram gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${mediaId}">${mediaActionsHtml()}<figcaption><strong>${escapeHtml(insertTitle || 'Diagram')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${content}</figure><p><br></p>`);
+    resetInsertState();
   };
 
   const insertImageDataUrl = (src: string, title: string, legend?: string) => {
     const caption = title.trim() || 'Figure';
-    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-figure gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(caption)}</strong>${legend?.trim() ? ` — ${escapeHtml(legend)}` : ''}</figcaption><img src="${src}" alt="${escapeHtml(caption)}"></figure><p><br></p>`);
+    const mediaId = editingMediaId || crypto.randomUUID();
+    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-figure gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${mediaId}">${mediaActionsHtml()}<figcaption><strong>${escapeHtml(caption)}</strong>${legend?.trim() ? ` — ${escapeHtml(legend)}` : ''}</figcaption><img src="${src}" alt="${escapeHtml(caption)}"></figure><p><br></p>`);
   };
 
   const insertImageFile = (file: File, title?: string, legend?: string) => {
@@ -296,14 +330,22 @@ export default function RichTextEditor({
   };
 
   const insertSelectedImage = () => {
-    if (!imageUploadFile || !insertTitle.trim()) return;
-    insertImageFile(imageUploadFile, insertTitle, insertLegend);
-    setImageUploadFile(null);
-    setImageUploadPreview('');
-    setInsertTitle('');
-    setInsertLegend('');
-    setInsertLayout('two-column');
-    setShowImageUpload(false);
+    if ((!imageUploadFile && !imageExistingSrc) || !insertTitle.trim()) return;
+    if (imageUploadFile) {
+      const file = imageUploadFile;
+      const title = insertTitle;
+      const legend = insertLegend;
+      const reader = new FileReader();
+      reader.onload = () => {
+        insertImageDataUrl(String(reader.result || ''), title.trim() || file.name, legend);
+        resetInsertState();
+      };
+      reader.readAsDataURL(file);
+      return;
+    } else {
+      insertImageDataUrl(imageExistingSrc, insertTitle, insertLegend);
+    }
+    resetInsertState();
   };
 
   const sanitizeRichPaste = (html: string) => {
@@ -340,7 +382,7 @@ export default function RichTextEditor({
     }
     if (html.includes('<table')) {
       event.preventDefault();
-      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table gbmn-media-two-column" data-layout="two-column" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>Table.</strong> Add title and legend...</figcaption>${sanitizeRichPaste(html)}</figure><p><br></p>`);
+      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table gbmn-media-two-column" data-layout="two-column" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}">${mediaActionsHtml()}<figcaption><strong>Table.</strong> Add title and legend...</figcaption>${sanitizeRichPaste(html)}</figure><p><br></p>`);
       return;
     }
     if (html) {
@@ -356,6 +398,24 @@ export default function RichTextEditor({
 
   const handleEditorClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
+    const action = target.closest('[data-media-action]') as HTMLElement | null;
+    if (action) {
+      event.preventDefault();
+      event.stopPropagation();
+      const media = action.closest('.gbmn-inline-media') as HTMLElement | null;
+      if (!media) return;
+      if (!media.dataset.mediaId) media.dataset.mediaId = crypto.randomUUID();
+      setSelectedMediaId(media.dataset.mediaId);
+      if (action.dataset.mediaAction === 'delete') {
+        pushHistory();
+        media.remove();
+        handleInput();
+        setSelectedMediaId(null);
+        return;
+      }
+      editExistingMedia(media);
+      return;
+    }
     const media = target.closest('.gbmn-inline-media');
     if (!media) {
       setSelectedMediaId(null);
@@ -372,6 +432,39 @@ export default function RichTextEditor({
     selection?.removeAllRanges();
     selection?.addRange(range);
     savedRangeRef.current = range.cloneRange();
+  };
+
+  const splitCaption = (caption: string) => {
+    const parts = caption.split(/\s+—\s+/);
+    return { title: parts[0]?.trim() || '', legend: parts.slice(1).join(' — ').trim() };
+  };
+
+  const editExistingMedia = (media: HTMLElement) => {
+    const id = media.dataset.mediaId || crypto.randomUUID();
+    media.dataset.mediaId = id;
+    setEditingMediaId(id);
+    const parsed = splitCaption(media.querySelector('figcaption')?.textContent || '');
+    setInsertTitle(parsed.title);
+    setInsertLegend(parsed.legend);
+    setInsertLayout(media.dataset.layout === 'one-column' || media.classList.contains('gbmn-media-one-column') ? 'one-column' : 'two-column');
+    const image = media.querySelector('img') as HTMLImageElement | null;
+    const table = media.querySelector('table') as HTMLTableElement | null;
+    setShowImageUpload(false);
+    setShowTablePaste(false);
+    setShowDiagramPaste(false);
+    if (image) {
+      setImageExistingSrc(image.src);
+      setImageUploadPreview(image.src);
+      setShowImageUpload(true);
+      return;
+    }
+    if (table) {
+      setPasteBuffer(table.outerHTML);
+      setShowTablePaste(true);
+      return;
+    }
+    setPasteBuffer(Array.from(media.childNodes).filter(node => !(node instanceof HTMLElement && (node.matches('figcaption') || node.matches('.gbmn-media-actions')))).map(node => node instanceof HTMLElement ? node.outerHTML : node.textContent || '').join(''));
+    setShowDiagramPaste(true);
   };
 
   const moveSelectedMedia = (direction: 'up' | 'down') => {
@@ -555,14 +648,14 @@ export default function RichTextEditor({
       </div>
 
       {showImageUpload && (
-        <div className="relative z-10 bg-white border border-slate-300 shadow-xl">
-          <div className="bg-white w-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/25 p-4">
+          <div className="bg-white w-full max-w-3xl max-h-[calc(100vh-48px)] overflow-y-auto border border-slate-300 shadow-2xl">
             <div className="flex items-start justify-between px-5 py-4 border-b">
               <div>
                 <h3 className="text-xl text-slate-900">Insert Figure</h3>
                 <p className="text-sm text-slate-600 mt-1">Upload an image, add title and legend, then insert it exactly where the cursor was.</p>
               </div>
-              <button type="button" onClick={() => { clearInsertionMarker(); setShowImageUpload(false); }} className="p-1 text-slate-500 hover:text-slate-900">
+              <button type="button" onClick={resetInsertState} className="p-1 text-slate-500 hover:text-slate-900">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -604,16 +697,16 @@ export default function RichTextEditor({
               </select>
             </div>
             <div className="flex justify-end gap-3 p-4 border-t bg-slate-50">
-              <button type="button" onClick={() => { clearInsertionMarker(); setImageUploadFile(null); setImageUploadPreview(''); setInsertTitle(''); setInsertLegend(''); setShowImageUpload(false); }} className="px-5 py-2 text-sm font-semibold border rounded-md text-slate-600 bg-white">Cancel</button>
-              <button type="button" disabled={!imageUploadFile || !insertTitle.trim()} onClick={insertSelectedImage} className="px-5 py-2 text-sm font-semibold rounded-md bg-sky-300 text-white disabled:opacity-50 disabled:cursor-not-allowed">Insert</button>
+              <button type="button" onClick={resetInsertState} className="px-5 py-2 text-sm font-semibold border rounded-md text-slate-600 bg-white">Cancel</button>
+              <button type="button" disabled={(!imageUploadFile && !imageExistingSrc) || !insertTitle.trim()} onClick={insertSelectedImage} className="px-5 py-2 text-sm font-semibold rounded-md bg-sky-300 text-white disabled:opacity-50 disabled:cursor-not-allowed">{editingMediaId ? 'Update' : 'Insert'}</button>
             </div>
           </div>
         </div>
       )}
 
       {(showTablePaste || showDiagramPaste) && (
-        <div className="relative z-10 bg-white border border-slate-300 shadow-xl">
-          <div className="bg-white w-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/25 p-4">
+          <div className="bg-white w-full max-w-4xl max-h-[calc(100vh-48px)] overflow-y-auto border border-slate-300 shadow-2xl">
             <div className="flex items-start justify-between px-5 py-4 border-b">
               <div>
                 <h3 className="text-xl text-slate-900">{showTablePaste ? 'Insert Table' : 'Insert Diagram'}</h3>
@@ -621,7 +714,7 @@ export default function RichTextEditor({
                   {showTablePaste ? 'Create your table in Excel, Word, PowerPoint, Google Docs or Sheets, then paste it here.' : 'Paste SVG/HTML, chart markup, or diagram text. It will be inserted exactly where the cursor was.'}
                 </p>
               </div>
-              <button type="button" onClick={() => { clearInsertionMarker(); setShowTablePaste(false); setShowDiagramPaste(false); }} className="p-1 text-slate-500 hover:text-slate-900">
+              <button type="button" onClick={resetInsertState} className="p-1 text-slate-500 hover:text-slate-900">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -670,11 +763,11 @@ export default function RichTextEditor({
               </div>
             </div>
             <div className="flex justify-end gap-3 p-4 border-t bg-slate-50">
-            <button type="button" onClick={() => { clearInsertionMarker(); setPasteBuffer(''); setInsertTitle(''); setInsertLegend(''); setShowTablePaste(false); setShowDiagramPaste(false); }} className="px-5 py-2 text-sm font-semibold border rounded-md text-slate-600 bg-white">
+            <button type="button" onClick={resetInsertState} className="px-5 py-2 text-sm font-semibold border rounded-md text-slate-600 bg-white">
               Cancel
             </button>
             <button type="button" disabled={!pasteBuffer.trim() || !insertTitle.trim()} onClick={showTablePaste ? insertTableFromText : insertDiagramFromText} className="px-5 py-2 text-sm font-semibold rounded-md bg-sky-300 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-              Insert
+              {editingMediaId ? 'Update' : 'Insert'}
             </button>
             </div>
           </div>
@@ -716,15 +809,37 @@ export default function RichTextEditor({
         }
         .rich-editor-area ul { list-style: disc; padding-left: 1.5em; }
         .rich-editor-area ol { list-style: decimal; padding-left: 1.5em; }
-        .gbmn-inline-media { break-inside: avoid; margin: 12px 0; border: 1px solid #cbd5e1; padding: 8px; background: #fff; cursor: move; }
+        .gbmn-inline-media { break-inside: avoid; margin: 12px 0; border: 1px solid #cbd5e1; padding: 8px; background: #fff; cursor: move; position: relative; }
         .gbmn-inline-media[data-media-id="${selectedMediaId || ''}"] { outline: 2px solid #0f766e; outline-offset: 2px; }
         .gbmn-inline-media::selection { background: rgba(15, 118, 110, 0.18); }
         .gbmn-inline-media img { display: block; max-width: 100%; height: auto; margin: 0 auto; }
         .gbmn-inline-media figcaption { margin-top: 6px; font-family: Arial, sans-serif; font-size: 11px; color: #475569; }
-        .gbmn-inline-table { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; }
-        .gbmn-inline-table th, .gbmn-inline-table td { border: 1px solid #cbd5e1; padding: 4px 6px; }
+        .gbmn-inline-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; }
+        .gbmn-inline-table th, .gbmn-inline-table td { border: 1px solid #cbd5e1; padding: 4px 6px; overflow-wrap: anywhere; word-break: normal; vertical-align: top; }
         .gbmn-inline-table th { background: #f1f5f9; font-weight: 700; }
         .gbmn-inline-media-diagram pre { white-space: pre-wrap; font-family: "JetBrains Mono", monospace; font-size: 11px; background: #f8fafc; padding: 8px; }
+        .gbmn-media-actions {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          display: flex;
+          gap: 4px;
+          opacity: 0;
+          transition: opacity .15s ease;
+          z-index: 2;
+        }
+        .gbmn-inline-media:hover .gbmn-media-actions,
+        .gbmn-inline-media[data-media-id="${selectedMediaId || ''}"] .gbmn-media-actions { opacity: 1; }
+        .gbmn-media-actions button {
+          border: 1px solid #cbd5e1;
+          background: rgba(255,255,255,.96);
+          color: #334155;
+          font: 700 10px/1 Arial, sans-serif;
+          padding: 4px 6px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .gbmn-media-actions button[data-media-action="delete"] { color: #b91c1c; }
       `}</style>
     </div>
   );

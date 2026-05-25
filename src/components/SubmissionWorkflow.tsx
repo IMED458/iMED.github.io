@@ -100,6 +100,7 @@ export default function SubmissionWorkflow({
   const [authorContributionTags, setAuthorContributionTags] = useState<string[]>([]);
   const [authorIsCorr, setAuthorIsCorr] = useState(false);
   const [editingAuthorId, setEditingAuthorId] = useState<string | null>(null);
+  const [isAuthorOrcidLookup, setIsAuthorOrcidLookup] = useState(false);
 
   // 3. Figures/Table temporary state
   const [mediaType, setMediaType] = useState<'figure' | 'table' | 'diagram'>('figure');
@@ -170,6 +171,45 @@ export default function SubmissionWorkflow({
     setNewAffiliation('');
   };
 
+  const normalizeOrcid = (value: string) => value.replace(/^https?:\/\/orcid\.org\//i, '').trim();
+
+  const autofillAuthorFromOrcid = async () => {
+    const clean = normalizeOrcid(authorOrcid);
+    if (!clean) return;
+    setIsAuthorOrcidLookup(true);
+    try {
+      const response = await fetch(`https://pub.orcid.org/v3.0/${clean}/record`, {
+        headers: { Accept: 'application/json' }
+      });
+      if (!response.ok) throw new Error('ORCID lookup failed');
+      const record = await response.json();
+      const name = record?.person?.name;
+      const given = name?.['given-names']?.value || '';
+      const family = name?.['family-name']?.value || '';
+      const emails = record?.person?.emails?.email || [];
+      const employments = record?.['activities-summary']?.employments?.['affiliation-group'] || [];
+      const org = employments?.[0]?.summaries?.[0]?.['employment-summary']?.organization;
+      if (given && !authorFirst) setAuthorFirst(given);
+      if (family && !authorLast) setAuthorLast(family);
+      if (emails[0]?.email && !authorEmail) setAuthorEmail(emails[0].email);
+      if (org?.name && !authorInst) setAuthorInst(org.name);
+      if (org?.address?.city && !authorCity) setAuthorCity(org.address.city);
+      if (org?.address?.country && !authorCountry) setAuthorCountry(org.address.country);
+      if (org?.name) addAuthorAffiliation([authorDept, org.name, org?.address?.city, org?.address?.country].filter(Boolean).join(', '));
+      setAuthorOrcid(clean);
+      onShowNotification('ORCID author metadata imported where available.', 'success');
+    } catch {
+      onShowNotification('ORCID metadata could not be imported. You can complete author fields manually.', 'error');
+    } finally {
+      setIsAuthorOrcidLookup(false);
+    }
+  };
+
+  const normalizeKeywords = (value: string) => {
+    const keywords = value.split(/[;,]/).map(item => item.trim()).filter(Boolean);
+    return keywords.length ? `${keywords.join('; ')}.` : '';
+  };
+
   const handleMediaFileSelected = (file: File) => {
     setMediaFileName(file.name);
     const reader = new FileReader();
@@ -204,6 +244,34 @@ export default function SubmissionWorkflow({
     const editorFiles = manuscript.editorFiles.filter(existing => existing.type !== type);
     updateField('editorFiles', [...editorFiles, item]);
     onShowNotification(`${type.replace('-', ' ')} uploaded: ${file.name}`, 'success');
+  };
+
+  const removeEditorFile = (type: string) => {
+    updateField('editorFiles', manuscript.editorFiles.filter(existing => existing.type !== type));
+    onShowNotification(`${type.replace('-', ' ')} removed.`, 'success');
+  };
+
+  const openEditorFile = (type: string) => {
+    const file = manuscript.editorFiles.find(existing => existing.type === type);
+    if (!file?.fileUrl) return;
+    const tab = window.open();
+    if (tab) {
+      tab.document.write(`<iframe src="${file.fileUrl}" style="border:0;width:100%;height:100vh"></iframe>`);
+    }
+  };
+
+  const renderEditorFileControls = (type: string, inputId: string) => {
+    const file = manuscript.editorFiles.find(existing => existing.type === type);
+    if (!file) return null;
+    return (
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-lg border border-teal-100 bg-teal-50 p-2">
+        <span className="font-semibold text-teal-900">{file.fileName}</span>
+        <button type="button" onClick={() => openEditorFile(type)} className="px-2 py-1 rounded border bg-white text-[10px] font-bold text-slate-700">Preview</button>
+        <a href={file.fileUrl} download={file.fileName} className="px-2 py-1 rounded border bg-white text-[10px] font-bold text-slate-700">Open</a>
+        <button type="button" onClick={() => document.getElementById(inputId)?.click()} className="px-2 py-1 rounded border bg-white text-[10px] font-bold text-slate-700">Replace</button>
+        <button type="button" onClick={() => removeEditorFile(type)} className="px-2 py-1 rounded border bg-white text-[10px] font-bold text-red-700">Delete</button>
+      </div>
+    );
   };
 
   // 4. Citation Form States
@@ -717,13 +785,21 @@ export default function SubmissionWorkflow({
                     placeholder="Kavtaradze" className="w-full bg-slate-50 border p-1.5 rounded focus:outline-hidden"
                   />
                 </div>
-                <div>
-                  <label className="block font-semibold mb-1">Mandatory ORCID iD *</label>
-                  <input
-                    type="text" required value={authorOrcid} onChange={(e) => setAuthorOrcid(e.target.value)}
-                    placeholder="0000-0002-1823-4412" className="w-full bg-slate-100 border p-1.5 rounded font-mono text-teal-800 focus:outline-hidden"
-                  />
-                </div>
+	                <div>
+	                  <label className="block font-semibold mb-1">Mandatory ORCID iD *</label>
+	                  <input
+	                    type="text" required value={authorOrcid} onChange={(e) => setAuthorOrcid(e.target.value)} onBlur={autofillAuthorFromOrcid}
+	                    placeholder="0000-0002-1823-4412" className="w-full bg-slate-100 border p-1.5 rounded font-mono text-teal-800 focus:outline-hidden"
+	                  />
+                    <button
+                      type="button"
+                      onClick={autofillAuthorFromOrcid}
+                      disabled={!authorOrcid.trim() || isAuthorOrcidLookup}
+                      className="mt-1 text-[10px] font-bold text-teal-700 disabled:text-slate-400 hover:underline"
+                    >
+                      {isAuthorOrcidLookup ? 'Importing ORCID...' : 'Auto-fill author'}
+                    </button>
+	                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -925,16 +1001,20 @@ export default function SubmissionWorkflow({
                 id="input-m-keywords"
                 type="text"
                 value={manuscript.sections['Keywords'] || ''}
-                onChange={(e) => {
-                  const updatedSecs = { ...manuscript.sections, Keywords: e.target.value };
-                  updateField('sections', updatedSecs);
-                }}
-                placeholder="e.g., Diabetes Mellitus; Cardiomyopathies; Cytokines"
+	                onChange={(e) => {
+	                  const updatedSecs = { ...manuscript.sections, Keywords: e.target.value.replace(/,/g, ';') };
+	                  updateField('sections', updatedSecs);
+	                }}
+	                onBlur={(e) => {
+	                  const updatedSecs = { ...manuscript.sections, Keywords: normalizeKeywords(e.target.value) };
+	                  updateField('sections', updatedSecs);
+	                }}
+	                placeholder="e.g., Diabetes Mellitus; Cardiomyopathies; Cytokines"
                 className="w-full bg-white border border-slate-350 p-2 text-sm rounded-lg focus:outline-hidden"
               />
             </div>
             <p className="text-slate-400 italic text-[11px]">
-              Use standardized MeSH (Medical Subject Headings) terms. Number of tags entered:{' '}
+              Use semicolons between terms. Commas are converted automatically, and the final period is added on save. Number of tags entered:{' '}
               <strong>{(manuscript.sections['Keywords'] || '').split(/[;,]/).map(k => k.trim()).filter(Boolean).length}</strong>
             </p>
           </div>
@@ -1493,15 +1573,16 @@ export default function SubmissionWorkflow({
                     }
                   }}
                 />
-                <button
-                  type="button"
-                  onClick={() => document.getElementById('cover-letter-upload')?.click()}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 border font-bold px-3 py-1.5 rounded"
-                >
-                  {manuscript.editorFiles.find(f => f.type === 'cover-letter')?.fileName || 'Upload File'}
-                </button>
-              </div>
-            </div>
+	                <button
+	                  type="button"
+	                  onClick={() => document.getElementById('cover-letter-upload')?.click()}
+	                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 border font-bold px-3 py-1.5 rounded"
+	                >
+	                  {manuscript.editorFiles.find(f => f.type === 'cover-letter')?.fileName || 'Upload File'}
+	                </button>
+                  {renderEditorFileControls('cover-letter', 'cover-letter-upload')}
+	              </div>
+	            </div>
 
             {/* Copyright Form */}
             <div className="space-y-2">
@@ -1539,15 +1620,16 @@ export default function SubmissionWorkflow({
                     }
                   }}
                 />
-                <button
-                  type="button"
-                  onClick={() => document.getElementById('copyright-form-upload')?.click()}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 border font-bold px-3 py-1.5 rounded"
-                >
-                  {manuscript.editorFiles.find(f => f.type === 'copyright-transfer')?.fileName || 'Upload File'}
-                </button>
-              </div>
-            </div>
+	                <button
+	                  type="button"
+	                  onClick={() => document.getElementById('copyright-form-upload')?.click()}
+	                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 border font-bold px-3 py-1.5 rounded"
+	                >
+	                  {manuscript.editorFiles.find(f => f.type === 'copyright-transfer')?.fileName || 'Upload File'}
+	                </button>
+                  {renderEditorFileControls('copyright-transfer', 'copyright-form-upload')}
+	              </div>
+	            </div>
           </div>
         )}
 

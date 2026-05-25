@@ -4,9 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import { User, UserRole } from '../types';
+import { User } from '../types';
 import { DB } from '../utils';
-import { Shield, Key, Mail, CheckCircle, GraduationCap, RefreshCw } from 'lucide-react';
+import { Key, Mail } from 'lucide-react';
+import { firebaseEnabled, signInWithGoogle } from '../firebase';
 
 interface AuthLayoutProps {
   currentUser: User | null;
@@ -25,11 +26,36 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
   const [lastName, setLastName] = useState('');
   const [orcidId, setOrcidId] = useState('');
   const [institution, setInstitution] = useState('');
-  const [role, setRole] = useState<UserRole>('Author');
   const [isOrcidLookup, setIsOrcidLookup] = useState(false);
   const demoPassword = 'password';
 
   const normalizeOrcid = (value: string) => value.replace(/^https?:\/\/orcid\.org\//i, '').trim();
+
+  const handleGoogleSignIn = async () => {
+    try {
+      const result = await signInWithGoogle();
+      const [given = 'GBMN', ...rest] = (result.user.displayName || '').split(' ').filter(Boolean);
+      const family = rest.join(' ') || 'Author';
+      const users = DB.getUsers();
+      const existing = users.find(u => u.email.toLowerCase() === (result.user.email || '').toLowerCase());
+      const user: User = existing || {
+        id: result.user.uid,
+        email: result.user.email || '',
+        firstName: given,
+        lastName: family,
+        role: 'Author',
+        institution: '',
+        isVerified: true,
+        joinedDate: new Date().toISOString().split('T')[0],
+      };
+      if (!existing) DB.setUsers([...users, user]);
+      DB.setCurrentUser(user);
+      onUserChanged(user);
+      onShowNotification('Google sign-in completed.', 'success');
+    } catch (error) {
+      onShowNotification(error instanceof Error ? error.message : 'Google sign-in is not available yet.', 'error');
+    }
+  };
 
   const autofillFromOrcid = async () => {
     const clean = normalizeOrcid(orcidId);
@@ -110,7 +136,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         firstName,
         lastName,
         orcidId: orcidId || undefined,
-        role,
+        role: 'Author',
         institution,
         isVerified: true,
         joinedDate: new Date().toISOString().split('T')[0]
@@ -136,20 +162,19 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
     <div id="auth-portal" className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
       
       {/* Platform Branding Logo */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <div className="inline-flex items-center justify-center p-3 bg-teal-50 border border-teal-100 rounded-2xl mb-4 text-teal-700 shadow-xs">
-          <GraduationCap className="h-10 w-10" />
-        </div>
-        <h2 className="text-2xl font-display font-bold tracking-tight text-slate-800">
-          Georgian Biomedical and Medical Nexus
-        </h2>
+      <div className="sm:mx-auto sm:w-full sm:max-w-lg text-center">
+        <img
+          src={`${import.meta.env.BASE_URL}gbmn-logo.png`}
+          alt="Georgian Biomedical News"
+          className="mx-auto w-[360px] max-w-[86vw] h-auto object-contain"
+        />
         <p className="mt-1 text-sm text-teal-700 font-medium tracking-wide">
-          GEORGIAN BIOMEDICAL NEWS · SUBMISSION STANDARD
+          MANUSCRIPT SUBMISSION SYSTEM
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 border border-slate-200 shadow-xl rounded-2xl sm:px-10">
+        <div className="bg-white py-8 px-4 border border-slate-200 shadow-xl rounded-xl sm:px-10">
           
           <div className="flex justify-between border-b border-slate-100 pb-4 mb-6">
             <button
@@ -171,6 +196,19 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
           </div>
 
           <form className="space-y-4" onSubmit={handleAction}>
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={!firebaseEnabled}
+              className="w-full border border-slate-300 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400 text-slate-700 font-semibold py-2.5 px-4 rounded-lg text-sm"
+            >
+              Continue with Google
+            </button>
+            {!firebaseEnabled && (
+              <p className="text-[10px] text-slate-400 -mt-2">
+                Google authentication will activate after Firebase configuration is connected.
+              </p>
+            )}
             
             {isReset ? (
               <>
@@ -327,17 +365,8 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="reg-role" className="block text-xs font-semibold text-slate-600 mb-1">Desired Central Role</label>
-                  <select
-                    id="reg-role"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value as UserRole)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 px-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-teal-600"
-                  >
-                    <option value="Author">Author (Submitter)</option>
-                    <option value="Reviewer">Independent Referee / Reviewer</option>
-                  </select>
+                <div className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-2 text-[11px] text-teal-900">
+                  New accounts are registered as authors. Editorial roles are assigned only by an administrator.
                 </div>
               </>
             )}
@@ -373,20 +402,6 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
             </div>
           </div>
 
-        </div>
-
-        <div className="mt-6 bg-slate-900 text-slate-100 rounded-2xl p-4 shadow-xl border border-slate-700 text-xs">
-          <h4 className="font-semibold uppercase tracking-wide text-sm">Registered demo accounts</h4>
-          <p className="text-slate-400 mt-1">
-            Use the account email for the role you need. Password for seeded accounts: <strong className="text-teal-300">password</strong>.
-          </p>
-          <div className="mt-3 grid gap-1.5 font-mono text-[11px] text-slate-300">
-            <span>author@gbmn.edu</span>
-            <span>editor@gbmn.edu</span>
-            <span>reviewer@gbmn.edu</span>
-            <span>managing.editor@gbmn.edu</span>
-            <span>admin@gbmn.org</span>
-          </div>
         </div>
 
       </div>

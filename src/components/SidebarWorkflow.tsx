@@ -183,7 +183,7 @@ function statusHelp(stepId: string, status: 'complete' | 'warning' | 'empty') {
     'title-meta': 'Full title, running title, and specialty are required.',
     authors: 'Add at least one author, ORCID, and a corresponding author.',
     abstract: 'Abstract is required for this article type.',
-    keywords: 'Enter 3-6 MeSH-style keywords separated by semicolons or commas.',
+    keywords: 'Enter 3-6 MeSH-style keywords separated by semicolons.',
     sections: 'Required manuscript body sections need content.',
     references: 'Add complete AMA references.',
     ethics: 'Ethics fields and IRB upload should be completed.',

@@ -148,7 +148,23 @@ function issueLabel(manuscript: Manuscript) {
 
 function doiText(manuscript: Manuscript) {
   const doi = manuscript.publicationInfo?.doi?.trim();
-  return doi ? `DOI: ${doi.replace(/^doi:/i, '')}` : '';
+  return doi ? `DOI: ${doi.replace(/^doi:/i, '')}` : 'DOI: 10.52340/GBMN.';
+}
+
+function formatKeywords(value?: string) {
+  const items = stripHtml(value).split(/[;,]/).map(item => item.trim()).filter(Boolean);
+  if (!items.length) return '';
+  return `${items.join('; ')}.`;
+}
+
+async function fetchPublicImageBytes(fileName: string) {
+  try {
+    const response = await fetch(`${import.meta.env.BASE_URL}${fileName}`);
+    if (!response.ok) return null;
+    return new Uint8Array(await response.arrayBuffer());
+  } catch {
+    return null;
+  }
 }
 
 function dataUrlToImage(dataUrl: string) {
@@ -297,7 +313,9 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
     return children;
   }
 
-  const fallback = stripHtml(figure.innerHTML);
+  const clone = figure.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('.gbmn-media-actions, figcaption').forEach(node => node.remove());
+  const fallback = stripHtml(clone.innerHTML);
   if (fallback) children.push(bodyParagraph([run(fallback)], false));
   return children;
 }
@@ -347,8 +365,8 @@ async function htmlToDocxChildren(html: string, { dropCap = false } = {}): Promi
     if (tag === 'h3') {
       children.push(new Paragraph({
         keepNext: true,
-        spacing: { before: 180, after: 100, line: 260, lineRule: LineRuleType.AUTO },
-        children: [run(textContent(element.textContent || '').toUpperCase(), { font: 'Arial', size: 22, bold: true, color: COLORS.headingRed })],
+        spacing: { before: 160, after: 80, line: 250, lineRule: LineRuleType.AUTO },
+        children: [run(textContent(element.textContent || ''), { font: 'Arial', size: 22, bold: true, color: COLORS.teal })],
       }));
       firstParagraph = true;
       continue;
@@ -405,32 +423,31 @@ function footer() {
 
 // ─── Journal header (logo + rule) ──────────────────────────
 
-function journalHeader(manuscript: Manuscript): DocxChild[] {
+async function journalHeader(manuscript: Manuscript): Promise<DocxChild[]> {
+  const logoBytes = await fetchPublicImageBytes('gbmn-logo.png');
   const logoCell = new TableCell({
-    width: { size: 4200, type: WidthType.DXA },
+    width: { size: 6500, type: WidthType.DXA },
     borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
     children: [
       new Paragraph({
         spacing: { before: 0, after: 0 },
-        children: [
-          // "gbmn" logo text in teal
-          run('gbmn', { font: 'Arial', size: 86, bold: true, color: COLORS.logoTeal }),
-          run('  GEORGIAN', { font: 'Arial', size: 30, bold: true, color: COLORS.black }),
-        ],
-      }),
-      new Paragraph({
-        spacing: { before: 0, after: 0 },
-        children: [run('BIOMEDICAL', { font: 'Arial', size: 30, bold: true, color: COLORS.black })],
-      }),
-      new Paragraph({
-        spacing: { before: 0, after: 0 },
-        children: [run('NEWS', { font: 'Arial', size: 30, bold: true, color: COLORS.black })],
+        children: logoBytes
+          ? [new ImageRun({
+              type: 'png',
+              data: logoBytes,
+              transformation: { width: 420, height: 123 },
+              altText: { title: 'Georgian Biomedical News', description: 'GBMN logo', name: 'GBMN logo' },
+            })]
+          : [
+              run('gbmn', { font: 'Arial', size: 86, bold: true, color: COLORS.logoTeal }),
+              run('  GEORGIAN BIOMEDICAL NEWS', { font: 'Arial', size: 30, bold: true, color: COLORS.black }),
+            ],
       }),
     ],
   });
 
   const issueCell = new TableCell({
-    width: { size: BODY_WIDTH - 4200, type: WidthType.DXA },
+    width: { size: BODY_WIDTH - 6500, type: WidthType.DXA },
     verticalAlign: VerticalAlign.CENTER,
     borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
     children: [
@@ -449,7 +466,7 @@ function journalHeader(manuscript: Manuscript): DocxChild[] {
     new Table({
       width: { size: BODY_WIDTH, type: WidthType.DXA },
       layout: TableLayoutType.FIXED,
-      columnWidths: [4200, BODY_WIDTH - 4200],
+      columnWidths: [6500, BODY_WIDTH - 6500],
       borders: TableBordersNone,
       rows: [new TableRow({ children: [logoCell, issueCell] })],
     }),
@@ -534,7 +551,8 @@ async function abstractBlock(manuscript: Manuscript): Promise<DocxChild[]> {
       spacing: { before: 160, after: 120, line: 260, lineRule: LineRuleType.AUTO },
       children: [
         run('ABSTRACT', { font: 'Arial', bold: true, size: 24, color: COLORS.headingRed }),
-        ...(doiText(manuscript) ? [run('     '), run(doiText(manuscript), { font: 'Arial', bold: true, size: 20, color: COLORS.gray, underline: {} })] : [])
+        run('     '),
+        run(doiText(manuscript), { font: 'Arial', bold: true, size: 20, color: COLORS.gray, underline: manuscript.publicationInfo?.doi ? {} : undefined })
       ],
     }),
     ...await htmlToDocxChildren(abstractHtml),
@@ -550,7 +568,7 @@ async function abstractBlock(manuscript: Manuscript): Promise<DocxChild[]> {
 // ─── Keywords ────────────────────────────────────────────────
 
 function keywordsBlock(manuscript: Manuscript): DocxChild[] {
-  const keywords = stripHtml(manuscript.sections.Keywords);
+  const keywords = formatKeywords(manuscript.sections.Keywords);
   if (!keywords) return [];
   return [
     new Paragraph({
@@ -613,7 +631,11 @@ async function bodyBlocks(manuscript: Manuscript): Promise<DocxChild[]> {
 
   // References
   if (manuscript.references.length) {
-    body.push(heading('REFERENCES'));
+    body.push(new Paragraph({
+      keepNext: true,
+      spacing: { before: 200, after: 120, line: 260, lineRule: LineRuleType.AUTO },
+      children: [run('References', { font: 'Arial', bold: true, size: 22, color: COLORS.black })],
+    }));
     manuscript.references.forEach((ref, index) => {
       const url = referenceUrl(ref);
       const citationText = `${index + 1}. ${formatAMAReference(ref).replace(/\*/g, '')}`;
@@ -634,7 +656,7 @@ async function bodyBlocks(manuscript: Manuscript): Promise<DocxChild[]> {
 
 export async function downloadManuscriptDocx(manuscript: Manuscript) {
   const frontMatter: DocxChild[] = [
-    ...journalHeader(manuscript),
+    ...await journalHeader(manuscript),
     ...titleBlock(manuscript),
     ...await abstractBlock(manuscript),
     ...keywordsBlock(manuscript),
