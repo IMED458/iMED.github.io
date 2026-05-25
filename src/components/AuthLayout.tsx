@@ -27,6 +27,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
   const [orcidId, setOrcidId] = useState('');
   const [institution, setInstitution] = useState('');
   const [isOrcidLookup, setIsOrcidLookup] = useState(false);
+  const [pendingProviderUid, setPendingProviderUid] = useState('');
   const demoPassword = 'password';
 
   const normalizeOrcid = (value: string) => value.replace(/^https?:\/\/orcid\.org\//i, '').trim();
@@ -38,6 +39,12 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       const family = rest.join(' ') || 'Author';
       const users = DB.getUsers();
       const existing = users.find(u => u.email.toLowerCase() === (result.user.email || '').toLowerCase());
+      if (existing?.orcidId && existing?.institution) {
+        DB.setCurrentUser(existing);
+        onUserChanged(existing);
+        onShowNotification('Google sign-in completed.', 'success');
+        return;
+      }
       const user: User = existing || {
         id: result.user.uid,
         email: result.user.email || '',
@@ -48,10 +55,15 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         isVerified: true,
         joinedDate: new Date().toISOString().split('T')[0],
       };
-      if (!existing) DB.setUsers([...users, user]);
-      DB.setCurrentUser(user);
-      onUserChanged(user);
-      onShowNotification('Google sign-in completed.', 'success');
+      setPendingProviderUid(user.id);
+      setEmail(user.email);
+      setFirstName(user.firstName);
+      setLastName(user.lastName);
+      setInstitution(user.institution || '');
+      setOrcidId(user.orcidId || '');
+      setIsLogin(false);
+      setIsReset(false);
+      onShowNotification('Google verified. Complete author profile with mandatory ORCID iD to finish registration.', 'info');
     } catch (error) {
       const rawMessage = error instanceof Error ? error.message : '';
       const host = window.location.hostname;
@@ -132,19 +144,19 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       }
     } else {
       // Register new user
-      if (!email || !firstName || !lastName || !institution) {
-        onShowNotification('Please fill in all required fields.', 'error');
+      if (!email || !firstName || !lastName || !institution || !orcidId) {
+        onShowNotification('Please fill in all required fields, including mandatory ORCID iD.', 'error');
         return;
       }
       const users = DB.getUsers();
       const userExists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
-      if (userExists) {
+      if (userExists && !pendingProviderUid) {
         onShowNotification('Email is already registered.', 'error');
         return;
       }
 
       const newUser: User = {
-        id: `user-${Date.now()}`,
+        id: pendingProviderUid || `user-${Date.now()}`,
         email,
         firstName,
         lastName,
@@ -155,11 +167,14 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         joinedDate: new Date().toISOString().split('T')[0]
       };
 
-      const updatedUsers = [...users, newUser];
+      const updatedUsers = userExists
+        ? users.map(item => item.email.toLowerCase() === email.toLowerCase() ? { ...item, ...newUser } : item)
+        : [...users, newUser];
       DB.setUsers(updatedUsers);
       DB.setCurrentUser(newUser);
       onUserChanged(newUser);
       onShowNotification(`Account successfully created! Logged in as ${newUser.firstName} ${newUser.lastName}.`, 'success');
+      setPendingProviderUid('');
       
       DB.addAuditLog({
         userId: newUser.id,
@@ -213,15 +228,17 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
               type="button"
               onClick={handleGoogleSignIn}
               disabled={!firebaseEnabled}
-              className="w-full border border-slate-300 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400 text-slate-700 font-semibold py-2.5 px-4 rounded-lg text-sm"
+              className="w-full border border-slate-300 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400 text-slate-700 font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-2"
             >
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600 border">G</span>
               Continue with Google
             </button>
             <button
               type="button"
               onClick={handleOrcidSignIn}
-              className="w-full border border-lime-300 bg-lime-50 hover:bg-lime-100 text-lime-900 font-semibold py-2.5 px-4 rounded-lg text-sm"
+              className="w-full border border-lime-300 bg-lime-50 hover:bg-lime-100 text-lime-900 font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-2"
             >
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#A6CE39] text-white text-xs font-black">iD</span>
               Continue with ORCID iD
             </button>
             {!firebaseEnabled && (
@@ -351,11 +368,12 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
 
                 <div>
                   <label htmlFor="reg-orcid" className="block text-xs font-semibold text-slate-600 mb-1">
-                    ORCID iD (Recommended)
+                    ORCID iD *
                   </label>
                   <input
                     id="reg-orcid"
                     type="text"
+                    required
                     value={orcidId}
                     onChange={(e) => setOrcidId(e.target.value)}
                     onBlur={autofillFromOrcid}

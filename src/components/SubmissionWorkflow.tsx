@@ -242,7 +242,7 @@ export default function SubmissionWorkflow({
 
   const attachEditorFile = async (file: File, type: string) => {
     const localFileUrl = await readFileAsDataUrl(file);
-    let fileUrl = localFileUrl;
+    let fileUrl = URL.createObjectURL(file);
     if (firebaseStorage) {
       try {
         const storagePath = `manuscripts/${manuscript.id}/editor-files/${type}-${Date.now()}-${file.name}`;
@@ -253,7 +253,7 @@ export default function SubmissionWorkflow({
         console.warn('Firebase Storage upload failed, using local fallback.', error);
       }
     }
-    const item = { id: `${type}-${Date.now()}`, fileName: file.name, type, fileUrl, uploadedAt: new Date().toISOString() };
+    const item = { id: `${type}-${Date.now()}`, fileName: file.name, type, fileUrl, uploadedAt: new Date().toISOString(), fileSize: fileSizeLabel(file) };
     const editorFiles = manuscript.editorFiles.filter(existing => existing.type !== type);
     updateField('editorFiles', [...editorFiles, item]);
     onShowNotification(`${type.replace('-', ' ')} uploaded: ${file.name}`, 'success');
@@ -278,7 +278,7 @@ export default function SubmissionWorkflow({
     if (!file) return null;
     return (
       <div className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-lg border border-teal-100 bg-teal-50 p-2">
-        <span className="font-semibold text-teal-900">{file.fileName}</span>
+        <span className="font-semibold text-teal-900">{file.fileName}{file.fileSize ? ` · ${file.fileSize}` : ''}</span>
         <button type="button" onClick={() => openEditorFile(type)} className="px-2 py-1 rounded border bg-white text-[10px] font-bold text-slate-700">Preview</button>
         <a href={file.fileUrl} download={file.fileName} className="px-2 py-1 rounded border bg-white text-[10px] font-bold text-slate-700">Open</a>
         <button type="button" onClick={() => document.getElementById(inputId)?.click()} className="px-2 py-1 rounded border bg-white text-[10px] font-bold text-slate-700">Replace</button>
@@ -1117,9 +1117,31 @@ export default function SubmissionWorkflow({
                 <p className="text-slate-400 italic">No citations cataloged yet.</p>
               ) : (
                 <ol className="list-decimal pl-5 space-y-2 max-h-48 overflow-y-auto font-sans">
-                  {manuscript.references.map((item) => (
+                  {manuscript.references.map((item, index) => (
                     <li key={item.id} className="text-[11px] pl-1 font-medium text-slate-700">
                       <span>{formatAMAReference(item)}</span>
+                      <button
+                        disabled={index === 0}
+                        onClick={() => {
+                          const updated = [...manuscript.references];
+                          [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+                          updateField('references', updated);
+                        }}
+                        className="text-teal-750 font-bold ml-2 hover:underline disabled:text-slate-300 disabled:no-underline"
+                      >
+                        [Up]
+                      </button>
+                      <button
+                        disabled={index === manuscript.references.length - 1}
+                        onClick={() => {
+                          const updated = [...manuscript.references];
+                          [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+                          updateField('references', updated);
+                        }}
+                        className="text-teal-750 font-bold ml-2 hover:underline disabled:text-slate-300 disabled:no-underline"
+                      >
+                        [Down]
+                      </button>
                       <button
                         onClick={() => {
                           const updated = manuscript.references.filter(r => r.id !== item.id);
@@ -1182,6 +1204,15 @@ export default function SubmissionWorkflow({
                         };
                         if (newRef.authors && newRef.title && newRef.journalOrBook && newRef.year) {
                           updateField('references', [...manuscript.references, newRef]);
+                          setCiteAuthors('');
+                          setCiteTitle('');
+                          setCiteBookOrJournal('');
+                          setCiteYear('');
+                          setCiteVolume('');
+                          setCiteIssue('');
+                          setCitePages('');
+                          setCiteDoi('');
+                          setCiteUrl('');
                           onShowNotification('DOI metadata loaded and reference added.', 'success');
                         } else {
                           onShowNotification('DOI metadata loaded. Review fields and click Add Reference.', 'info');
@@ -1767,7 +1798,8 @@ export default function SubmissionWorkflow({
                     onShowNotification('Submission error: Minimum of 1 author affiliate matching credentials required.', 'error');
                     return;
                   }
-                  onUpdateManuscript({ ...manuscript, status: 'Submitted', updatedAt: new Date().toISOString() });
+                  const now = new Date().toISOString();
+                  onUpdateManuscript({ ...manuscript, status: 'Submitted', submittedAt: now, updatedAt: now });
                   onStepChange('getting-started');
                   onShowNotification('Manuscript submitted to the editorial office. Confirmation recorded.', 'success');
                 }}

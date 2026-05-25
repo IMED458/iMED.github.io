@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, FormEvent } from 'react';
+import React, { useEffect, useState, FormEvent } from 'react';
 import { User, UserRole, Manuscript, ManuscriptStatus, SystemAuditLog, JournalSettings, ReferenceItem, FigureTableItem } from '../types';
 import { DB, ARTICLE_TYPES } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
@@ -67,6 +67,12 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     orcidId: '',
     isVerified: true,
   });
+
+  useEffect(() => {
+    if (!selectedManuscript) return;
+    const latest = manuscripts.find(item => item.id === selectedManuscript.id);
+    if (latest && latest !== selectedManuscript) setSelectedManuscript(latest);
+  }, [manuscripts, selectedManuscript]);
 
   // Manage Settings state
   const [journalSettings, setJournalSettings] = useState<JournalSettings>(() => DB.getJournalSettings());
@@ -638,10 +644,15 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   >
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-mono font-bold text-teal-800">{m.id}</span>
+                      {m.status === 'Submitted' && m.reviewerAssignments.length === 0 && m.editorDecisionLog.length === 0 && (
+                        <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide text-white">New</span>
+                      )}
                       {renderStatusBadge(m.status)}
                     </div>
                     <h5 className="text-xs font-bold text-slate-800 mt-1.5 line-clamp-2">{m.title}</h5>
-                    <p className="text-[10px] text-slate-400 mt-1">Submitted: {new Date(m.createdAt).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Submitted: {new Date((m as any).submittedAt || m.createdAt).toLocaleString()}
+                    </p>
                   </div>
                 ))
               )}

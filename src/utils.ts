@@ -430,8 +430,19 @@ export const DB = {
 
   setCurrentUser(user: User | null) {
     if (user) {
-      localStorage.setItem('gbmn_current_user', JSON.stringify(user));
-      mirrorToFirestore('sessions', user.id, user);
+      const sessionUser: User = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        institution: user.institution,
+        orcidId: user.orcidId,
+        isVerified: user.isVerified,
+        joinedDate: user.joinedDate,
+      };
+      localStorage.setItem('gbmn_current_user', JSON.stringify(sessionUser));
+      mirrorToFirestore('sessions', sessionUser.id, sessionUser);
     } else {
       localStorage.removeItem('gbmn_current_user');
     }

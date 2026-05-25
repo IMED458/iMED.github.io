@@ -32,6 +32,14 @@ export default function App() {
   // Real-time toast alert state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
   const [showNotificationBell, setShowNotificationBell] = useState(false);
+  const [showProfileEditor, setShowProfileEditor] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    institution: '',
+    orcidId: '',
+  });
   const [journalNotifications, setJournalNotifications] = useState<Array<{ id: string; text: string; time: string; read: boolean }>>([
     { id: 'n1', text: 'Welcome to GBMN peer submissions network! Check policies.', time: 'Just now', read: false },
     { id: 'n2', text: 'Shota Rustaveli national grant funding integration loaded.', time: '2 hours ago', read: true },
@@ -88,6 +96,36 @@ export default function App() {
     DB.setCurrentUser(null);
     setCurrentUser(null);
     triggerNotification('Logged out from publishing dashboard.', 'info');
+  };
+
+  const openProfileEditor = () => {
+    if (!currentUser) return;
+    setProfileDraft({
+      firstName: currentUser.firstName,
+      lastName: currentUser.lastName,
+      email: currentUser.email,
+      institution: currentUser.institution,
+      orcidId: currentUser.orcidId || '',
+    });
+    setShowProfileEditor(true);
+  };
+
+  const saveProfileEditor = () => {
+    if (!currentUser) return;
+    if (!profileDraft.firstName || !profileDraft.lastName || !profileDraft.email || !profileDraft.institution || !profileDraft.orcidId) {
+      triggerNotification('Profile requires first name, last name, email, institution, and ORCID iD.', 'error');
+      return;
+    }
+    const updatedUser = { ...currentUser, ...profileDraft, orcidId: profileDraft.orcidId };
+    const users = DB.getUsers();
+    const updatedUsers = users.some(user => user.id === currentUser.id)
+      ? users.map(user => user.id === currentUser.id ? updatedUser : user)
+      : [...users, updatedUser];
+    DB.setUsers(updatedUsers);
+    DB.setCurrentUser(updatedUser);
+    setCurrentUser(updatedUser);
+    setShowProfileEditor(false);
+    triggerNotification('Profile updated.', 'success');
   };
 
   const createEmptyDraft = (authorId: string): Manuscript => ({
@@ -280,6 +318,15 @@ export default function App() {
               </div>
             </div>
 
+            <button
+              id="profile-editor-btn"
+              onClick={openProfileEditor}
+              className="p-2 border border-slate-200 bg-slate-50 text-teal-700 rounded-lg hover:bg-teal-50 transition"
+              title="Edit profile"
+            >
+              <UserIcon className="h-4 w-4" />
+            </button>
+
             {/* Logout actions */}
             <button
               id="platform-logout-btn"
@@ -292,6 +339,31 @@ export default function App() {
           </div>
         )}
       </header>
+
+      {showProfileEditor && currentUser && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/30 p-4 no-print">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3 border-b pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Profile</h2>
+                <p className="text-xs text-slate-500">Update your GBMN account details. ORCID iD is mandatory.</p>
+              </div>
+              <button onClick={() => setShowProfileEditor(false)} className="rounded-lg border px-3 py-1 text-xs font-bold text-slate-600">Close</button>
+            </div>
+            <div className="grid grid-cols-1 gap-3 text-xs">
+              <input value={profileDraft.firstName} onChange={event => setProfileDraft(prev => ({ ...prev, firstName: event.target.value }))} placeholder="First name" className="rounded-lg border border-slate-300 p-2" />
+              <input value={profileDraft.lastName} onChange={event => setProfileDraft(prev => ({ ...prev, lastName: event.target.value }))} placeholder="Last name" className="rounded-lg border border-slate-300 p-2" />
+              <input value={profileDraft.email} onChange={event => setProfileDraft(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" className="rounded-lg border border-slate-300 p-2" />
+              <input value={profileDraft.institution} onChange={event => setProfileDraft(prev => ({ ...prev, institution: event.target.value }))} placeholder="Institution" className="rounded-lg border border-slate-300 p-2" />
+              <input value={profileDraft.orcidId} onChange={event => setProfileDraft(prev => ({ ...prev, orcidId: event.target.value }))} placeholder="ORCID iD" className="rounded-lg border border-slate-300 p-2 font-mono" />
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setShowProfileEditor(false)} className="rounded-lg border px-4 py-2 text-xs font-bold text-slate-600">Cancel</button>
+              <button onClick={saveProfileEditor} className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-bold text-white">Save Profile</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 4. WORKPLACE CANVAS */}
       <main id="main-workplace-canvas" className="flex-1 py-8 px-4 md:px-8 max-w-7xl mx-auto w-full">

@@ -159,6 +159,7 @@ export interface Manuscript {
   authorId: string;
   createdAt: string;
   updatedAt: string;
+  submittedAt?: string;
   
   // Title & Categorization
   title: string;
@@ -201,7 +202,7 @@ export interface Manuscript {
   payment: PaymentReceipt;
 
   // Additional Reviewer/Editorial attachments
-  editorFiles: { id: string; fileName: string; type: string; fileUrl?: string; uploadedAt?: string }[];
+  editorFiles: { id: string; fileName: string; type: string; fileUrl?: string; uploadedAt?: string; fileSize?: string }[];
   reviewerAssignments: {
     reviewerId: string;
     reviewerName: string;
