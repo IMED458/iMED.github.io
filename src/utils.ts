@@ -4,6 +4,8 @@
  */
 
 import { ArticleTypeConfig, Manuscript, User, SystemAuditLog, JournalSettings, AuthorDetails } from './types';
+import { firebaseEnabled, firestore } from './firebase';
+import { doc, setDoc } from 'firebase/firestore';
 
 export const ARTICLE_TYPES: { [key: string]: ArticleTypeConfig } = {
   'clinical-cases': {
@@ -368,7 +370,22 @@ export const SAMPLE_MANUSCRIPT: Manuscript = {
   ]
 };
 
-// Simulated Local Storage Database Layer
+function mirrorToFirestore(collectionName: string, id: string, data: unknown) {
+  if (!firebaseEnabled || !firestore) return;
+  void setDoc(doc(firestore, collectionName, id), {
+    payload: data,
+    updatedAt: new Date().toISOString(),
+  }).catch((error) => {
+    console.warn(`Firebase mirror failed for ${collectionName}/${id}`, error);
+  });
+}
+
+function mirrorArrayToFirestore<T extends { id: string }>(collectionName: string, rows: T[]) {
+  rows.forEach(row => mirrorToFirestore(collectionName, row.id, row));
+  mirrorToFirestore('snapshots', collectionName, rows);
+}
+
+// Local-first database layer with Firebase Firestore mirroring.
 export const DB = {
   getUsers(): User[] {
     const data = localStorage.getItem('gbmn_users');
@@ -381,6 +398,7 @@ export const DB = {
 
   setUsers(users: User[]) {
     localStorage.setItem('gbmn_users', JSON.stringify(users));
+    mirrorArrayToFirestore('users', users);
   },
 
   getManuscripts(): Manuscript[] {
@@ -395,6 +413,7 @@ export const DB = {
 
   setManuscripts(manuscripts: Manuscript[]) {
     localStorage.setItem('gbmn_manuscripts', JSON.stringify(manuscripts));
+    mirrorArrayToFirestore('manuscripts', manuscripts);
   },
 
   getCurrentUser(): User | null {
@@ -412,6 +431,7 @@ export const DB = {
   setCurrentUser(user: User | null) {
     if (user) {
       localStorage.setItem('gbmn_current_user', JSON.stringify(user));
+      mirrorToFirestore('sessions', user.id, user);
     } else {
       localStorage.removeItem('gbmn_current_user');
     }
@@ -473,6 +493,8 @@ export const DB = {
     };
     logs.unshift(newLog); // Put new actions on top
     localStorage.setItem('gbmn_audit_logs', JSON.stringify(logs));
+    mirrorToFirestore('auditLogs', newLog.id, newLog);
+    mirrorToFirestore('snapshots', 'auditLogs', logs);
   },
 
   getJournalSettings(): JournalSettings {
@@ -494,5 +516,6 @@ export const DB = {
 
   setJournalSettings(settings: JournalSettings) {
     localStorage.setItem('gbmn_settings', JSON.stringify(settings));
+    mirrorToFirestore('settings', 'journal', settings);
   }
 };
