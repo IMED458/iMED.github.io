@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { DB } from '../utils';
 import { Key, Mail } from 'lucide-react';
-import { firebaseEnabled, signInWithGoogle } from '../firebase';
+import { firebaseEnabled, signInWithGoogle, startOrcidAuthentication } from '../firebase';
 
 interface AuthLayoutProps {
   currentUser: User | null;
@@ -54,6 +54,14 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       onShowNotification('Google sign-in completed.', 'success');
     } catch (error) {
       onShowNotification(error instanceof Error ? error.message : 'Google sign-in is not available yet.', 'error');
+    }
+  };
+
+  const handleOrcidSignIn = () => {
+    try {
+      startOrcidAuthentication();
+    } catch (error) {
+      onShowNotification(error instanceof Error ? error.message : 'ORCID sign-in is not configured yet.', 'info');
     }
   };
 
@@ -203,6 +211,13 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
               className="w-full border border-slate-300 bg-white hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400 text-slate-700 font-semibold py-2.5 px-4 rounded-lg text-sm"
             >
               Continue with Google
+            </button>
+            <button
+              type="button"
+              onClick={handleOrcidSignIn}
+              className="w-full border border-lime-300 bg-lime-50 hover:bg-lime-100 text-lime-900 font-semibold py-2.5 px-4 rounded-lg text-sm"
+            >
+              Continue with ORCID iD
             </button>
             {!firebaseEnabled && (
               <p className="text-[10px] text-slate-400 -mt-2">

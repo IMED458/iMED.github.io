@@ -180,10 +180,10 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
               print-color-adjust: exact !important;
             }
             #academic-manuscript-sheet {
-              width: auto !important;
+              width: 100% !important;
               min-height: auto !important;
               padding: 0 !important;
-              margin: 0 !important;
+              margin: 0 auto !important;
               box-shadow: none !important;
               border: none !important;
               font-size: 11pt !important;
@@ -658,17 +658,28 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         .gbmn-abstract-heading-row {
           display: grid;
           grid-template-columns: minmax(0, 1fr) auto;
-          gap: 24px;
-          align-items: end;
+          gap: 34px;
+          align-items: start;
           margin: 10pt 0 8pt;
+          padding-bottom: 7pt;
+          position: relative;
         }
         .gbmn-abstract-rule-title { min-width: 0; }
         .gbmn-abstract-rule {
           border-top: 1px solid #000000;
           height: 0;
         }
+        .gbmn-abstract-rule-title .gbmn-abstract-rule:first-child {
+          margin-top: 1pt;
+        }
+        .gbmn-abstract-rule-title .gbmn-abstract-rule:last-child {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+        }
         .gbmn-abstract-heading-row .gbmn-section-heading {
-          margin: 5pt 0 5pt;
+          margin: 7pt 0 0;
         }
         .gbmn-doi-link {
           font-family: Arial, sans-serif;
@@ -677,7 +688,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           color: #777777;
           text-decoration: underline;
           white-space: nowrap;
-          margin-bottom: 5pt;
+          margin: -2pt 4pt 0 0;
         }
         .gbmn-doi-placeholder {
           text-decoration: none;
@@ -754,12 +765,12 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         }
 
         /* DROP CAP for first section first letter */
-        .preview-rich-dropcap p:first-child::first-letter {
+        .preview-rich-dropcap p:first-of-type::first-letter {
           float: left;
-          font-size: 42pt;
-          line-height: 34pt;
+          font-size: 48pt;
+          line-height: 38pt;
           font-weight: 400;
-          margin: 3px 5px 0 0;
+          margin: 4px 6px 0 0;
           color: #111111;
         }
 
@@ -1035,6 +1046,10 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           .gbmn-section-heading { color: #D72626 !important; }
           .preview-rich h3 { color: #0E8B8B !important; }
           .gbmn-references-heading { color: #000000 !important; }
+          .preview-rich-dropcap p:first-of-type::first-letter {
+            font-size: 48pt !important;
+            line-height: 38pt !important;
+          }
           .gbmn-inline-table th { background: #DCE8D0 !important; }
           .gbmn-inline-table tr:nth-child(even) td { background: #D9E3D1 !important; }
           .gbmn-inline-table th,

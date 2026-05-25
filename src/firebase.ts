@@ -50,3 +50,18 @@ export async function signInWithGoogle() {
   provider.setCustomParameters({ prompt: 'select_account' });
   return signInWithPopup(firebaseAuth, provider);
 }
+
+export function startOrcidAuthentication() {
+  const clientId = import.meta.env.VITE_ORCID_CLIENT_ID;
+  if (!clientId) {
+    throw new Error('ORCID OAuth requires a public ORCID client ID and redirect URL registration.');
+  }
+  const redirectUri = `${window.location.origin}${import.meta.env.BASE_URL}`;
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    scope: '/authenticate',
+    redirect_uri: redirectUri,
+  });
+  window.location.href = `https://orcid.org/oauth/authorize?${params.toString()}`;
+}
