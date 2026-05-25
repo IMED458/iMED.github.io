@@ -95,6 +95,9 @@ export default function SubmissionWorkflow({
   const [authorAffil, setAuthorAffil] = useState('');
   const [authorTitle, setAuthorTitle] = useState('MD, PhD');
   const [authorContrib, setAuthorContrib] = useState('Draft Writing & Methodology');
+  const [authorAffiliations, setAuthorAffiliations] = useState<string[]>([]);
+  const [newAffiliation, setNewAffiliation] = useState('');
+  const [authorContributionTags, setAuthorContributionTags] = useState<string[]>([]);
   const [authorIsCorr, setAuthorIsCorr] = useState(false);
   const [editingAuthorId, setEditingAuthorId] = useState<string | null>(null);
 
@@ -105,6 +108,7 @@ export default function SubmissionWorkflow({
   const [mediaFileName, setMediaFileName] = useState('');
   const [mediaFileUrl, setMediaFileUrl] = useState('');
   const [mediaPasteContent, setMediaPasteContent] = useState('');
+  const [mediaLayout, setMediaLayout] = useState<'two-column' | 'one-column'>('two-column');
   
   // Custom Table cells creator state
   const [tableRows, setTableRows] = useState(3);
@@ -136,6 +140,34 @@ export default function SubmissionWorkflow({
     return `<table class="gbmn-inline-table"><tbody>${rows.map((row, rIdx) => (
       `<tr>${row.map(cell => rIdx === 0 ? `<th>${escapeHtml(cell)}</th>` : `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`
     )).join('')}</tbody></table>`;
+  };
+
+  const contributionOptions = [
+    'Substantial contributions to concept or design',
+    'Acquisition, analysis, or interpretation of data',
+    'Drafting of the manuscript',
+    'Critical review of the manuscript for important intellectual content',
+    'Agreed to be accountable for all aspects of the work',
+    'Will review the final version to be published',
+    'Supervised the work'
+  ];
+
+  const savedAffiliations = Array.from(new Set(
+    manuscript.authors
+      .flatMap(author => author.affiliations?.length ? author.affiliations : [author.affiliation])
+      .filter(Boolean)
+  ));
+
+  const toggleContributionTag = (tag: string) => {
+    setAuthorContributionTags(prev => prev.includes(tag) ? prev.filter(item => item !== tag) : [...prev, tag]);
+  };
+
+  const addAuthorAffiliation = (value: string) => {
+    const clean = value.trim();
+    if (!clean || authorAffiliations.includes(clean)) return;
+    setAuthorAffiliations(prev => [...prev, clean]);
+    setAuthorAffil(prev => prev || clean);
+    setNewAffiliation('');
   };
 
   const handleMediaFileSelected = (file: File) => {
@@ -195,8 +227,27 @@ export default function SubmissionWorkflow({
 
   const handleAddAuthor = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authorFirst || !authorLast || !authorOrcid || !authorInst) {
+    const affiliations = authorAffiliations.length
+      ? authorAffiliations
+      : [authorAffil || `${authorDept}, ${authorInst}, ${authorCity}, ${authorCountry}`].filter(Boolean);
+    if (!authorFirst || !authorLast || !authorOrcid || (!authorInst && affiliations.length === 0)) {
       onShowNotification('First name, Last Name, Affiliation, and Mandated ORCID iD are required.', 'error');
+      return;
+    }
+    const hasCoreContribution = authorContributionTags.some(tag => [
+      'Substantial contributions to concept or design',
+      'Acquisition, analysis, or interpretation of data'
+    ].includes(tag));
+    const hasWritingContribution = authorContributionTags.some(tag => [
+      'Drafting of the manuscript',
+      'Critical review of the manuscript for important intellectual content'
+    ].includes(tag));
+    const hasRequiredContribution = [
+      'Agreed to be accountable for all aspects of the work',
+      'Will review the final version to be published'
+    ].every(tag => authorContributionTags.includes(tag));
+    if (!hasCoreContribution || !hasWritingContribution || !hasRequiredContribution) {
+      onShowNotification('Each author must have concept/data, writing/review, accountability, and final review contributions checked.', 'error');
       return;
     }
 
@@ -213,9 +264,11 @@ export default function SubmissionWorkflow({
       city: authorCity,
       institution: authorInst,
       department: authorDept,
-      affiliation: authorAffil || `${authorDept}, ${authorInst}, ${authorCity}, ${authorCountry}`,
+      affiliation: affiliations[0],
+      affiliations,
       academicTitle: authorTitle,
-      contributionRole: authorContrib,
+      contributionRole: authorContrib || authorContributionTags.join('; '),
+      contributionTags: authorContributionTags,
       isCorresponding: authorIsCorr
     };
 
@@ -241,7 +294,10 @@ export default function SubmissionWorkflow({
     setAuthorInst('');
     setAuthorDept('');
     setAuthorAffil('');
+    setAuthorAffiliations([]);
+    setNewAffiliation('');
     setAuthorIsCorr(false);
+    setAuthorContributionTags([]);
     setEditingAuthorId(null);
   };
 
@@ -259,8 +315,10 @@ export default function SubmissionWorkflow({
     setAuthorInst(auth.institution);
     setAuthorDept(auth.department);
     setAuthorAffil(auth.affiliation);
+    setAuthorAffiliations(auth.affiliations?.length ? auth.affiliations : [auth.affiliation].filter(Boolean));
     setAuthorTitle(auth.academicTitle);
     setAuthorContrib(auth.contributionRole);
+    setAuthorContributionTags(auth.contributionTags || []);
     setAuthorIsCorr(auth.isCorresponding);
   };
 
@@ -308,6 +366,8 @@ export default function SubmissionWorkflow({
       fileUrl: mediaType === 'figure' ? mediaFileUrl : undefined,
       tableData: mediaType === 'table' && !pastedHtml ? tempTableData : undefined,
       htmlContent: pastedHtml
+      ,
+      layout: mediaLayout
     };
 
     updateField('figuresAndTables', [...manuscript.figuresAndTables, newItem]);
@@ -319,6 +379,7 @@ export default function SubmissionWorkflow({
     setMediaFileName('');
     setMediaFileUrl('');
     setMediaPasteContent('');
+    setMediaLayout('two-column');
   };
 
   const handleAddCitation = (e: React.FormEvent) => {
@@ -710,6 +771,75 @@ export default function SubmissionWorkflow({
                     type="text" value={authorContrib} onChange={(e) => setAuthorContrib(e.target.value)}
                     placeholder="e.g., Conception, Biochemical Assays" className="w-full bg-slate-50 border p-1.5 rounded"
                   />
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-3">
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="flex-1 min-w-64">
+                    <label className="block font-semibold mb-1">Affiliations for this author</label>
+                    <select
+                      value=""
+                      onChange={(event) => addAuthorAffiliation(event.target.value)}
+                      className="w-full bg-white border p-1.5 rounded"
+                    >
+                      <option value="">Choose saved affiliation...</option>
+                      {savedAffiliations.map(affiliation => (
+                        <option key={affiliation} value={affiliation}>{affiliation}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-1 min-w-64">
+                    <label className="block font-semibold mb-1">Add new affiliation</label>
+                    <input
+                      value={newAffiliation}
+                      onChange={(event) => setNewAffiliation(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          addAuthorAffiliation(newAffiliation);
+                        }
+                      }}
+                      placeholder="Department, Institution, City, Country"
+                      className="w-full bg-white border p-1.5 rounded"
+                    />
+                  </div>
+                  <button type="button" onClick={() => addAuthorAffiliation(newAffiliation)} className="bg-teal-700 text-white font-bold px-3 py-1.5 rounded">
+                    Add
+                  </button>
+                </div>
+                {authorAffiliations.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {authorAffiliations.map(affiliation => (
+                      <button
+                        type="button"
+                        key={affiliation}
+                        onClick={() => setAuthorAffiliations(prev => prev.filter(item => item !== affiliation))}
+                        className="px-2 py-1 rounded bg-white border text-slate-700 text-[10px]"
+                        title="Click to remove"
+                      >
+                        {affiliation} ×
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2">
+                <h5 className="font-bold text-slate-800">Contributions. How did each listed author contribute?</h5>
+                <p className="text-[10px] text-slate-500">Contributions (please check all that apply). All authors must contribute to at least one concept/data item, one writing/review item, and both required items.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {contributionOptions.map(option => (
+                    <label key={option} className="flex items-start gap-2 text-[11px] text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={authorContributionTags.includes(option)}
+                        onChange={() => toggleContributionTag(option)}
+                        className="mt-0.5"
+                      />
+                      <span>{option}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
 

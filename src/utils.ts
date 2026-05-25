@@ -156,6 +156,10 @@ export const SAMPLE_MANUSCRIPT: Manuscript = {
   runningTitle: 'Mitochondrial Deficits in Georgian Diabetic Myopathy',
   specialty: 'Clinical Biochemistry & Cardiology',
   articleType: 'original-research',
+  publicationInfo: {
+    doi: '10.52340/GBMN.2026.01.01.167',
+    volumeIssue: 'VOLUME 4 ISSUE 2. APR-JUN 2026'
+  },
   checklistAgreed: true,
   checklistAgreedAt: '2026-04-12T10:15:00Z',
   authors: [
@@ -172,8 +176,10 @@ export const SAMPLE_MANUSCRIPT: Manuscript = {
       institution: 'Tbilisi State Medical University',
       department: 'Department of Medical Biochemistry',
       affiliation: 'Tbilisi State Medical University, Tbilisi, Georgia',
+      affiliations: ['Tbilisi State Medical University, Tbilisi, Georgia'],
       academicTitle: 'Associate Professor, MD, PhD',
       contributionRole: 'Study Conception, Laboratory Diagnostics, Manuscript Compilation',
+      contributionTags: ['Substantial contributions to concept or design', 'Drafting of the manuscript', 'Agreed to be accountable for all aspects of the work', 'Will review the final version to be published'],
       isCorresponding: true
     },
     {
@@ -189,8 +195,10 @@ export const SAMPLE_MANUSCRIPT: Manuscript = {
       institution: 'Cardiology Center of Western Georgia',
       department: 'Ischemic Heart Disease Ward',
       affiliation: 'Kutaisi Cardiology Center, Kutaisi, Georgia',
+      affiliations: ['Kutaisi Cardiology Center, Kutaisi, Georgia'],
       academicTitle: 'Consultant Cardiologist, MD',
       contributionRole: 'Clinical Diagnosis, Sample Collection, Patient Enrolment',
+      contributionTags: ['Acquisition, analysis, or interpretation of data', 'Critical review of the manuscript for important intellectual content', 'Agreed to be accountable for all aspects of the work', 'Will review the final version to be published'],
       isCorresponding: false
     },
     {
@@ -206,8 +214,10 @@ export const SAMPLE_MANUSCRIPT: Manuscript = {
       institution: 'Ivane Javakhishvili Tbilisi State University',
       department: 'Institute of Translational Medicine',
       affiliation: 'TSU Institute of Translational Medicine, Tbilisi, Georgia',
+      affiliations: ['TSU Institute of Translational Medicine, Tbilisi, Georgia'],
       academicTitle: 'Professor, PhD',
       contributionRole: 'Statistical Analysis, Biomarker Profiling, Funding Acquisition',
+      contributionTags: ['Acquisition, analysis, or interpretation of data', 'Drafting of the manuscript', 'Supervised the work', 'Agreed to be accountable for all aspects of the work', 'Will review the final version to be published'],
       isCorresponding: false
     }
   ],

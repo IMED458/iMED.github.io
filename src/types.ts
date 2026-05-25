@@ -31,8 +31,10 @@ export interface AuthorDetails {
   institution: string;
   department: string;
   affiliation: string;
+  affiliations?: string[];
   academicTitle: string;
   contributionRole: string; // e.g., 'Draft Writing', 'Data Analysis', 'Funding', etc.
+  contributionTags?: string[];
   isCorresponding: boolean;
 }
 
@@ -79,6 +81,7 @@ export interface FigureTableItem {
   fileName?: string;
   tableData?: string[][]; // For grid/table builder
   htmlContent?: string;
+  layout?: 'two-column' | 'one-column';
 }
 
 export interface SupplementaryFile {
@@ -162,6 +165,10 @@ export interface Manuscript {
   runningTitle: string; // Max 50 chars
   specialty: string;
   articleType: ArticleTypeKey;
+  publicationInfo?: {
+    doi?: string;
+    volumeIssue?: string;
+  };
 
   // Checklist Agreement
   checklistAgreed: boolean;

@@ -100,6 +100,10 @@ export default function App() {
       runningTitle: '',
       specialty: 'Clinical Medicine',
       articleType: 'original-research',
+      publicationInfo: {
+        doi: '',
+        volumeIssue: ''
+      },
       checklistAgreed: false,
       authors: currentUser ? [{
         id: `auth-${currentUser.id}`,
@@ -114,8 +118,13 @@ export default function App() {
         institution: currentUser.institution,
         department: '',
         affiliation: `${currentUser.institution}`,
+        affiliations: [`${currentUser.institution}`],
         academicTitle: '',
         contributionRole: 'Corresponding Author',
+        contributionTags: [
+          'Agreed to be accountable for all aspects of the work',
+          'Will review the final version to be published'
+        ],
         isCorresponding: true
       }] : [],
       abstractContents: {},

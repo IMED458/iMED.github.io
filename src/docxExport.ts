@@ -141,6 +141,16 @@ function toGbmnTitleCase(title: string) {
   }).join(' ');
 }
 
+function issueLabel(manuscript: Manuscript) {
+  return manuscript.publicationInfo?.volumeIssue?.trim()
+    || `VOLUME X ISSUE X. ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()}`;
+}
+
+function doiText(manuscript: Manuscript) {
+  const doi = manuscript.publicationInfo?.doi?.trim();
+  return doi ? `DOI: ${doi.replace(/^doi:/i, '')}` : '';
+}
+
 function dataUrlToImage(dataUrl: string) {
   const match = dataUrl.match(/^data:image\/(png|jpe?g|gif|bmp);base64,(.+)$/i);
   if (!match) return null;
@@ -247,6 +257,7 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
   const caption = textContent(figure.querySelector('figcaption')?.textContent || '');
   const tableEl = figure.querySelector('table');
   const img = figure.querySelector('img');
+  const availableWidth = figure.classList.contains('gbmn-media-one-column') ? BODY_WIDTH : COLUMN_WIDTH;
 
   if (caption) {
     children.push(new Paragraph({
@@ -257,7 +268,7 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
   }
 
   if (tableEl) {
-    children.push(docxTableFromElement(tableEl));
+    children.push(docxTableFromElement(tableEl, availableWidth));
     children.push(new Paragraph({ spacing: { before: 0, after: 100 }, children: [run('')] }));
     return children;
   }
@@ -266,6 +277,7 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
     const parsed = dataUrlToImage(img.src);
     if (parsed) {
       const dimensions = await measureImage(img.src);
+      const scale = Math.min(1, availableWidth / Math.max(1, dimensions.width * 15));
       children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
         spacing: { before: 0, after: 120 },
@@ -273,7 +285,10 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
           new ImageRun({
             type: parsed.type,
             data: parsed.bytes,
-            transformation: dimensions,
+            transformation: {
+              width: Math.round(dimensions.width * scale),
+              height: Math.round(dimensions.height * scale),
+            },
             altText: { title: caption || img.alt || 'Figure', description: caption || '', name: caption || 'Figure' },
           }),
         ],
@@ -329,6 +344,15 @@ async function htmlToDocxChildren(html: string, { dropCap = false } = {}): Promi
       firstParagraph = false;
       continue;
     }
+    if (tag === 'h3') {
+      children.push(new Paragraph({
+        keepNext: true,
+        spacing: { before: 180, after: 100, line: 260, lineRule: LineRuleType.AUTO },
+        children: [run(textContent(element.textContent || '').toUpperCase(), { font: 'Arial', size: 22, bold: true, color: COLORS.headingRed })],
+      }));
+      firstParagraph = true;
+      continue;
+    }
 
     const runs = parseInlineRuns(element);
     if (runs.length || textContent(element.textContent || '')) {
@@ -381,7 +405,7 @@ function footer() {
 
 // ─── Journal header (logo + rule) ──────────────────────────
 
-function journalHeader(): DocxChild[] {
+function journalHeader(manuscript: Manuscript): DocxChild[] {
   const logoCell = new TableCell({
     width: { size: 4200, type: WidthType.DXA },
     borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
@@ -390,17 +414,17 @@ function journalHeader(): DocxChild[] {
         spacing: { before: 0, after: 0 },
         children: [
           // "gbmn" logo text in teal
-          run('gbmn', { font: 'Arial', size: 74, bold: true, color: COLORS.logoTeal }),
-          run('  GEORGIAN', { font: 'Arial', size: 28, bold: true, color: COLORS.black }),
+          run('gbmn', { font: 'Arial', size: 86, bold: true, color: COLORS.logoTeal }),
+          run('  GEORGIAN', { font: 'Arial', size: 30, bold: true, color: COLORS.black }),
         ],
       }),
       new Paragraph({
         spacing: { before: 0, after: 0 },
-        children: [run('BIOMEDICAL', { font: 'Arial', size: 28, bold: true, color: COLORS.black })],
+        children: [run('BIOMEDICAL', { font: 'Arial', size: 30, bold: true, color: COLORS.black })],
       }),
       new Paragraph({
         spacing: { before: 0, after: 0 },
-        children: [run('NEWS', { font: 'Arial', size: 28, bold: true, color: COLORS.black })],
+        children: [run('NEWS', { font: 'Arial', size: 30, bold: true, color: COLORS.black })],
       }),
     ],
   });
@@ -414,7 +438,7 @@ function journalHeader(): DocxChild[] {
         alignment: AlignmentType.RIGHT,
         spacing: { before: 0, after: 0 },
         children: [run(
-          `VOLUME X ISSUE X. ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()}`,
+          issueLabel(manuscript),
           { font: 'Arial', size: 20, bold: true, color: COLORS.black }
         )],
       }),
@@ -465,7 +489,7 @@ function titleBlock(manuscript: Manuscript): DocxChild[] {
       spacing: { before: 0, after: 60, line: 260, lineRule: LineRuleType.AUTO },
       children: [
         run(String(index + 1), { size: 14, superScript: true, color: COLORS.teal }),
-        run(` ${author.affiliation}${corresponding}`, { size: 18, color: COLORS.gray, italics: author.isCorresponding }),
+        run(` ${(author.affiliations?.length ? author.affiliations : [author.affiliation]).filter(Boolean).join('; ')}${corresponding}`, { size: 18, color: COLORS.gray, italics: author.isCorresponding }),
       ],
     });
   });
@@ -505,7 +529,14 @@ async function abstractBlock(manuscript: Manuscript): Promise<DocxChild[]> {
     : entries.map(([label, value]) => `<p><strong>${label}:</strong> ${value}</p>`).join('');
 
   return [
-    heading('ABSTRACT'),
+    new Paragraph({
+      border: { top: { color: '000000', style: BorderStyle.SINGLE, size: 6 }, bottom: { color: '000000', style: BorderStyle.SINGLE, size: 6 } },
+      spacing: { before: 160, after: 120, line: 260, lineRule: LineRuleType.AUTO },
+      children: [
+        run('ABSTRACT', { font: 'Arial', bold: true, size: 24, color: COLORS.headingRed }),
+        ...(doiText(manuscript) ? [run('     '), run(doiText(manuscript), { font: 'Arial', bold: true, size: 20, color: COLORS.gray, underline: {} })] : [])
+      ],
+    }),
     ...await htmlToDocxChildren(abstractHtml),
     // Separator rule
     new Paragraph({
@@ -603,7 +634,7 @@ async function bodyBlocks(manuscript: Manuscript): Promise<DocxChild[]> {
 
 export async function downloadManuscriptDocx(manuscript: Manuscript) {
   const frontMatter: DocxChild[] = [
-    ...journalHeader(),
+    ...journalHeader(manuscript),
     ...titleBlock(manuscript),
     ...await abstractBlock(manuscript),
     ...keywordsBlock(manuscript),

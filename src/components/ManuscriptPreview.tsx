@@ -45,10 +45,11 @@ function RichContent({ html, references, dropCap = false }: { html: string; refe
 
 function RenderMediaItem({ item, index }: { item: Manuscript['figuresAndTables'][number]; index: number }) {
   const label = item.type === 'table' ? 'TABLE' : item.type === 'diagram' ? 'DIAGRAM' : 'FIGURE';
+  const layoutClass = item.layout === 'one-column' ? 'gbmn-media-one-column' : 'gbmn-media-two-column';
 
   if (item.htmlContent) {
     return (
-      <figure className={`gbmn-inline-media gbmn-inline-media-${item.type}`}>
+      <figure className={`gbmn-inline-media gbmn-inline-media-${item.type} ${layoutClass}`}>
         <div dangerouslySetInnerHTML={{ __html: item.htmlContent }} />
         <figcaption>
           <strong>{label} {index + 1}.</strong> {item.title}
@@ -60,7 +61,7 @@ function RenderMediaItem({ item, index }: { item: Manuscript['figuresAndTables']
 
   if (item.type === 'figure') {
     return (
-      <figure className="gbmn-inline-media gbmn-inline-media-figure">
+      <figure className={`gbmn-inline-media gbmn-inline-media-figure ${layoutClass}`}>
         {item.fileUrl ? (
           <img src={item.fileUrl} alt={item.title || item.fileName || `Figure ${index + 1}`} />
         ) : (
@@ -75,7 +76,7 @@ function RenderMediaItem({ item, index }: { item: Manuscript['figuresAndTables']
   }
 
   return (
-    <figure className="gbmn-inline-media gbmn-inline-media-table">
+    <figure className={`gbmn-inline-media gbmn-inline-media-table ${layoutClass}`}>
       <p className="gbmn-table-title">
         TABLE {index + 1}. {item.title}
       </p>
@@ -112,6 +113,20 @@ function toGbmnTitleCase(title: string) {
     if (index > 0 && minor.has(lower)) return lower;
     return lower.charAt(0).toUpperCase() + lower.slice(1);
   }).join(' ');
+}
+
+function issueLabel(manuscript: Manuscript) {
+  return manuscript.publicationInfo?.volumeIssue?.trim()
+    || `VOLUME X ISSUE X. ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()}`;
+}
+
+function doiLabel(manuscript: Manuscript) {
+  const doi = manuscript.publicationInfo?.doi?.trim();
+  return doi ? `DOI: ${doi.replace(/^doi:/i, '')}` : '';
+}
+
+function authorAffiliations(author: Manuscript['authors'][number]) {
+  return author.affiliations?.length ? author.affiliations : [author.affiliation].filter(Boolean);
 }
 
 export default function ManuscriptPreview({ manuscript, onShowNotification }: ManuscriptPreviewProps) {
@@ -195,6 +210,11 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
             .gbmn-inline-table tr {
               break-inside: avoid !important;
               page-break-inside: avoid !important;
+            }
+            .gbmn-media-one-column {
+              column-span: all !important;
+              -webkit-column-span: all !important;
+              width: 100% !important;
             }
             .no-print { display: none !important; }
           </style>
@@ -350,10 +370,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
               <div className="gbmn-rule-line" />
               <div className="gbmn-rule-line" />
             </div>
-            <div className="gbmn-volume-label">
-              VOLUME X ISSUE X.{' '}
-              {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()}
-            </div>
+            <div className="gbmn-volume-label">{issueLabel(manuscript)}</div>
           </div>
         </div>
 
@@ -370,7 +387,9 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
               manuscript.authors.map((a, i) => (
                 <span key={a.id}>
                   {a.firstName} {a.middleInitial ? `${a.middleInitial}. ` : ''}{a.lastName}
-                  {a.isCorresponding && <span className="gbmn-corresponding-mark" title="Corresponding">✉</span>}
+                  {a.isCorresponding && (
+                    <a className="gbmn-corresponding-mark" title="Email corresponding author" href={`mailto:${a.email}`}>✉</a>
+                  )}
                   {orcidUrl(a.orcidId) ? (
                     <a href={orcidUrl(a.orcidId)} target="_blank" rel="noreferrer" className="gbmn-author-num">
                       {i + 1}
@@ -389,9 +408,9 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
               {manuscript.authors.map((a, i) => (
                 <p key={a.id} className="gbmn-affiliation-line">
                   <sup className="gbmn-author-num">{i + 1}</sup>{' '}
-                  {a.affiliation}
+                  {authorAffiliations(a).join('; ')}
                   {a.isCorresponding && (
-                    <span className="gbmn-affiliation-corresponding"> — Corresponding: {a.email}</span>
+                    <span className="gbmn-affiliation-corresponding"> — Corresponding: <a href={`mailto:${a.email}`}>{a.email}</a></span>
                   )}
                 </p>
               ))}
@@ -402,7 +421,18 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         {/* ── ABSTRACT (single column) ── */}
         {articleConfig?.abstractType !== 'none' && (
           <div className="gbmn-abstract-block">
-            <h2 className="gbmn-section-heading">ABSTRACT</h2>
+            <div className="gbmn-abstract-heading-row">
+              <div className="gbmn-abstract-rule-title">
+                <div className="gbmn-abstract-rule" />
+                <h2 className="gbmn-section-heading">ABSTRACT</h2>
+                <div className="gbmn-abstract-rule" />
+              </div>
+              {doiLabel(manuscript) && (
+                <a className="gbmn-doi-link" href={`https://doi.org/${manuscript.publicationInfo?.doi?.replace(/^doi:/i, '').trim()}`} target="_blank" rel="noreferrer">
+                  {doiLabel(manuscript)}
+                </a>
+              )}
+            </div>
             {abstractHtml ? (
               <RichContent html={abstractHtml} references={manuscript.references} />
             ) : (
@@ -546,28 +576,30 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         .gbmn-logo-row {
           display: flex;
           align-items: flex-start;
-          gap: 10px;
+          gap: 6px;
           margin-bottom: 10px;
         }
         .gbmn-logo-box {
           background: #3b8790;
           color: #ffffff;
           font-family: Arial, sans-serif;
-          font-size: 56pt;
+          font-size: 64pt;
           font-weight: 900;
-          letter-spacing: -3px;
+          letter-spacing: -5px;
           line-height: 1;
-          padding: 4px 10px 6px;
-          border-radius: 2px;
+          padding: 1px 12px 8px;
+          border-radius: 0;
           flex-shrink: 0;
+          min-width: 255px;
+          text-align: center;
         }
         .gbmn-logo-text {
           font-family: Arial, sans-serif;
-          font-size: 22pt;
+          font-size: 25pt;
           font-weight: 700;
           color: #000000;
-          line-height: 1.1;
-          padding-top: 4px;
+          line-height: 1.05;
+          padding-top: 1px;
         }
         .gbmn-header-rule-row {
           display: flex;
@@ -630,6 +662,30 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
         /* ── ABSTRACT ────────────────────────────────── */
         .gbmn-abstract-block { margin-bottom: 14px; }
+        .gbmn-abstract-heading-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 24px;
+          align-items: end;
+          margin: 10pt 0 8pt;
+        }
+        .gbmn-abstract-rule-title { min-width: 0; }
+        .gbmn-abstract-rule {
+          border-top: 1px solid #000000;
+          height: 0;
+        }
+        .gbmn-abstract-heading-row .gbmn-section-heading {
+          margin: 5pt 0 5pt;
+        }
+        .gbmn-doi-link {
+          font-family: Arial, sans-serif;
+          font-size: 10pt;
+          font-weight: 700;
+          color: #777777;
+          text-decoration: underline;
+          white-space: nowrap;
+          margin-bottom: 5pt;
+        }
 
         /* ── KEYWORDS ────────────────────────────────── */
         .gbmn-keywords-block {
@@ -684,6 +740,16 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           margin: 0 0 4pt;
           text-indent: 1.27cm;
         }
+        .preview-rich h3 {
+          font-family: Arial, sans-serif;
+          font-size: 11pt;
+          line-height: 1.2;
+          color: var(--gbmn-heading-red);
+          font-weight: 700;
+          text-transform: uppercase;
+          margin: 9pt 0 5pt;
+          break-after: avoid;
+        }
         /* No indent: first paragraph of section, after media, inside abstract */
         .gbmn-abstract-block .preview-rich p,
         .preview-rich p:first-child,
@@ -729,6 +795,13 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           break-inside: auto;
           page-break-inside: auto;
         }
+        .gbmn-media-one-column {
+          column-span: all;
+          -webkit-column-span: all;
+          width: 100%;
+          display: block;
+          clear: both;
+        }
         .gbmn-inline-media img {
           display: block;
           max-width: 100%;
@@ -773,6 +846,10 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           border: 1px solid var(--gbmn-border-green);
           text-align: center;
           line-height: 1.2;
+          overflow-wrap: anywhere;
+          word-break: normal;
+          hyphens: auto;
+          vertical-align: middle;
         }
         .gbmn-inline-table th {
           background: var(--gbmn-light-green);
@@ -953,6 +1030,10 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           .gbmn-inline-table tr:nth-child(even) td { background: #D9E3D1 !important; }
           .gbmn-inline-table th,
           .gbmn-inline-table td { border-color: #A8C28F !important; }
+          .gbmn-media-one-column {
+            column-span: all !important;
+            -webkit-column-span: all !important;
+          }
           .gbmn-rule-line { background: #0E8B8B !important; }
           .gbmn-logo-box { background: #3b8790 !important; color: #ffffff !important; }
           .gbmn-author-num,

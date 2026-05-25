@@ -23,7 +23,7 @@ export default function RichTextEditor({
   onChange,
   placeholder = 'Enter text here...',
   showWordCount = false,
-  minHeight = '180px',
+  minHeight = '620px',
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -41,6 +41,7 @@ export default function RichTextEditor({
   const [pasteBuffer, setPasteBuffer] = useState('');
   const [insertTitle, setInsertTitle] = useState('');
   const [insertLegend, setInsertLegend] = useState('');
+  const [insertLayout, setInsertLayout] = useState<'two-column' | 'one-column'>('two-column');
 
   // Sync incoming value into contenteditable (only if different to avoid cursor jump)
   useEffect(() => {
@@ -63,6 +64,12 @@ export default function RichTextEditor({
   const execCmd = (command: string, value?: string) => {
     editorRef.current?.focus();
     document.execCommand(command, false, value);
+    handleInput();
+  };
+
+  const applyBlockStyle = (style: 'normal' | 'subheading') => {
+    editorRef.current?.focus();
+    document.execCommand('formatBlock', false, style === 'subheading' ? 'h3' : 'p');
     handleInput();
   };
 
@@ -242,10 +249,11 @@ export default function RichTextEditor({
       ? pasteBuffer
       : tableFromDelimitedText(pasteBuffer);
     if (!html) return;
-    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(insertTitle || 'Table')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${html}</figure><p><br></p>`);
+    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(insertTitle || 'Table')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${html}</figure><p><br></p>`);
     setPasteBuffer('');
     setInsertTitle('');
     setInsertLegend('');
+    setInsertLayout('two-column');
     setShowTablePaste(false);
   };
 
@@ -254,18 +262,23 @@ export default function RichTextEditor({
     const content = pasteBuffer.includes('<svg') || pasteBuffer.includes('<img') || pasteBuffer.includes('<table')
       ? pasteBuffer
       : `<pre>${escapeHtml(pasteBuffer)}</pre>`;
-    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-diagram" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(insertTitle || 'Diagram')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${content}</figure><p><br></p>`);
+    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-diagram gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(insertTitle || 'Diagram')}</strong>${insertLegend ? ` — ${escapeHtml(insertLegend)}` : ''}</figcaption>${content}</figure><p><br></p>`);
     setPasteBuffer('');
     setInsertTitle('');
     setInsertLegend('');
+    setInsertLayout('two-column');
     setShowDiagramPaste(false);
+  };
+
+  const insertImageDataUrl = (src: string, title: string, legend?: string) => {
+    const caption = title.trim() || 'Figure';
+    insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-figure gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(caption)}</strong>${legend?.trim() ? ` — ${escapeHtml(legend)}` : ''}</figcaption><img src="${src}" alt="${escapeHtml(caption)}"></figure><p><br></p>`);
   };
 
   const insertImageFile = (file: File, title?: string, legend?: string) => {
     const reader = new FileReader();
     reader.onload = () => {
-      const caption = title?.trim() || file.name;
-      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-figure" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>${escapeHtml(caption)}</strong>${legend?.trim() ? ` — ${escapeHtml(legend)}` : ''}</figcaption><img src="${reader.result}" alt="${escapeHtml(caption)}"></figure><p><br></p>`);
+      insertImageDataUrl(String(reader.result || ''), title?.trim() || file.name, legend);
     };
     reader.readAsDataURL(file);
   };
@@ -289,26 +302,55 @@ export default function RichTextEditor({
     setImageUploadPreview('');
     setInsertTitle('');
     setInsertLegend('');
+    setInsertLayout('two-column');
     setShowImageUpload(false);
+  };
+
+  const sanitizeRichPaste = (html: string) => {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    template.content.querySelectorAll('*').forEach(element => {
+      const tag = element.tagName.toLowerCase();
+      if (!['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'sup', 'sub', 'ul', 'ol', 'li', 'table', 'tbody', 'thead', 'tr', 'th', 'td', 'span', 'h3'].includes(tag)) {
+        element.replaceWith(...Array.from(element.childNodes));
+        return;
+      }
+      Array.from(element.attributes).forEach(attr => {
+        if (!['rowspan', 'colspan'].includes(attr.name.toLowerCase())) element.removeAttribute(attr.name);
+      });
+    });
+    return template.innerHTML;
   };
 
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
     const html = event.clipboardData.getData('text/html');
     const text = event.clipboardData.getData('text/plain');
     const imageFile = Array.from(event.clipboardData.files).find(file => file.type.startsWith('image/'));
-    if (imageFile && !html && !text) {
+    if (imageFile) {
       event.preventDefault();
-      insertImageFile(imageFile);
+      saveSelection();
+      createInsertionMarker();
+      setShowImageUpload(true);
+      setImageUploadFile(imageFile);
+      setInsertTitle(imageFile.name);
+      const reader = new FileReader();
+      reader.onload = () => setImageUploadPreview(String(reader.result || ''));
+      reader.readAsDataURL(imageFile);
       return;
     }
     if (html.includes('<table')) {
       event.preventDefault();
-      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>Table.</strong> Add title and legend...</figcaption>${html}</figure><p><br></p>`);
+      insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table gbmn-media-two-column" data-layout="two-column" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}"><figcaption><strong>Table.</strong> Add title and legend...</figcaption>${sanitizeRichPaste(html)}</figure><p><br></p>`);
+      return;
+    }
+    if (html) {
+      event.preventDefault();
+      insertHtml(sanitizeRichPaste(html));
       return;
     }
     if (text) {
       event.preventDefault();
-      insertHtml(escapeHtml(text).replace(/\n/g, '<br>'));
+      insertHtml(escapeHtml(text).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>'));
     }
   };
 
@@ -404,6 +446,19 @@ export default function RichTextEditor({
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    const droppedImage = Array.from(event.dataTransfer.files).find(file => file.type.startsWith('image/'));
+    if (droppedImage) {
+      event.preventDefault();
+      saveSelectionFromPoint(event.clientX, event.clientY);
+      createInsertionMarker();
+      setShowImageUpload(true);
+      setImageUploadFile(droppedImage);
+      setInsertTitle(droppedImage.name);
+      const reader = new FileReader();
+      reader.onload = () => setImageUploadPreview(String(reader.result || ''));
+      reader.readAsDataURL(droppedImage);
+      return;
+    }
     const html = event.dataTransfer.getData('text/html');
     const dragged = draggedMediaRef.current;
     if (!html || !dragged || !editorRef.current) return;
@@ -439,6 +494,15 @@ export default function RichTextEditor({
 
       {/* Toolbar */}
       <div className="flex flex-wrap gap-1 bg-slate-100 border border-b-0 border-slate-300 rounded-t-lg p-1.5">
+        <select
+          onChange={(event) => applyBlockStyle(event.target.value as 'normal' | 'subheading')}
+          defaultValue="normal"
+          className="h-8 border border-slate-300 bg-white px-2 text-xs font-semibold"
+          title="Block style"
+        >
+          <option value="normal">Normal</option>
+          <option value="subheading">Subheading</option>
+        </select>
         <ToolbarBtn title="Bold" onClick={() => execCmd('bold')}>
           <Bold className="h-3.5 w-3.5" />
         </ToolbarBtn>
@@ -491,8 +555,8 @@ export default function RichTextEditor({
       </div>
 
       {showImageUpload && (
-        <div className="fixed inset-0 z-60 bg-black/30 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-3xl rounded-sm shadow-2xl border border-slate-200">
+        <div className="relative z-10 bg-white border border-slate-300 shadow-xl">
+          <div className="bg-white w-full">
             <div className="flex items-start justify-between px-5 py-4 border-b">
               <div>
                 <h3 className="text-xl text-slate-900">Insert Figure</h3>
@@ -503,11 +567,27 @@ export default function RichTextEditor({
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <div className="border-2 border-dashed border-slate-300 rounded bg-slate-50 p-5 text-center">
+              <div
+                className="border-2 border-dashed border-slate-300 rounded bg-slate-50 p-5 text-center"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const file = Array.from(event.dataTransfer.files).find(item => item.type.startsWith('image/'));
+                  if (file) handleImageUpload({ target: { files: [file], value: '' } } as any);
+                }}
+                onPaste={(event) => {
+                  const file = Array.from(event.clipboardData.files).find(item => item.type.startsWith('image/'));
+                  if (file) {
+                    event.preventDefault();
+                    handleImageUpload({ target: { files: [file], value: '' } } as any);
+                  }
+                }}
+                tabIndex={0}
+              >
                 {imageUploadPreview ? (
                   <img src={imageUploadPreview} alt="Figure preview" className="max-h-56 mx-auto object-contain bg-white border" />
                 ) : (
-                  <p className="text-sm text-slate-500">Choose image file for the figure.</p>
+                  <p className="text-sm text-slate-500">Upload, drag & drop, or paste copied image here.</p>
                 )}
                 <button type="button" onClick={() => imageInputRef.current?.click()} className="mt-3 px-4 py-2 text-xs font-bold rounded bg-white border text-slate-700">
                   {imageUploadFile ? imageUploadFile.name : 'Upload Image'}
@@ -518,6 +598,10 @@ export default function RichTextEditor({
                 <input value={insertTitle} onChange={(event) => setInsertTitle(event.target.value)} placeholder="Figure 1. Descriptive title" className="w-full border border-slate-300 px-3 py-2 text-sm" />
               </div>
               <textarea value={insertLegend} onChange={(event) => setInsertLegend(event.target.value)} rows={4} placeholder="Legend (optional)" className="w-full border border-slate-300 p-3 text-sm" />
+              <select value={insertLayout} onChange={(event) => setInsertLayout(event.target.value as any)} className="w-full border border-slate-300 px-3 py-2 text-sm">
+                <option value="two-column">Two-column width</option>
+                <option value="one-column">One-column full article width</option>
+              </select>
             </div>
             <div className="flex justify-end gap-3 p-4 border-t bg-slate-50">
               <button type="button" onClick={() => { clearInsertionMarker(); setImageUploadFile(null); setImageUploadPreview(''); setInsertTitle(''); setInsertLegend(''); setShowImageUpload(false); }} className="px-5 py-2 text-sm font-semibold border rounded-md text-slate-600 bg-white">Cancel</button>
@@ -528,8 +612,8 @@ export default function RichTextEditor({
       )}
 
       {(showTablePaste || showDiagramPaste) && (
-        <div className="fixed inset-0 z-60 bg-black/30 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-5xl rounded-sm shadow-2xl border border-slate-200">
+        <div className="relative z-10 bg-white border border-slate-300 shadow-xl">
+          <div className="bg-white w-full">
             <div className="flex items-start justify-between px-5 py-4 border-b">
               <div>
                 <h3 className="text-xl text-slate-900">{showTablePaste ? 'Insert Table' : 'Insert Diagram'}</h3>
@@ -557,6 +641,10 @@ export default function RichTextEditor({
                   className="w-full bg-white p-5 text-sm font-sans focus:outline-none resize-y"
           />
               </div>
+              <select value={insertLayout} onChange={(event) => setInsertLayout(event.target.value as any)} className="w-full border border-slate-300 px-3 py-2 text-sm">
+                <option value="two-column">Two-column width</option>
+                <option value="one-column">One-column full article width</option>
+              </select>
               <div>
                 <label className="block text-sm text-slate-700 mb-1">Title <span className="text-red-600">*</span></label>
                 <input
@@ -611,7 +699,7 @@ export default function RichTextEditor({
         onClick={handleEditorClick}
         data-placeholder={placeholder}
         className="w-full bg-white border border-slate-300 rounded-b-lg p-3 font-serif text-[14px] leading-relaxed focus:ring-1 focus:ring-teal-600 focus:outline-none text-slate-800 rich-editor-area"
-        style={{ minHeight }}
+        style={{ minHeight, maxHeight: '72vh', overflowY: 'auto' }}
       />
 
       {showWordCount && (

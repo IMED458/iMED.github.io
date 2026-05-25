@@ -692,6 +692,35 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   </select>
                 </div>
 
+                <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Issue / Volume label</label>
+                    <input
+                      value={selectedManuscript.publicationInfo?.volumeIssue || ''}
+                      onChange={(event) => updateSelectedManuscript({
+                        ...selectedManuscript,
+                        publicationInfo: { ...(selectedManuscript.publicationInfo || {}), volumeIssue: event.target.value },
+                        updatedAt: new Date().toISOString()
+                      })}
+                      placeholder="VOLUME 4 ISSUE 2. APR-JUN 2026"
+                      className="w-full bg-white border border-slate-300 rounded p-2 font-semibold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">DOI</label>
+                    <input
+                      value={selectedManuscript.publicationInfo?.doi || ''}
+                      onChange={(event) => updateSelectedManuscript({
+                        ...selectedManuscript,
+                        publicationInfo: { ...(selectedManuscript.publicationInfo || {}), doi: event.target.value },
+                        updatedAt: new Date().toISOString()
+                      })}
+                      placeholder="10.52340/GBMN.2026.01.01.167"
+                      className="w-full bg-white border border-slate-300 rounded p-2 font-mono text-teal-800"
+                    />
+                  </div>
+                </div>
+
                 {/* Submitting author specs */}
                 <div id="editor-submission-author-card" className="bg-slate-50 border p-4 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-4 text-xs no-print">
                   <div>
