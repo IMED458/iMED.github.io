@@ -7,7 +7,8 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { DB } from '../utils';
 import { Key, Mail } from 'lucide-react';
-import { firebaseEnabled, signInWithGoogle } from '../firebase';
+import { firebaseEnabled, signInWithGoogle, getGoogleRedirectResult } from '../firebase';
+import { useEffect } from 'react';
 
 interface AuthLayoutProps {
   currentUser: User | null;
@@ -30,6 +31,56 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
   const [pendingProviderUid, setPendingProviderUid] = useState('');
   const demoPassword = 'password';
 
+
+  // Handle Google redirect result (fires after redirect sign-in)
+  useEffect(() => {
+    getGoogleRedirectResult().then(result => {
+      if (!result) return;
+      const [given = 'GBMN', ...rest] = (result.user.displayName || '').split(' ').filter(Boolean);
+      const family = rest.join(' ') || 'Author';
+      const users = DB.getUsers();
+      const existing = users.find(u => u.email.toLowerCase() === (result.user.email || '').toLowerCase());
+      if (existing?.institution) {
+        DB.setCurrentUser(existing);
+        onUserChanged(existing);
+        onShowNotification('Google sign-in completed.', 'success');
+        return;
+      }
+      // Existing user but incomplete profile — prefill and let them complete
+      if (existing) {
+        setPendingProviderUid(existing.id);
+        setEmail(existing.email);
+        setFirstName(existing.firstName);
+        setLastName(existing.lastName);
+        setInstitution(existing.institution || '');
+        setOrcidId(existing.orcidId || '');
+        setIsLogin(false);
+        setIsReset(false);
+        onShowNotification('Please complete your profile to continue.', 'info');
+        return;
+      }
+      const user = existing || {
+        id: result.user.uid,
+        email: result.user.email || '',
+        firstName: given,
+        lastName: family,
+        role: 'Author' as const,
+        institution: '',
+        isVerified: true,
+        joinedDate: new Date().toISOString().split('T')[0],
+      };
+      setPendingProviderUid(user.id);
+      setEmail(user.email);
+      setFirstName(user.firstName);
+      setLastName(user.lastName);
+      setInstitution(user.institution || '');
+      setOrcidId(user.orcidId || '');
+      setIsLogin(false);
+      setIsReset(false);
+      onShowNotification('Google verified. Complete missing author profile details.', 'info');
+    }).catch(() => {});
+  }, []);
+
   const normalizeOrcid = (value: string) => value.replace(/^https?:\/\/orcid\.org\//i, '').trim();
 
   const handleGoogleSignIn = async () => {
@@ -43,6 +94,19 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         DB.setCurrentUser(existing);
         onUserChanged(existing);
         onShowNotification('Google sign-in completed.', 'success');
+        return;
+      }
+      // Existing user but incomplete profile — prefill and let them complete
+      if (existing) {
+        setPendingProviderUid(existing.id);
+        setEmail(existing.email);
+        setFirstName(existing.firstName);
+        setLastName(existing.lastName);
+        setInstitution(existing.institution || '');
+        setOrcidId(existing.orcidId || '');
+        setIsLogin(false);
+        setIsReset(false);
+        onShowNotification('Please complete your profile to continue.', 'info');
         return;
       }
       const user: User = existing || {
