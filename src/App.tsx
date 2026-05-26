@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User, Manuscript } from './types';
 import { createManuscriptId, DB } from './utils';
 import { uploadImageDataUrlToCloudinary } from './cloudinary';
@@ -51,9 +51,19 @@ export default function App() {
     { id: 'n2', text: 'Shota Rustaveli national grant funding integration loaded.', time: '2 hours ago', read: true },
   ]);
 
+  // Ref holds the active manuscript unsubscribe fn so we can replace it on auth change
+  const manuscriptSubRef = useRef<(() => void) | null>(null);
+
   // Load persistent cloud state on mount and sync visible role users across devices.
   useEffect(() => {
+    // Initial subscription — may be anonymous; will be replaced when auth settles
+    manuscriptSubRef.current = DB.subscribeToManuscripts(setManuscripts);
+
     const unsubAuth = subscribeFirebaseAuth(async firebaseUser => {
+      // Re-subscribe now that Firebase auth state is known (rules may require auth)
+      manuscriptSubRef.current?.();
+      manuscriptSubRef.current = DB.subscribeToManuscripts(setManuscripts);
+
       await DB.syncUsersFromFirestore().catch(() => {});
       if (!firebaseUser) {
         setCurrentUser(null);
@@ -62,15 +72,23 @@ export default function App() {
       const profile = await DB.getUserByIdAsync(firebaseUser.uid);
       if (profile) setCurrentUser(profile);
     });
-    return unsubAuth;
+
+    return () => {
+      unsubAuth();
+      manuscriptSubRef.current?.();
+    };
   }, []);
 
+  // Re-subscribe to manuscripts whenever the logged-in user changes (handles demo
+  // users who bypass Firebase auth) and ensure an anonymous Firebase session so
+  // Firestore security rules that require auth don't block the listener.
   useEffect(() => {
     if (!currentUser) return;
     ensureFirebaseSession().finally(() => {
       DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
     });
-    return DB.subscribeToManuscripts(setManuscripts);
+    manuscriptSubRef.current?.();
+    manuscriptSubRef.current = DB.subscribeToManuscripts(setManuscripts);
   }, [currentUser?.id]);
 
   const triggerNotification = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -93,7 +111,7 @@ export default function App() {
 
   const handleUserChanged = (newAuth: User | null) => {
     setCurrentUser(newAuth);
-    // Real-time subscription handles manuscript updates automatically
+    // useEffect([currentUser?.id]) fires on change → re-subscribes to manuscripts automatically
   };
 
   const uploadEmbeddedImages = async (manuscript: Manuscript): Promise<Manuscript> => {

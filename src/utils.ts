@@ -573,20 +573,19 @@ export const DB = {
     const unsubscribe = onSnapshot(
       collection(firestore, 'manuscripts'),
       (snapshot) => {
-        if (snapshot.empty) {
-          this.getManuscriptsAsync().then(callback).catch(() => {});
-          return;
-        }
         const rows = snapshot.docs.map(d => d.data().payload as Manuscript).filter(Boolean);
         if (rows.length > 0) {
           manuscriptMemory = rows;
           setIndexedState('gbmn_manuscripts', rows).catch(() => {});
           callback(rows);
+        } else {
+          // Collection is empty OR docs exist but lack a valid payload — fall back to local cache
+          this.getManuscriptsAsync().then(callback).catch(() => callback([]));
         }
       },
       (error) => {
         console.warn('Firestore manuscript listener error:', error);
-        this.getManuscriptsAsync().then(callback).catch(() => {});
+        this.getManuscriptsAsync().then(callback).catch(() => callback([]));
       }
     );
     return unsubscribe;
