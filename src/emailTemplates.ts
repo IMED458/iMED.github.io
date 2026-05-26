@@ -50,9 +50,10 @@ export async function sendEmail(kind: keyof typeof templateIds, manuscript: Manu
 }
 
 export function submissionConfirmation(manuscript: Manuscript) {
+  const draftUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://gbmnsubmit.github.io'}`;
   return {
-    subject: 'Manuscript Submission Confirmation',
-    body: `Dear Author,\n\nThank you for submitting your manuscript to Georgian Biomedical and Medical Nexus.\n\nWe are pleased to confirm that your submission has been successfully received and is currently undergoing an initial editorial assessment. The manuscript will be reviewed in accordance with the journal's editorial policies and peer-review procedures.\n\nYou will be notified once the evaluation process has progressed to the next stage. Should additional information or revisions be required, the editorial office will contact you accordingly.\n\nWe appreciate your interest in publishing with GBMN.\n\nSincerely,\nEditorial Office\nGBMN\n\nManuscript: ${manuscript.title}\nID: ${manuscript.id}`,
+    subject: 'Manuscript Submission Confirmation — GBMN',
+    body: `Dear Author,\n\nThank you for submitting your manuscript to Georgian Biomedical and Medical Nexus (GBMN).\n\nWe are pleased to confirm that your submission has been successfully received and is currently undergoing an initial editorial assessment. The manuscript will be reviewed in accordance with the journal's editorial policies and peer-review procedures.\n\nYou can view and track your submission status at any time by signing in to the author portal:\n${draftUrl}\n\nManuscript ID: ${manuscript.id}\nTitle: ${manuscript.title}\n\nYou will be notified once the evaluation process has progressed to the next stage. Should additional information or revisions be required, the editorial office will contact you accordingly.\n\nWe appreciate your interest in publishing with GBMN.\n\nSincerely,\nEditorial Office\nGeorgian Biomedical and Medical Nexus\ngbmn@tsmu.edu`,
   };
 }
 
@@ -71,8 +72,12 @@ export function paymentRequest(manuscript: Manuscript) {
 }
 
 export function publishedNotice(manuscript: Manuscript) {
+  const doi = manuscript.publicationInfo?.doi?.trim();
+  const articleLink = doi
+    ? `https://doi.org/${doi.replace(/^doi:/i, '')}`
+    : `https://gbmn.org`;
   return {
     subject: 'Your GBMN Article Is Published',
-    body: `Dear Author,\n\nWe are pleased to inform you that your article is officially published and available online.\n\nYou can view and share your published work using the following link: gbmn.org\n\nThanks and regards\nGBMN\n\nArticle: ${manuscript.title}`,
+    body: `Dear Author,\n\nWe are pleased to inform you that your article is officially published and available online.\n\nYou can view and share your published work using the following link:\n${articleLink}\n\nThanks and regards\nEditorial Office\nGeorgian Biomedical and Medical Nexus\n\nArticle: ${manuscript.title}\nDOI: ${doi || 'Pending assignment'}`,
   };
 }
