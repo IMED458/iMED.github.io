@@ -9,16 +9,29 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   type Auth,
 } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
 
+/**
+ * IMPORTANT — Firebase Auth on GitHub Pages:
+ *
+ * Firebase's signInWithRedirect stores OAuth state in sessionStorage.
+ * On GitHub Pages (and any storage-partitioned environment) sessionStorage
+ * is unavailable inside the Firebase-hosted auth iframe, so redirect flow
+ * ALWAYS fails with "missing initial state".
+ *
+ * Fix: set authDomain to the ACTUAL hosting domain (gbmnsubmit.github.io)
+ * so Firebase opens the popup/redirect on the same origin.
+ * Also add 'gbmnsubmit.github.io' to Firebase Console →
+ * Authentication → Settings → Authorized domains.
+ */
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCu8RuX9cSeJfDBCuB-QqhHR00I2PKgEPo',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'gbmnsubmit.firebaseapp.com',
+  // Use the actual hosting domain — NOT firebaseapp.com — to avoid cross-origin
+  // sessionStorage issues on GitHub Pages.
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'gbmnsubmit.github.io',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'gbmnsubmit',
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'gbmnsubmit.firebasestorage.app',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '427592261852',
@@ -44,9 +57,10 @@ export const firebaseAnalyticsPromise: Promise<Analytics | null> = firebaseApp
   ? isSupported().then(supported => supported ? getAnalytics(firebaseApp) : null).catch(() => null)
   : Promise.resolve(null);
 
-/** 
- * Sign in with Google. Tries popup first; if sessionStorage is unavailable
- * (partitioned browser, IDP-initiated SAML) automatically falls back to redirect.
+/**
+ * Sign in with Google using popup only.
+ * Redirect flow is intentionally NOT used — it requires sessionStorage
+ * which is unavailable in storage-partitioned environments (GitHub Pages).
  */
 export async function signInWithGoogle() {
   if (!firebaseAuth) {
@@ -54,47 +68,12 @@ export async function signInWithGoogle() {
   }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-
-  // Detect sessionStorage availability (causes the "missing initial state" error)
-  let sessionStorageAvailable = false;
-  try {
-    const testKey = '__gbmn_ss_test__';
-    sessionStorage.setItem(testKey, '1');
-    sessionStorage.removeItem(testKey);
-    sessionStorageAvailable = true;
-  } catch {
-    sessionStorageAvailable = false;
-  }
-
-  if (!sessionStorageAvailable) {
-    // Redirect flow — page will reload; result handled in getGoogleRedirectResult()
-    return signInWithRedirect(firebaseAuth, provider);
-  }
-
-  try {
-    return await signInWithPopup(firebaseAuth, provider);
-  } catch (error: any) {
-    // Popup blocked or storage partitioned — fall back to redirect
-    if (
-      error?.code === 'auth/popup-blocked' ||
-      error?.code === 'auth/cancelled-popup-request' ||
-      error?.message?.includes('missing initial state') ||
-      error?.message?.includes('storage-partitioned')
-    ) {
-      return signInWithRedirect(firebaseAuth, provider);
-    }
-    throw error;
-  }
+  return signInWithPopup(firebaseAuth, provider);
 }
 
-/** Call once on app mount to capture the redirect result after Google sign-in. */
+/** No-op — redirect flow removed. Kept for import compatibility. */
 export async function getGoogleRedirectResult() {
-  if (!firebaseAuth) return null;
-  try {
-    return await getRedirectResult(firebaseAuth);
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export function startOrcidAuthentication() {
