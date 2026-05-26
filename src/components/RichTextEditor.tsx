@@ -5,6 +5,7 @@
 
 import React, { ChangeEvent, ClipboardEvent, DragEvent, KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { Bold, Italic, Underline, List, ListOrdered, AlignLeft, Image, Table2, ChartNoAxesColumn, Superscript, Subscript, X, Trash2, ArrowUp, ArrowDown, Undo2 } from 'lucide-react';
+import { uploadImageDataUrlToCloudinary } from '../cloudinary';
 
 interface RichTextEditorProps {
   label?: string;
@@ -354,7 +355,7 @@ export default function RichTextEditor({
       const file = imageUploadFile;
       const title = insertTitle;
       const legend = insertLegend;
-      readCompressedImage(file).then((src) => {
+      readCompressedImage(file).then((src) => uploadImageDataUrlToCloudinary(src).catch(() => src)).then((src) => {
         insertImageDataUrl(src, title.trim() || file.name, legend);
         resetInsertState();
       });

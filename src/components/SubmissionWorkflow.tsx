@@ -8,8 +8,6 @@ import { Manuscript, AuthorDetails, ReferenceItem, FigureTableItem, Supplementar
 import { ARTICLE_TYPES, formatAMAReference, SAMPLE_MANUSCRIPT } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import RichTextEditor from './RichTextEditor';
-import { firebaseStorage } from '../firebase';
-import { getDownloadURL, ref, uploadString } from 'firebase/storage';
 import { 
   Users, 
   FileText, 
@@ -241,18 +239,7 @@ export default function SubmissionWorkflow({
   };
 
   const attachEditorFile = async (file: File, type: string) => {
-    const localFileUrl = await readFileAsDataUrl(file);
-    let fileUrl = URL.createObjectURL(file);
-    if (firebaseStorage) {
-      try {
-        const storagePath = `manuscripts/${manuscript.id}/editor-files/${type}-${Date.now()}-${file.name}`;
-        const storageRef = ref(firebaseStorage, storagePath);
-        await uploadString(storageRef, localFileUrl, 'data_url');
-        fileUrl = await getDownloadURL(storageRef);
-      } catch (error) {
-        console.warn('Firebase Storage upload failed, using local fallback.', error);
-      }
-    }
+    const fileUrl = URL.createObjectURL(file);
     const item = { id: `${type}-${Date.now()}`, fileName: file.name, type, fileUrl, uploadedAt: new Date().toISOString(), fileSize: fileSizeLabel(file) };
     const editorFiles = manuscript.editorFiles.filter(existing => existing.type !== type);
     updateField('editorFiles', [...editorFiles, item]);

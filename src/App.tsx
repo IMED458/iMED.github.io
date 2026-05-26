@@ -6,8 +6,7 @@
 import { useState, useEffect } from 'react';
 import { User, Manuscript } from './types';
 import { DB } from './utils';
-import { firebaseStorage } from './firebase';
-import { getDownloadURL, ref, uploadString } from 'firebase/storage';
+import { uploadImageDataUrlToCloudinary } from './cloudinary';
 import AuthLayout from './components/AuthLayout';
 import SidebarWorkflow from './components/SidebarWorkflow';
 import SubmissionWorkflow from './components/SubmissionWorkflow';
@@ -80,14 +79,12 @@ export default function App() {
   };
 
   const uploadEmbeddedImages = async (manuscript: Manuscript): Promise<Manuscript> => {
-    if (!firebaseStorage) return manuscript;
     const replaceImages = async (html: string, section: string) => {
       const matches = Array.from(new Set(html.match(/data:image\/[^"')\s]+/g) || []));
       let nextHtml = html;
       for (const [index, dataUrl] of matches.entries()) {
-        const storageRef = ref(firebaseStorage, `manuscripts/${manuscript.id}/embedded/${section}-${Date.now()}-${index}.jpg`);
-        await uploadString(storageRef, dataUrl, 'data_url');
-        nextHtml = nextHtml.replaceAll(dataUrl, await getDownloadURL(storageRef));
+        const url = await uploadImageDataUrlToCloudinary(dataUrl, `gbmn/${manuscript.id}/${section}-${index}`);
+        nextHtml = nextHtml.replaceAll(dataUrl, url);
       }
       return nextHtml;
     };

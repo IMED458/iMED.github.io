@@ -177,6 +177,20 @@ function dataUrlToImage(dataUrl: string) {
   return { type: type as 'png' | 'jpg' | 'gif' | 'bmp', bytes };
 }
 
+async function imageSourceToImage(src: string) {
+  if (src.startsWith('data:image/')) return dataUrlToImage(src);
+  if (!/^https?:\/\//i.test(src)) return null;
+  try {
+    const response = await fetch(src);
+    if (!response.ok) return null;
+    const contentType = response.headers.get('content-type') || '';
+    const ext = contentType.includes('png') ? 'png' : contentType.includes('gif') ? 'gif' : contentType.includes('bmp') ? 'bmp' : 'jpg';
+    return { type: ext as 'png' | 'jpg' | 'gif' | 'bmp', bytes: new Uint8Array(await response.arrayBuffer()) };
+  } catch {
+    return null;
+  }
+}
+
 function measureImage(src: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -289,8 +303,8 @@ async function mediaFromFigure(figure: HTMLElement): Promise<DocxChild[]> {
     return children;
   }
 
-  if (img?.src?.startsWith('data:image/')) {
-    const parsed = dataUrlToImage(img.src);
+  if (img?.src) {
+    const parsed = await imageSourceToImage(img.src);
     if (parsed) {
       const dimensions = await measureImage(img.src);
       const scale = Math.min(1, availableWidth / Math.max(1, dimensions.width * 15));
