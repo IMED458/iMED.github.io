@@ -441,17 +441,32 @@ export const DB = {
   },
 
   getUsers(): User[] {
+    // Primary: localStorage cache (fast); Firestore mirror keeps devices in sync
     const data = localStorage.getItem('gbmn_users');
-    if (!data) {
-      localStorage.setItem('gbmn_users', JSON.stringify(DEFAULT_USERS));
-      return DEFAULT_USERS;
+    if (data) {
+      try { return JSON.parse(data); } catch {}
     }
-    return JSON.parse(data);
+    localStorage.setItem('gbmn_users', JSON.stringify(DEFAULT_USERS));
+    return DEFAULT_USERS;
   },
 
   setUsers(users: User[]) {
     localStorage.setItem('gbmn_users', JSON.stringify(users));
     mirrorArrayToFirestore('users', users);
+  },
+
+  /** Sync users FROM Firestore into localStorage (call on app mount on every device). */
+  async syncUsersFromFirestore(): Promise<void> {
+    if (!firebaseEnabled || !firestore) return;
+    try {
+      const snapshot = await getDocs(collection(firestore, 'users'));
+      const rows: User[] = snapshot.docs.map(d => d.data().payload as User).filter(Boolean);
+      if (rows.length) {
+        localStorage.setItem('gbmn_users', JSON.stringify(rows));
+      }
+    } catch (e) {
+      console.warn('Firestore user sync failed', e);
+    }
   },
 
   getManuscripts(): Manuscript[] {
@@ -473,14 +488,8 @@ export const DB = {
 
   getCurrentUser(): User | null {
     const data = localStorage.getItem('gbmn_current_user');
-    if (!data) {
-      return null;
-    }
-    try {
-      return JSON.parse(data);
-    } catch {
-      return null;
-    }
+    if (!data) return null;
+    try { return JSON.parse(data); } catch { return null; }
   },
 
   setCurrentUser(user: User | null) {
@@ -498,6 +507,13 @@ export const DB = {
       };
       localStorage.setItem('gbmn_current_user', JSON.stringify(sessionUser));
       mirrorToFirestore('sessions', sessionUser.id, sessionUser);
+      // Also persist to Firestore users collection so other devices pick it up
+      const allUsers = this.getUsers();
+      const exists = allUsers.some(u => u.id === sessionUser.id);
+      if (!exists) {
+        const updated = [...allUsers, sessionUser];
+        this.setUsers(updated);
+      }
     } else {
       localStorage.removeItem('gbmn_current_user');
     }
