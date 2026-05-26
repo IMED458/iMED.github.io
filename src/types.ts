@@ -15,6 +15,9 @@ export interface User {
   institution: string;
   isVerified: boolean;
   joinedDate: string;
+  password?: string;
+  tempPassword?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface AuthorDetails {

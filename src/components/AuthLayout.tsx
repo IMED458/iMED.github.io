@@ -18,7 +18,7 @@ interface AuthLayoutProps {
 export default function AuthLayout({ currentUser, onUserChanged, onShowNotification }: AuthLayoutProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [isReset, setIsReset] = useState(false);
-  
+
   // Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,6 +29,33 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
   const [isOrcidLookup, setIsOrcidLookup] = useState(false);
   const [pendingProviderUid, setPendingProviderUid] = useState('');
   const demoPassword = 'password';
+
+  // Force-password-change state (admin-created accounts)
+  const [forcedChangeUser, setForcedChangeUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const completeLogin = (user: User) => {
+    if (user.mustChangePassword) {
+      setForcedChangeUser(user);
+      return;
+    }
+    DB.setCurrentUser(user);
+    onUserChanged(user);
+    onShowNotification(`Signed in as ${user.firstName} ${user.lastName} (${user.role})`, 'success');
+  };
+
+  const handleForcePasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 6) { onShowNotification('Password must be at least 6 characters.', 'error'); return; }
+    if (newPassword !== confirmPassword) { onShowNotification('Passwords do not match.', 'error'); return; }
+    const updated: User = { ...forcedChangeUser!, password: newPassword, tempPassword: undefined, mustChangePassword: false };
+    DB.setUser(updated);
+    DB.setCurrentUser(updated);
+    onUserChanged(updated);
+    setForcedChangeUser(null);
+    onShowNotification(`Password set. Welcome, ${updated.firstName}!`, 'success');
+  };
 
 
   const normalizeOrcid = (value: string) => value.replace(/^https?:\/\/orcid\.org\//i, '').trim();
@@ -42,9 +69,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       const users = DB.getUsers();
       const existing = users.find(u => u.email.toLowerCase() === (result.user.email || '').toLowerCase());
       if (existing?.institution) {
-        DB.setCurrentUser(existing);
-        onUserChanged(existing);
-        onShowNotification('Google sign-in completed.', 'success');
+        completeLogin(existing);
         return;
       }
       // Existing user but incomplete profile — prefill and let them complete
@@ -149,18 +174,13 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       const demoMatch = DB.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
       const demoStoredPassword = demoMatch ? (demoMatch as any).password : '';
       if (demoMatch && (password === demoPassword || password === demoStoredPassword)) {
-        DB.setCurrentUser(demoMatch);
-        onUserChanged(demoMatch);
-        onShowNotification(`Signed in as ${demoMatch.firstName} ${demoMatch.lastName} (${demoMatch.role})`, 'success');
+        completeLogin(demoMatch);
         return;
       }
       try {
         const credential = await signInWithPassword(email, password);
         const match = await DB.getUserByIdAsync(credential.user.uid) || DB.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
         if (!match) throw new Error('Profile is missing. Please complete registration.');
-        DB.setCurrentUser(match);
-        onUserChanged(match);
-        onShowNotification(`Signed in as ${match.firstName} ${match.lastName} (${match.role})`, 'success');
         DB.addAuditLog({
           userId: match.id,
           userEmail: match.email,
@@ -168,13 +188,12 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
           targetId: match.id,
           details: `User completed authentication form into dashboard with role: ${match.role}`
         });
+        completeLogin(match);
       } catch (error) {
         const users = DB.getUsers();
         const match = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-        if (match && password === demoPassword) {
-          DB.setCurrentUser(match);
-          onUserChanged(match);
-          onShowNotification(`Signed in as ${match.firstName} ${match.lastName} (${match.role})`, 'success');
+        if (match && (password === demoPassword || password === (match.password || ''))) {
+          completeLogin(match);
           return;
         }
         onShowNotification(error instanceof Error ? error.message : 'Could not sign in.', 'error');
@@ -229,6 +248,48 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       });
     }
   };
+
+  if (forcedChangeUser) {
+    return (
+      <div id="auth-portal" className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-6">
+          <img src={`${import.meta.env.BASE_URL}gbmn-logo.png`} alt="GBMN" className="mx-auto w-[260px] max-w-[80vw] h-auto object-contain" />
+          <p className="mt-1 text-sm text-teal-700 font-medium tracking-wide">MANUSCRIPT SUBMISSION SYSTEM</p>
+        </div>
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+          <div className="bg-white py-8 px-4 border border-slate-200 shadow-xl rounded-xl sm:px-10 space-y-5">
+            <div className="border-b pb-4">
+              <h2 className="text-base font-black text-slate-900">Set Your Password</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Welcome, <strong>{forcedChangeUser.firstName}</strong>. Your account was created by an administrator with a temporary password. Please set a permanent password before continuing.
+              </p>
+            </div>
+            <form onSubmit={handleForcePasswordChange} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">New Password</label>
+                <div className="relative">
+                  <input type="password" required value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimum 6 characters"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2.5 pl-9 pr-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-teal-600" />
+                  <Key className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Confirm New Password</label>
+                <div className="relative">
+                  <input type="password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat password"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2.5 pl-9 pr-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-teal-600" />
+                  <Key className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+              <button type="submit" className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-2.5 px-4 rounded-lg text-sm">
+                Set Password &amp; Sign In
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div id="auth-portal" className="min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">

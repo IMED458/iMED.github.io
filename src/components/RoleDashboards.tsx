@@ -9,7 +9,7 @@ import { DB, ARTICLE_TYPES } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import SubmissionWorkflow from './SubmissionWorkflow';
 import RichTextEditor from './RichTextEditor';
-import { acceptanceNotice, paymentRequest, publishedNotice, sendEmail } from '../emailTemplates';
+import { acceptanceNotice, paymentRequest, publishedNotice, reviewerInvitation, sendEmail, sendEmailToAddress } from '../emailTemplates';
 import {
   Users,
   FileText,
@@ -63,6 +63,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [selectedDecision, setSelectedDecision] = useState<'accept' | 'minor-revision' | 'major-revision' | 'reject' | 'publish'>('minor-revision');
   const [showDecisionPanel, setShowDecisionPanel] = useState(false);
   const [assignEditorId, setAssignEditorId] = useState('');
+  const [assignReviewerId, setAssignReviewerId] = useState('');
   const [reviewScoreEthical, setReviewScoreEthical] = useState('None identified');
   const [reviewScoreMethod, setReviewScoreMethod] = useState(5);
   const [reviewScoreOrig, setReviewScoreOrig] = useState(5);
@@ -80,7 +81,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [emailDraft, setEmailDraft] = useState<{ open: boolean; manuscript: Manuscript | null; subject: string; body: string }>({ open: false, manuscript: null, subject: '', body: '' });
   const [adminUsers, setAdminUsers] = useState<User[]>(() => DB.getUsers());
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [userForm, setUserForm] = useState({ firstName: '', lastName: '', email: '', institution: '', role: 'Author' as UserRole, orcidId: '', isVerified: true });
+  const [userForm, setUserForm] = useState({ firstName: '', lastName: '', email: '', institution: '', role: 'Author' as UserRole, orcidId: '', isVerified: true, tempPassword: '' });
   const [journalSettings, setJournalSettings] = useState<JournalSettings>(() => DB.getJournalSettings());
   const editorOwnManuscripts = manuscripts.filter(m => m.authorId === currentUser.id);
   const [editorMyMsStep, setEditorMyMsStep] = useState('title-meta');
@@ -159,10 +160,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     };
     updateSelectedManuscript(updated);
     try {
-      await sendEmail('generic', updated, `GBMN Editorial Decision — ${manuscript.id}`, plainText);
-      onShowNotification('Decision sent to author via EmailJS.', 'success');
+      const result = await sendEmail('generic', updated, `GBMN Editorial Decision — ${manuscript.id}`, plainText);
+      onShowNotification(result.fallback ? 'Decision saved. Mail client opened for delivery.' : 'Decision sent to author.', 'success');
     } catch {
-      onShowNotification('Email failed — decision saved locally.', 'error');
+      onShowNotification('Email delivery failed — decision recorded locally.', 'info');
     }
     setShowDecisionPanel(false);
     setEditorCommentHtml('');
@@ -185,18 +186,26 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     DB.addAuditLog({ userId: currentUser.id, userEmail: currentUser.email, action: 'EDITOR_ASSIGNED', targetId: manuscript.id, details: `Assigned editor: ${editorObj.email}` });
   };
 
-  const handleAssignReviewer = (manuscript: Manuscript, reviewerId: string) => {
+  const handleAssignReviewer = async (manuscript: Manuscript, reviewerId: string) => {
     const reviewerObj = DB.getUsers().find(u => u.id === reviewerId);
     if (!reviewerObj) return;
     if (manuscript.reviewerAssignments.some(ra => ra.reviewerId === reviewerId)) { onShowNotification('Reviewer already assigned.', 'error'); return; }
+    const reviewerFullName = `${reviewerObj.firstName} ${reviewerObj.lastName}`;
     updateSelectedManuscript({
       ...manuscript,
       status: 'Reviewer Assigned',
       updatedAt: new Date().toISOString(),
-      reviewerAssignments: [...manuscript.reviewerAssignments, { reviewerId, reviewerName: `${reviewerObj.firstName} ${reviewerObj.lastName}`, status: 'assigned', assignedAt: new Date().toISOString() }],
+      reviewerAssignments: [...manuscript.reviewerAssignments, { reviewerId, reviewerName: reviewerFullName, status: 'assigned', assignedAt: new Date().toISOString() }],
     });
-    onShowNotification(`Reviewer ${reviewerObj.firstName} ${reviewerObj.lastName} assigned.`, 'success');
+    onShowNotification(`Reviewer ${reviewerFullName} assigned.`, 'success');
     DB.addAuditLog({ userId: currentUser.id, userEmail: currentUser.email, action: 'REVIEWER_ASSIGNED', targetId: manuscript.id, details: `Dispatched to ${reviewerObj.email}` });
+    try {
+      const inv = reviewerInvitation(manuscript, reviewerFullName);
+      await sendEmailToAddress(reviewerObj.email, reviewerFullName, inv.subject, inv.body);
+      onShowNotification(`Invitation email sent to ${reviewerObj.email}.`, 'success');
+    } catch {
+      onShowNotification('Reviewer assigned — invitation email could not be delivered.', 'info');
+    }
   };
 
   const handleCommitEditorialDecision = (manuscript: Manuscript, decision: 'accept' | 'minor-revision' | 'major-revision' | 'reject' | 'publish') => {
@@ -274,8 +283,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     onShowNotification('Highlight saved.', 'success');
   };
 
-  const resetUserForm = () => { setEditingUserId(null); setUserForm({ firstName: '', lastName: '', email: '', institution: '', role: 'Author', orcidId: '', isVerified: true }); };
-  const handleEditUser = (user: User) => { setEditingUserId(user.id); setUserForm({ firstName: user.firstName, lastName: user.lastName, email: user.email, institution: user.institution, role: user.role, orcidId: user.orcidId || '', isVerified: user.isVerified }); };
+  const resetUserForm = () => { setEditingUserId(null); setUserForm({ firstName: '', lastName: '', email: '', institution: '', role: 'Author', orcidId: '', isVerified: true, tempPassword: '' }); };
+  const handleEditUser = (user: User) => { setEditingUserId(user.id); setUserForm({ firstName: user.firstName, lastName: user.lastName, email: user.email, institution: user.institution, role: user.role, orcidId: user.orcidId || '', isVerified: user.isVerified, tempPassword: '' }); };
   const handleUpdateUserRole = (userId: string, newRole: UserRole) => {
     const updated = adminUsers.map(u => u.id === userId ? { ...u, role: newRole } : u);
     setAdminUsers(updated); DB.setUsers(updated);
@@ -285,11 +294,24 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     e.preventDefault();
     if (!userForm.firstName || !userForm.lastName || !userForm.email || !userForm.institution) { onShowNotification('Fill all required fields.', 'error'); return; }
     if (adminUsers.some(u => u.email.toLowerCase() === userForm.email.toLowerCase() && u.id !== editingUserId)) { onShowNotification('Email already exists.', 'error'); return; }
-    const updated = editingUserId
-      ? adminUsers.map(u => u.id === editingUserId ? { ...u, ...userForm } : u)
-      : [...adminUsers, { id: `user-${Date.now()}`, ...userForm, orcidId: userForm.orcidId || undefined, joinedDate: new Date().toISOString().split('T')[0] }];
-    setAdminUsers(updated); DB.setUsers(updated); resetUserForm();
-    onShowNotification(editingUserId ? 'User updated.' : 'User created.', 'success');
+    const { tempPassword, ...formFields } = userForm;
+    if (editingUserId) {
+      const updated = adminUsers.map(u => u.id === editingUserId ? { ...u, ...formFields, orcidId: formFields.orcidId || undefined } : u);
+      setAdminUsers(updated); DB.setUsers(updated); resetUserForm();
+      onShowNotification('User updated.', 'success');
+    } else {
+      const newUser = {
+        id: `user-${Date.now()}`,
+        ...formFields,
+        orcidId: formFields.orcidId || undefined,
+        joinedDate: new Date().toISOString().split('T')[0],
+        ...(tempPassword ? { password: tempPassword, tempPassword, mustChangePassword: true } : {}),
+      };
+      const updated = [...adminUsers, newUser];
+      setAdminUsers(updated); DB.setUsers(updated); resetUserForm();
+      const pwMsg = tempPassword ? ` Temp password: ${tempPassword}` : ' No password set — user must register.';
+      onShowNotification(`User created.${pwMsg}`, 'success');
+    }
   };
   const handleDeleteUser = (user: User) => {
     if (user.id === currentUser.id) { onShowNotification('Cannot delete your own account.', 'error'); return; }
@@ -361,10 +383,13 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
           <div className="col-span-2">
             <label className="block font-bold text-slate-600 mb-1 text-[10px] uppercase">Assign Reviewer</label>
-            <select onChange={e => { if (e.target.value) { handleAssignReviewer(manuscript, e.target.value); e.target.value = ''; } }} className="w-full border border-slate-300 rounded-lg p-1.5 text-xs bg-white">
-              <option value="">— Choose Reviewer —</option>
-              {reviewers.map(r => <option key={r.id} value={r.id}>{r.firstName} {r.lastName} ({r.institution})</option>)}
-            </select>
+            <div className="flex gap-1">
+              <select value={assignReviewerId} onChange={e => setAssignReviewerId(e.target.value)} className="flex-1 border border-slate-300 rounded-lg p-1.5 text-xs bg-white">
+                <option value="">— Choose Reviewer —</option>
+                {reviewers.map(r => <option key={r.id} value={r.id}>{r.firstName} {r.lastName} ({r.institution})</option>)}
+              </select>
+              <button onClick={() => { if (assignReviewerId) { handleAssignReviewer(manuscript, assignReviewerId); setAssignReviewerId(''); } }} disabled={!assignReviewerId} className="bg-teal-700 disabled:opacity-40 text-white font-bold px-2 rounded-lg text-[11px]">Assign</button>
+            </div>
             {manuscript.reviewerAssignments.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {manuscript.reviewerAssignments.map(ra => (
@@ -455,10 +480,22 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               <button onClick={() => handleSendToAuthor(manuscript)} className="bg-teal-700 hover:bg-teal-800 text-white font-bold px-4 py-1.5 rounded-lg">Send to Author</button>
               <button onClick={() => handleCommitEditorialDecision(manuscript, selectedDecision)} className="bg-purple-700 hover:bg-purple-800 text-white font-bold px-4 py-1.5 rounded-lg">Commit Decision</button>
             </div>
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => openAuthorEmailModal(manuscript, 'acceptance')} className="border px-3 py-1 rounded text-[10px] font-bold text-emerald-700 border-emerald-200 hover:bg-emerald-50">Acceptance Email</button>
-              <button onClick={() => openAuthorEmailModal(manuscript, 'payment')} className="border px-3 py-1 rounded text-[10px] font-bold text-amber-700 border-amber-200 hover:bg-amber-50">Payment Email</button>
-              <button onClick={() => openAuthorEmailModal(manuscript, 'published')} className="border px-3 py-1 rounded text-[10px] font-bold text-teal-700 border-teal-200 hover:bg-teal-50">Published Email</button>
+            <div className="flex gap-2 pt-1 flex-wrap">
+              {([
+                { kind: 'accepted' as const, label: 'Acceptance Email', cls: 'text-emerald-700 border-emerald-200 hover:bg-emerald-50', preset: 'acceptance' as const },
+                { kind: 'generic' as const, label: 'Payment Email', cls: 'text-amber-700 border-amber-200 hover:bg-amber-50', preset: 'payment' as const },
+                { kind: 'published' as const, label: 'Published Email', cls: 'text-teal-700 border-teal-200 hover:bg-teal-50', preset: 'published' as const },
+              ]).map(({ kind, label, cls, preset }) => (
+                <button key={kind} onClick={async () => {
+                  const tmpl = preset === 'acceptance' ? acceptanceNotice(manuscript) : preset === 'payment' ? paymentRequest(manuscript) : publishedNotice(manuscript);
+                  try {
+                    const res = await sendEmail(kind, manuscript, tmpl.subject, tmpl.body);
+                    onShowNotification(res.fallback ? 'Mail client opened.' : `${label} sent.`, 'success');
+                  } catch {
+                    openAuthorEmailModal(manuscript, preset);
+                  }
+                }} className={`border px-3 py-1 rounded text-[10px] font-bold ${cls}`}>{label}</button>
+              ))}
             </div>
           </div>
         )}
@@ -771,7 +808,15 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               <textarea value={emailDraft.body} onChange={e => setEmailDraft(p => ({ ...p, body: e.target.value }))} rows={10} className="w-full border rounded-lg p-2 text-sm font-mono" />
               <div className="flex justify-end gap-2">
                 <button onClick={() => setEmailDraft(p => ({ ...p, open: false }))} className="border px-4 py-2 rounded-lg text-xs font-bold text-slate-600">Cancel</button>
-                <button onClick={async () => { await sendEmail('generic', emailDraft.manuscript!, emailDraft.subject, emailDraft.body); setEmailDraft(p => ({ ...p, open: false })); onShowNotification('Email sent.', 'success'); }} className="bg-teal-700 text-white font-bold px-4 py-2 rounded-lg text-xs">Send Email</button>
+                <button onClick={async () => {
+                  try {
+                    const res = await sendEmail('generic', emailDraft.manuscript!, emailDraft.subject, emailDraft.body);
+                    onShowNotification(res.fallback ? 'Mail client opened for delivery.' : 'Email sent successfully.', 'success');
+                  } catch {
+                    onShowNotification('Email delivery failed. Check EmailJS configuration.', 'error');
+                  }
+                  setEmailDraft(p => ({ ...p, open: false }));
+                }} className="bg-teal-700 text-white font-bold px-4 py-2 rounded-lg text-xs">Send Email</button>
               </div>
             </div>
           </div>
@@ -1002,6 +1047,13 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
           <label className="flex items-center gap-2 border border-slate-300 rounded-lg p-2 bg-slate-50 font-semibold text-slate-700 text-xs">
             <input type="checkbox" checked={userForm.isVerified} onChange={e => setUserForm(p => ({ ...p, isVerified: e.target.checked }))} /> Verified
           </label>
+          {!editingUserId && (
+            <div className="md:col-span-4">
+              <label className="block text-[10px] font-bold text-slate-600 mb-1">Temporary Password <span className="text-slate-400 font-normal">(user must change on first login)</span></label>
+              <input type="text" value={userForm.tempPassword} onChange={e => setUserForm(p => ({ ...p, tempPassword: e.target.value }))} placeholder="e.g. Welcome2024!" className="w-full md:w-64 border border-amber-300 bg-amber-50 rounded-lg p-2" />
+              {userForm.tempPassword && <p className="text-[10px] text-amber-700 mt-1 font-semibold">⚠ Share this password with the user securely. They will be required to change it on first login.</p>}
+            </div>
+          )}
         </div>
         <button type="submit" className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-4 py-2 rounded-lg">{editingUserId ? 'Save Changes' : 'Create User'}</button>
       </form>
