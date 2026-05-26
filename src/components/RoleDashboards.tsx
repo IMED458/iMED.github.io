@@ -243,7 +243,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const updated = manuscripts.map(item => {
       if (item.id !== manuscript.id) return item;
       const updatedAssignments = item.reviewerAssignments.map(ra => {
-        if (ra.reviewerId !== currentUser.id && ra.reviewerEmail !== currentUser.email) return ra;
+        if (!reviewerMatchesCurrentUser(ra)) return ra;
         return {
           ...ra,
           status: isDraft ? 'assigned' as const : 'completed' as const,
@@ -855,8 +855,15 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   };
 
   // ── Reviewer dashboard ───────────────────────────────────────────────────
+  const reviewerMatchesCurrentUser = (ra: { reviewerId: string; reviewerName: string; reviewerEmail?: string }) => {
+    const currentName = `${currentUser.firstName} ${currentUser.lastName}`.trim().toLowerCase();
+    return ra.reviewerId === currentUser.id
+      || (ra.reviewerEmail || '').toLowerCase() === currentUser.email.toLowerCase()
+      || ra.reviewerName.trim().toLowerCase() === currentName;
+  };
+
   const renderReviewerDashboard = () => {
-    const assignedManuscripts = sortNewest(manuscripts.filter(m => m.reviewerAssignments.some(ra => ra.reviewerId === currentUser.id || ra.reviewerEmail === currentUser.email)));
+    const assignedManuscripts = sortNewest(manuscripts.filter(m => m.reviewerAssignments.some(reviewerMatchesCurrentUser)));
     return (
       <div className="min-h-[calc(100vh-88px)] flex flex-col md:flex-row bg-slate-50">
         <div className={`${selectedManuscript ? 'hidden md:flex md:flex-col' : 'flex flex-col'} w-full md:w-80 shrink-0 bg-white border-r border-slate-200`}>
@@ -868,7 +875,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             {assignedManuscripts.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-sm border-2 border-dashed rounded-xl">No assigned manuscripts.</div>
             ) : assignedManuscripts.map(m => {
-              const ra = m.reviewerAssignments.find(r => r.reviewerId === currentUser.id || r.reviewerEmail === currentUser.email);
+              const ra = m.reviewerAssignments.find(reviewerMatchesCurrentUser);
               return (
                 <div key={m.id} onClick={() => setSelectedManuscript(m)}
                   className={`p-3 border rounded-xl cursor-pointer transition-all text-xs ${selectedManuscript?.id === m.id ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-100' : ra?.status === 'completed' ? 'border-emerald-200 bg-emerald-50' : 'border-blue-200 bg-blue-50 hover:border-blue-400'}`}>
