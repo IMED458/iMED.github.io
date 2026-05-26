@@ -125,6 +125,15 @@ export interface PaymentReceipt {
   status: 'pending' | 'verified' | 'rejected';
 }
 
+export interface ReviewHighlight {
+  id: string;
+  text: string;
+  note?: string;
+  color?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
 export interface ReviewerComment {
   id: string;
   reviewerId: string;
@@ -137,6 +146,9 @@ export interface ReviewerComment {
   confidentialToEditor: string;
   recommendation: 'accept' | 'minor-revision' | 'major-revision' | 'reject';
   submittedAt: string;
+  highlights?: ReviewHighlight[];
+  uploadedPdfUrl?: string;
+  status?: 'draft' | 'submitted';
 }
 
 export type ManuscriptStatus =
@@ -201,6 +213,12 @@ export interface Manuscript {
   // Payment Receipt Details
   payment: PaymentReceipt;
 
+  // Editor assignment
+  assignedEditorId?: string;
+  assignedEditorName?: string;
+  assignedEditorEmail?: string;
+  editorAssignedAt?: string;
+
   // Additional Reviewer/Editorial attachments
   editorFiles: { id: string; fileName: string; type: string; fileUrl?: string; uploadedAt?: string; fileSize?: string }[];
   reviewerAssignments: {
@@ -209,6 +227,8 @@ export interface Manuscript {
     status: 'assigned' | 'completed' | 'declined';
     assignedAt: string;
     comments?: ReviewerComment;
+    highlights?: ReviewHighlight[];
+    draftReview?: string;
   }[];
   editorDecisionLog: {
     editorId: string;
