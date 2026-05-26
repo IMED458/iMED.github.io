@@ -586,17 +586,21 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const showListDetail = !['Dashboard', 'My Manuscripts', 'Submit Manuscript', 'Reviews', 'Settings', 'Profile'].includes(activeSection);
 
     return (
-      <div className="min-h-[calc(100vh-88px)] bg-slate-50">
-        <div className="grid min-h-[calc(100vh-88px)]" style={{ gridTemplateColumns: '220px 1fr' }}>
-          <aside className="bg-slate-950 text-white flex flex-col">
-            <div className="p-4 border-b border-slate-800">
-              <p className="text-xs font-black text-white">GBMN Editorial</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{currentUser.firstName} {currentUser.lastName}</p>
-              <p className="text-[10px] text-teal-400 font-semibold">{currentUser.role}</p>
+      <div className="min-h-[calc(100vh-88px)] bg-slate-50 relative">
+        {sidebarOpen && <div className="fixed inset-0 z-40 bg-slate-950/60 md:hidden" onClick={() => setSidebarOpen(false)} />}
+        <div className="flex min-h-[calc(100vh-88px)]">
+          <aside className={`fixed md:relative inset-y-0 left-0 z-50 md:z-auto w-[220px] shrink-0 bg-slate-950 text-white flex flex-col transition-transform duration-200 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
+            <div className="p-4 border-b border-slate-800 flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-black text-white">GBMN Editorial</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{currentUser.firstName} {currentUser.lastName}</p>
+                <p className="text-[10px] text-teal-400 font-semibold">{currentUser.role}</p>
+              </div>
+              <button className="md:hidden mt-0.5 text-slate-400 hover:text-white shrink-0" onClick={() => setSidebarOpen(false)}><X className="h-4 w-4" /></button>
             </div>
             <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
               {navItems.map(({ id, icon: Icon, label }) => (
-                <button key={id} onClick={() => { setActiveSection(id); setSelectedManuscript(null); setOfficeEditMode(false); }}
+                <button key={id} onClick={() => { setActiveSection(id); setSelectedManuscript(null); setOfficeEditMode(false); setSidebarOpen(false); }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-bold transition ${activeSection === id ? 'bg-teal-600 text-white' : 'text-slate-300 hover:bg-white/10'}`}>
                   <Icon className="h-3.5 w-3.5 shrink-0" />{label}
                 </button>
@@ -604,15 +608,18 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             </nav>
           </aside>
 
-          <main className="flex flex-col overflow-hidden">
-            <div className="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h1 className="text-base font-black text-slate-900">{activeSection}</h1>
-                <p className="text-[11px] text-slate-400">Clean editorial workflow.</p>
+          <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+            <div className="bg-white border-b border-slate-200 px-3 md:px-6 py-2 md:py-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <button className="md:hidden p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" onClick={() => setSidebarOpen(true)}><Menu className="h-5 w-5" /></button>
+                <div>
+                  <h1 className="text-sm md:text-base font-black text-slate-900">{activeSection}</h1>
+                  <p className="text-[11px] text-slate-400 hidden sm:block">Clean editorial workflow.</p>
+                </div>
               </div>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search title, ID, email…" className="border rounded-lg pl-8 pr-3 py-1.5 text-xs w-60 bg-slate-50" />
+                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search…" className="border rounded-lg pl-8 pr-3 py-1.5 text-xs w-36 sm:w-60 bg-slate-50" />
               </div>
             </div>
 
@@ -770,8 +777,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             )}
 
             {showListDetail && (
-              <div className="flex-1 flex overflow-hidden">
-                <div className="w-72 shrink-0 border-r border-slate-200 bg-white flex flex-col overflow-hidden">
+              <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+                <div className={`${selectedManuscript ? 'hidden md:flex' : 'flex'} w-full md:w-72 shrink-0 border-r border-slate-200 bg-white flex-col overflow-hidden`}>
                   <div className="p-3 border-b">
                     <div className="flex gap-1 bg-slate-100 p-1 rounded-lg text-[10px] font-bold">
                       {(['all', 'pending', 'reviewed'] as const).map(t => (
@@ -788,7 +795,12 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     {visibleManuscripts.length === 0 && <p className="text-xs text-slate-400 text-center py-8">No manuscripts in this view.</p>}
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-5">
+                <div className={`${selectedManuscript ? 'flex flex-col' : 'hidden md:flex md:flex-col'} flex-1 overflow-y-auto p-5`}>
+                  {selectedManuscript && (
+                    <button onClick={() => setSelectedManuscript(null)} className="md:hidden flex items-center gap-1 text-xs font-bold text-teal-700 mb-3 shrink-0">
+                      <ArrowLeft className="h-4 w-4" /> Back to list
+                    </button>
+                  )}
                   {selectedManuscript ? renderEditorManuscriptPanel(selectedManuscript) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-300">
                       <FileText className="h-12 w-12 mb-3 opacity-40" />
@@ -835,7 +847,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const assignedManuscripts = sortNewest(manuscripts.filter(m => m.reviewerAssignments.some(ra => ra.reviewerId === currentUser.id)));
     return (
       <div className="min-h-[calc(100vh-88px)] flex flex-col md:flex-row bg-slate-50">
-        <div className="w-full md:w-80 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+        <div className={`${selectedManuscript ? 'hidden md:flex md:flex-col' : 'flex flex-col'} w-full md:w-80 shrink-0 bg-white border-r border-slate-200`}>
           <div className="p-4 border-b bg-white">
             <div className="flex items-center gap-2 mb-1"><ShieldCheck className="h-5 w-5 text-teal-700" /><h3 className="font-bold text-sm text-slate-800">Reviewer Queue</h3></div>
             <p className="text-[11px] text-slate-500">Welcome, {currentUser.firstName}.</p>
@@ -863,7 +875,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className={`${selectedManuscript ? 'flex flex-col' : 'hidden md:flex md:flex-col'} flex-1 overflow-hidden`}>
           {!selectedManuscript ? (
             <div className="flex-1 flex items-center justify-center text-slate-300 flex-col gap-3">
               <BookOpen className="h-12 w-12 opacity-40" /><p>Select a manuscript to review</p>
@@ -872,12 +884,15 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             <div className="flex-1 overflow-y-auto flex flex-col gap-0">
               <div className="border-b border-slate-200">
                 <div className="bg-white px-4 py-2 flex items-center justify-between border-b">
-                  <div className="flex items-center gap-2"><Eye className="h-4 w-4 text-teal-700" /><span className="text-xs font-bold text-slate-800">Manuscript Preview — {selectedManuscript.id}</span></div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setSelectedManuscript(null)} className="md:hidden p-1 rounded hover:bg-slate-100 text-slate-500 mr-1"><ArrowLeft className="h-4 w-4" /></button>
+                    <Eye className="h-4 w-4 text-teal-700" /><span className="text-xs font-bold text-slate-800">Manuscript Preview — {selectedManuscript.id}</span>
+                  </div>
                   <div className="flex gap-2">
                     <button onClick={handleTextHighlight} className="text-[11px] flex items-center gap-1 bg-yellow-100 border border-yellow-300 text-yellow-800 font-bold px-3 py-1 rounded-lg hover:bg-yellow-200">
                       <Highlighter className="h-3.5 w-3.5" /> Highlight selected text
                     </button>
-                    <button onClick={() => setSelectedManuscript(null)} className="text-xs text-slate-400 hover:text-slate-600 font-bold">Close ×</button>
+                    <button onClick={() => setSelectedManuscript(null)} className="hidden md:block text-xs text-slate-400 hover:text-slate-600 font-bold">Close ×</button>
                   </div>
                 </div>
                 <div className="max-h-[45vh] overflow-y-auto bg-slate-50 p-4">
