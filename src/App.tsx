@@ -62,13 +62,14 @@ export default function App() {
       const profile = await DB.getUserByIdAsync(firebaseUser.uid);
       if (profile) setCurrentUser(profile);
     });
-    // Real-time cross-device sync — fires whenever any device writes a manuscript
-    const unsubManuscripts = DB.subscribeToManuscripts(setManuscripts);
-    return () => {
-      unsubAuth();
-      unsubManuscripts();
-    };
+    return unsubAuth;
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    return DB.subscribeToManuscripts(setManuscripts);
+  }, [currentUser?.id]);
 
   const triggerNotification = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToast({ message, type });
