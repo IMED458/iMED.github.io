@@ -1775,30 +1775,42 @@ export default function SubmissionWorkflow({
 
             {/* Submission button */}
             <div className="pt-2 text-center">
-              <button
-                id="final-package-submit-btn"
-                onClick={async () => {
-                  if (!manuscript.title.trim()) {
-                    onShowNotification('Submission error: Full title is missing from metadata.', 'error');
-                    return;
-                  }
-                  if (manuscript.authors.length === 0) {
-                    onShowNotification('Submission error: Minimum of 1 author affiliate matching credentials required.', 'error');
-                    return;
-                  }
-                  const now = new Date().toISOString();
-                  onUpdateManuscript({ ...manuscript, status: 'Submitted', submittedAt: now, updatedAt: now });
-                  const email = submissionConfirmation(manuscript);
-                  await sendEmail('submission', manuscript, email.subject, email.body);
-                  onStepChange('getting-started');
-                  onShowNotification('Manuscript submitted and confirmation email processed.', 'success');
-                }}
-                className="inline-flex items-center gap-2 bg-teal-900 hover:bg-teal-800 text-white font-bold py-4 px-8 rounded-xl shadow-lg cursor-pointer transition-all text-sm uppercase tracking-wide"
-              >
-                <CheckCircle2 className="h-5 w-5" />
-                Submit Manuscript Package to Editorial office
-              </button>
-              <p className="text-[10px] text-slate-400 mt-2">
+              <div className="flex flex-col items-center gap-3">
+                <button
+                  id="final-package-submit-btn"
+                  onClick={async () => {
+                    if (!manuscript.title.trim()) {
+                      onShowNotification('Submission error: Full title is missing from metadata.', 'error');
+                      return;
+                    }
+                    if (manuscript.authors.length === 0) {
+                      onShowNotification('Submission error: Minimum of 1 author affiliate matching credentials required.', 'error');
+                      return;
+                    }
+                    const now = new Date().toISOString();
+                    onUpdateManuscript({ ...manuscript, status: 'Submitted', submittedAt: now, updatedAt: now });
+                    const email = submissionConfirmation(manuscript);
+                    await sendEmail('submission', manuscript, email.subject, email.body);
+                    onStepChange('getting-started');
+                    onShowNotification('Manuscript submitted and confirmation email processed.', 'success');
+                  }}
+                  className="inline-flex items-center gap-2 bg-teal-900 hover:bg-teal-800 text-white font-bold py-4 px-8 rounded-xl shadow-lg cursor-pointer transition-all text-sm uppercase tracking-wide"
+                >
+                  <CheckCircle2 className="h-5 w-5" />
+                  Save & Submit to Editorial Office
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateManuscript({ ...manuscript, updatedAt: new Date().toISOString() });
+                    onShowNotification('Draft saved. You can return to continue editing.', 'success');
+                  }}
+                  className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold py-2 px-6 rounded-xl cursor-pointer text-xs"
+                >
+                  Save as Draft
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">
                 A confirmation notification will be routed to your academic mailbox credentials.
               </p>
             </div>
