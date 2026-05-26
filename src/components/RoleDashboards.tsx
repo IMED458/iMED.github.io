@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState, FormEvent } from 'react';
 import { User, UserRole, Manuscript, ManuscriptStatus, SystemAuditLog, JournalSettings, ReferenceItem, FigureTableItem } from '../types';
-import { DB, ARTICLE_TYPES } from '../utils';
+import { DB, ARTICLE_TYPES, createManuscriptId } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import SubmissionWorkflow from './SubmissionWorkflow';
 import { acceptanceNotice, paymentRequest, publishedNotice, sendEmail } from '../emailTemplates';
@@ -109,7 +109,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     if (!base) return;
     const draft: Manuscript = {
       ...base,
-      id: `GBMN-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`,
+      id: createManuscriptId(),
       status: 'Draft',
       authorId: currentUser.id,
       createdAt: new Date().toISOString(),
@@ -407,7 +407,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               </section>
             )}
             {emailDraft.open && emailDraft.manuscript && (
-              <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/40 p-4">
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4">
                 <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
                   <h3 className="text-sm font-black">Email Author</h3><p className="text-xs text-slate-500">{emailDraft.manuscript.authors[0]?.email}</p>
                   <input value={emailDraft.subject} onChange={e => setEmailDraft(prev => ({ ...prev, subject: e.target.value }))} className="mt-3 w-full rounded border p-2 text-sm" />

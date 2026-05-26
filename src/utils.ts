@@ -7,6 +7,8 @@ import { ArticleTypeConfig, Manuscript, User, SystemAuditLog, JournalSettings, A
 import { firebaseEnabled, firestore } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 
+let manuscriptMemory: Manuscript[] = [];
+
 function openGbmnDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB unavailable'));
@@ -111,7 +113,7 @@ export function formatAMAReference(ref: any): string {
   }
 
   const titleFormatted = ref.title.trim();
-  const volume = ref.volume ? ` ${ref.volume}` : '';
+  const volume = ref.volume ? `${ref.volume}`.trim() : '';
   const issue = ref.issue ? `(${ref.issue})` : '';
   const pages = ref.pages ? `:${ref.pages}` : '';
   const suffix = ref.doi ? ` doi:${ref.doi}` : ref.url ? ` Available at: ${ref.url}` : '';
@@ -123,6 +125,14 @@ export function formatAMAReference(ref: any): string {
   } else {
     return `${authorsFormatted} ${titleFormatted}. *${ref.journalOrBook}*. Published ${ref.year}.${suffix}`;
   }
+}
+
+export function createManuscriptId(): string {
+  const suffix =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID().split('-')[0].toUpperCase()
+      : Math.random().toString(36).slice(2, 10).toUpperCase();
+  return `GBMN-${new Date().getFullYear()}-${suffix}`;
 }
 
 // Full, rich default users list
@@ -434,6 +444,7 @@ export const DB = {
         const rows = snapshot.docs.map(item => item.data().payload as Manuscript).filter(Boolean);
         if (rows.length) {
           await setIndexedState('gbmn_manuscripts', rows);
+          manuscriptMemory = rows;
           return rows;
         }
       } catch (error) {
@@ -442,8 +453,12 @@ export const DB = {
     }
     try {
       const stored = await getIndexedState<Manuscript[]>('gbmn_manuscripts');
-      if (stored?.length) return stored;
+      if (stored?.length) {
+        manuscriptMemory = stored;
+        return stored;
+      }
     } catch {}
+    manuscriptMemory = [SAMPLE_MANUSCRIPT];
     return [SAMPLE_MANUSCRIPT];
   },
 
@@ -451,7 +466,10 @@ export const DB = {
     if (firebaseEnabled && firestore) {
       try {
         const snap = await getDoc(doc(firestore, 'users', userId));
-        if (snap.exists()) return snap.data() as User;
+        if (snap.exists()) {
+          const data = snap.data();
+          return (data.payload || data) as User;
+        }
       } catch (error) {
         console.warn('Firestore user read failed.', error);
       }
@@ -510,16 +528,20 @@ export const DB = {
   },
 
   getManuscripts(): Manuscript[] {
+    if (manuscriptMemory.length) return manuscriptMemory;
     const data = localStorage.getItem('gbmn_manuscripts');
     if (!data) {
       // Default to initial sample manuscript
       localStorage.setItem('gbmn_manuscripts', JSON.stringify([SAMPLE_MANUSCRIPT]));
+      manuscriptMemory = [SAMPLE_MANUSCRIPT];
       return [SAMPLE_MANUSCRIPT];
     }
-    return JSON.parse(data);
+    manuscriptMemory = JSON.parse(data);
+    return manuscriptMemory;
   },
 
   setManuscripts(manuscripts: Manuscript[]) {
+    manuscriptMemory = manuscripts;
     setIndexedState('gbmn_manuscripts', manuscripts).catch(console.warn);
     localStorage.removeItem('gbmn_manuscripts');
     localStorage.setItem('gbmn_manuscripts_indexed', 'true');

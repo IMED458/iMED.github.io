@@ -1,5 +1,5 @@
-const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'du2nlfyl6';
-const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || 'ml_default';
+const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 export const cloudinaryEnabled = Boolean(cloudName && uploadPreset);
 

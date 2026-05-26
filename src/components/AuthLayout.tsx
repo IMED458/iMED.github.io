@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { User } from '../types';
 import { DB } from '../utils';
 import { Key, Mail } from 'lucide-react';
-import { createPasswordAccount, firebaseEnabled, getGoogleRedirectResult, sendFirebasePasswordReset, signInWithGoogle, signInWithPassword } from '../firebase';
+import { createPasswordAccount, firebaseEnabled, sendFirebasePasswordReset, signInWithGoogle, signInWithPassword } from '../firebase';
 
 interface AuthLayoutProps {
   currentUser: User | null;
@@ -31,55 +31,6 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
   const demoPassword = 'password';
 
 
-  // Handle Google redirect result (fires after redirect sign-in)
-  useEffect(() => {
-    getGoogleRedirectResult().then(result => {
-      if (!result) return;
-      const [given = 'GBMN', ...rest] = (result.user.displayName || '').split(' ').filter(Boolean);
-      const family = rest.join(' ') || 'Author';
-      const users = DB.getUsers();
-      const existing = users.find(u => u.email.toLowerCase() === (result.user.email || '').toLowerCase());
-      if (existing?.institution) {
-        DB.setCurrentUser(existing);
-        onUserChanged(existing);
-        onShowNotification('Google sign-in completed.', 'success');
-        return;
-      }
-      // Existing user but incomplete profile — prefill and let them complete
-      if (existing) {
-        setPendingProviderUid(existing.id);
-        setEmail(existing.email);
-        setFirstName(existing.firstName);
-        setLastName(existing.lastName);
-        setInstitution(existing.institution || '');
-        setOrcidId(existing.orcidId || '');
-        setIsLogin(false);
-        setIsReset(false);
-        onShowNotification('Please complete your profile to continue.', 'info');
-        return;
-      }
-      const user: User = existing || {
-        id: result.user.uid,
-        email: result.user.email || '',
-        firstName: given,
-        lastName: family,
-        role: 'Author' as const,
-        institution: '',
-        isVerified: true,
-        joinedDate: new Date().toISOString().split('T')[0],
-      };
-      setPendingProviderUid(user.id);
-      setEmail(user.email);
-      setFirstName(user.firstName);
-      setLastName(user.lastName);
-      setInstitution(user.institution || '');
-      setOrcidId(user.orcidId || '');
-      setIsLogin(false);
-      setIsReset(false);
-      onShowNotification('Google verified. Complete missing author profile details.', 'info');
-    }).catch(() => {});
-  }, []);
-
   const normalizeOrcid = (value: string) => value.replace(/^https?:\/\/orcid\.org\//i, '').trim();
 
   const handleGoogleSignIn = async () => {
@@ -87,6 +38,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       const result = await signInWithGoogle();
       const [given = 'GBMN', ...rest] = (result.user.displayName || '').split(' ').filter(Boolean);
       const family = rest.join(' ') || 'Author';
+      await DB.syncUsersFromFirestore().catch(() => {});
       const users = DB.getUsers();
       const existing = users.find(u => u.email.toLowerCase() === (result.user.email || '').toLowerCase());
       if (existing?.institution) {
@@ -149,6 +101,10 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
   const autofillFromOrcid = async () => {
     const clean = normalizeOrcid(orcidId);
     if (!clean) return;
+    if (!/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/i.test(clean)) {
+      onShowNotification('ORCID format must be 0000-0000-0000-0000.', 'error');
+      return;
+    }
     setIsOrcidLookup(true);
     try {
       const response = await fetch(`https://pub.orcid.org/v3.0/${clean}/record`, {
@@ -234,7 +190,8 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         return;
       }
       const users = DB.getUsers();
-      const userExists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
+      const existingUser = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+      const userExists = Boolean(existingUser);
       if (userExists && !pendingProviderUid) {
         onShowNotification('Email is already registered.', 'error');
         return;
@@ -242,12 +199,12 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       const firebaseUserId = pendingProviderUid || (await createPasswordAccount(email, password)).user.uid;
 
       const newUser: User = {
-        id: firebaseUserId,
+        id: pendingProviderUid || existingUser?.id || firebaseUserId,
         email,
         firstName,
         lastName,
         orcidId: orcidId || undefined,
-        role: 'Author',
+        role: existingUser?.role || 'Author',
         institution,
         isVerified: true,
         joinedDate: new Date().toISOString().split('T')[0]

@@ -34,13 +34,13 @@ import { getStorage, type FirebaseStorage } from 'firebase/storage';
  * Authentication → Settings → Authorized domains.
  */
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCu8RuX9cSeJfDBCuB-QqhHR00I2PKgEPo',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'gbmnsubmit.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'gbmnsubmit',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'gbmnsubmit.firebasestorage.app',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '427592261852',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:427592261852:web:693e8ab33827d5f83a5419',
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-JS59R1ZZFG',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const hasFirebaseConfig = Boolean(
@@ -73,11 +73,6 @@ export async function signInWithGoogle() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   return signInWithPopup(firebaseAuth, provider);
-}
-
-/** No-op — redirect flow removed. Kept for import compatibility. */
-export async function getGoogleRedirectResult() {
-  return null;
 }
 
 export async function signInWithPassword(email: string, password: string) {
