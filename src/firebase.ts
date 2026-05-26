@@ -9,6 +9,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   type Auth,
 } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
@@ -42,13 +44,57 @@ export const firebaseAnalyticsPromise: Promise<Analytics | null> = firebaseApp
   ? isSupported().then(supported => supported ? getAnalytics(firebaseApp) : null).catch(() => null)
   : Promise.resolve(null);
 
+/** 
+ * Sign in with Google. Tries popup first; if sessionStorage is unavailable
+ * (partitioned browser, IDP-initiated SAML) automatically falls back to redirect.
+ */
 export async function signInWithGoogle() {
   if (!firebaseAuth) {
     throw new Error('Firebase configuration is not connected yet.');
   }
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  return signInWithPopup(firebaseAuth, provider);
+
+  // Detect sessionStorage availability (causes the "missing initial state" error)
+  let sessionStorageAvailable = false;
+  try {
+    const testKey = '__gbmn_ss_test__';
+    sessionStorage.setItem(testKey, '1');
+    sessionStorage.removeItem(testKey);
+    sessionStorageAvailable = true;
+  } catch {
+    sessionStorageAvailable = false;
+  }
+
+  if (!sessionStorageAvailable) {
+    // Redirect flow — page will reload; result handled in getGoogleRedirectResult()
+    return signInWithRedirect(firebaseAuth, provider);
+  }
+
+  try {
+    return await signInWithPopup(firebaseAuth, provider);
+  } catch (error: any) {
+    // Popup blocked or storage partitioned — fall back to redirect
+    if (
+      error?.code === 'auth/popup-blocked' ||
+      error?.code === 'auth/cancelled-popup-request' ||
+      error?.message?.includes('missing initial state') ||
+      error?.message?.includes('storage-partitioned')
+    ) {
+      return signInWithRedirect(firebaseAuth, provider);
+    }
+    throw error;
+  }
+}
+
+/** Call once on app mount to capture the redirect result after Google sign-in. */
+export async function getGoogleRedirectResult() {
+  if (!firebaseAuth) return null;
+  try {
+    return await getRedirectResult(firebaseAuth);
+  } catch {
+    return null;
+  }
 }
 
 export function startOrcidAuthentication() {
