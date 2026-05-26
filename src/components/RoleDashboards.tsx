@@ -305,6 +305,16 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   </div>
                   <input value={selected.publicationInfo?.volumeIssue || ''} onChange={e => updateSelectedManuscript({ ...selected, publicationInfo: { ...(selected.publicationInfo || {}), volumeIssue: e.target.value }, updatedAt: new Date().toISOString() })} placeholder="VOLUME 4 ISSUE 2. APR-JUN 2026" className="w-full rounded border p-2 text-xs" />
                   <input value={selected.publicationInfo?.doi || ''} onChange={e => updateSelectedManuscript({ ...selected, publicationInfo: { ...(selected.publicationInfo || {}), doi: e.target.value }, updatedAt: new Date().toISOString() })} placeholder="10.52340/GBMN..." className="w-full rounded border p-2 text-xs font-mono" />
+                  <button onClick={() => { onUpdateManuscripts(manuscripts.map(m => m.id === selected.id ? selected : m)); onShowNotification('Saved.', 'success'); }} className="w-full rounded bg-teal-700 px-3 py-2 text-xs font-bold text-white">Save Changes</button>
+                  {/* Author-uploaded files */}
+                  {selected.editorFiles && selected.editorFiles.length > 0 && (
+                    <div className="border-t pt-2 space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Author Files</p>
+                      {selected.editorFiles.map(f => (
+                        <a key={f.id} href={f.fileUrl} download={f.fileName} className="block text-[11px] font-bold text-teal-700 hover:underline truncate">{f.fileName}</a>
+                      ))}
+                    </div>
+                  )}
                   <button onClick={() => openAuthorEmailModal(selected, 'acceptance')} className="w-full rounded border p-2 text-xs font-bold text-emerald-800">Acceptance Email</button>
                   <button onClick={() => openAuthorEmailModal(selected, 'payment')} className="w-full rounded border p-2 text-xs font-bold text-amber-800">Payment Email</button>
                   <button onClick={() => openAuthorEmailModal(selected, 'published')} className="w-full rounded border p-2 text-xs font-bold text-teal-800">Published Email</button>
@@ -815,7 +825,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   </div>
                 </div>
 
-                <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print">
+                <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print space-y-2">
                   <label className="block font-bold text-slate-700 mb-1">Editorial status visible to author</label>
                   <select
                     value={selectedManuscript.status}
@@ -826,6 +836,22 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                       <option key={status} value={status}>{status}</option>
                     ))}
                   </select>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { updateSelectedManuscript({ ...selectedManuscript, updatedAt: new Date().toISOString() }); onShowNotification('Manuscript changes saved.', 'success'); }}
+                      className="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { updateSelectedManuscript({ ...selectedManuscript, status: 'Draft', updatedAt: new Date().toISOString() }); onShowNotification('Marked as Draft.', 'info'); }}
+                      className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg"
+                    >
+                      Mark as Draft
+                    </button>
+                  </div>
                 </div>
 
                 <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print space-y-2">
@@ -884,8 +910,15 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     />
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => { onUpdateManuscripts(manuscripts.map(m => m.id === selectedManuscript.id ? selectedManuscript : m)); onShowNotification('Publication info saved.', 'success'); }}
+                  className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-4 py-2 rounded-lg"
+                >
+                  Save DOI / Issue
+                </button>
 
-                {/* Submitting author specs */}
+                {/* Submitting author specs + uploaded files */}
                 <div id="editor-submission-author-card" className="bg-slate-50 border p-4 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-4 text-xs no-print">
                   <div>
                     <span className="text-slate-400 font-semibold block">Primary Author</span>
@@ -904,6 +937,21 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     </span>
                   </div>
                 </div>
+
+                {/* Author uploaded files */}
+                {selectedManuscript.editorFiles && selectedManuscript.editorFiles.length > 0 && (
+                  <div className="bg-white border p-3 rounded-xl text-xs no-print">
+                    <h4 className="font-bold text-slate-700 mb-2">Author-Uploaded Files</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedManuscript.editorFiles.map(f => (
+                        <a key={f.id} href={f.fileUrl} download={f.fileName}
+                          className="inline-flex items-center gap-1 bg-teal-50 border border-teal-200 text-teal-800 px-3 py-1.5 rounded-lg font-bold text-[11px] hover:bg-teal-100">
+                          ⬇ {f.fileName}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Assigned Reviewer Stats & comments matrix */}
                 <div id="editor-reviewer-pipeline" className="border-t pt-4 space-y-3 no-print">
