@@ -180,6 +180,13 @@ export const DEFAULT_USERS: User[] = [
   }
 ];
 
+function withRequiredSystemUsers(users: User[]): User[] {
+  const byEmail = new Map<string, User>();
+  DEFAULT_USERS.forEach(user => byEmail.set(user.email.toLowerCase(), user));
+  users.forEach(user => byEmail.set(user.email.toLowerCase(), user));
+  return Array.from(byEmail.values());
+}
+
 // Rich, high-fidelity sample manuscript prefilled for Georgia Biomedical News
 export const SAMPLE_MANUSCRIPT: Manuscript = {
   id: 'GBMN-2026-0142',
@@ -456,8 +463,8 @@ export const DB = {
     if (firebaseEnabled && firestore) {
       try {
         const snap = await getDocs(collection(firestore, 'users'));
-        const rows = snap.docs.map(row => row.data() as User);
-        if (rows.length) return rows;
+        const rows = snap.docs.map(row => (row.data().payload || row.data()) as User).filter(Boolean);
+        if (rows.length) return withRequiredSystemUsers(rows);
       } catch (error) {
         console.warn('Firestore users read failed.', error);
       }
@@ -469,15 +476,16 @@ export const DB = {
     // Primary: localStorage cache (fast); Firestore mirror keeps devices in sync
     const data = localStorage.getItem('gbmn_users');
     if (data) {
-      try { return JSON.parse(data); } catch {}
+      try { return withRequiredSystemUsers(JSON.parse(data)); } catch {}
     }
     localStorage.setItem('gbmn_users', JSON.stringify(DEFAULT_USERS));
     return DEFAULT_USERS;
   },
 
   setUsers(users: User[]) {
-    localStorage.setItem('gbmn_users', JSON.stringify(users));
-    mirrorArrayToFirestore('users', users);
+    const normalized = withRequiredSystemUsers(users);
+    localStorage.setItem('gbmn_users', JSON.stringify(normalized));
+    mirrorArrayToFirestore('users', normalized);
   },
 
   /** Sync users FROM Firestore into local cache (call on app mount on every device). */
@@ -486,7 +494,7 @@ export const DB = {
     try {
       const snapshot = await getDocs(collection(firestore, 'users'));
       const rows: User[] = snapshot.docs.map(d => (d.data().payload || d.data()) as User).filter(Boolean);
-      if (rows.length) localStorage.setItem('gbmn_users', JSON.stringify(rows));
+      localStorage.setItem('gbmn_users', JSON.stringify(withRequiredSystemUsers(rows)));
     } catch (e) {
       console.warn('Firestore user sync failed', e);
     }

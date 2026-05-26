@@ -190,6 +190,14 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
     }
 
     if (isLogin) {
+      const demoMatch = DB.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
+      const demoStoredPassword = demoMatch ? (demoMatch as any).password : '';
+      if (demoMatch && (password === demoPassword || password === demoStoredPassword)) {
+        DB.setCurrentUser(demoMatch);
+        onUserChanged(demoMatch);
+        onShowNotification(`Signed in as ${demoMatch.firstName} ${demoMatch.lastName} (${demoMatch.role})`, 'success');
+        return;
+      }
       try {
         const credential = await signInWithPassword(email, password);
         const match = await DB.getUserByIdAsync(credential.user.uid) || DB.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
