@@ -15,6 +15,7 @@ import {
   updatePassword,
   signOut,
   onAuthStateChanged,
+  signInAnonymously,
   type Auth,
   type User as FirebaseUser,
 } from 'firebase/auth';
@@ -98,6 +99,13 @@ export async function changeFirebasePassword(newPassword: string) {
 export async function signOutFirebase() {
   if (!firebaseAuth) return;
   return signOut(firebaseAuth);
+}
+
+
+export async function ensureFirebaseSession() {
+  if (!firebaseAuth) return null;
+  if (firebaseAuth.currentUser) return firebaseAuth.currentUser;
+  return signInAnonymously(firebaseAuth).then(result => result.user);
 }
 
 export function subscribeFirebaseAuth(callback: (user: FirebaseUser | null) => void) {

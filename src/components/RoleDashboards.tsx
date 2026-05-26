@@ -242,30 +242,30 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const handleReviewerSubmit = (manuscript: Manuscript, isDraft = false) => {
     const updated = manuscripts.map(item => {
       if (item.id !== manuscript.id) return item;
+      const reviewComment = {
+        id: `rev-${Date.now()}`,
+        reviewerId: currentUser.id,
+        reviewerName: `${currentUser.firstName} ${currentUser.lastName}`,
+        ethicalConcerns: reviewScoreEthical,
+        methodologyScore: reviewScoreMethod,
+        originalityScore: reviewScoreOrig,
+        scientificMeritScore: reviewScoreMerit,
+        constructiveComments: reviewComments || '<p>See attached evaluation.</p>',
+        confidentialToEditor: reviewPrivate,
+        recommendation: reviewRecommend,
+        submittedAt: new Date().toISOString(),
+        highlights: reviewHighlights,
+        status: 'submitted' as const,
+      };
+      let matched = false;
       const updatedAssignments = item.reviewerAssignments.map(ra => {
         if (!reviewerMatchesCurrentUser(ra)) return ra;
-        return {
-          ...ra,
-          status: isDraft ? 'assigned' as const : 'completed' as const,
-          draftReview: reviewComments,
-          highlights: reviewHighlights,
-          comments: isDraft ? ra.comments : {
-            id: `rev-${Date.now()}`,
-            reviewerId: currentUser.id,
-            reviewerName: `${currentUser.firstName} ${currentUser.lastName}`,
-            ethicalConcerns: reviewScoreEthical,
-            methodologyScore: reviewScoreMethod,
-            originalityScore: reviewScoreOrig,
-            scientificMeritScore: reviewScoreMerit,
-            constructiveComments: reviewComments || '<p>See attached evaluation.</p>',
-            confidentialToEditor: reviewPrivate,
-            recommendation: reviewRecommend,
-            submittedAt: new Date().toISOString(),
-            highlights: reviewHighlights,
-            status: 'submitted' as const,
-          },
-        };
+        matched = true;
+        return { ...ra, status: isDraft ? 'assigned' as const : 'completed' as const, draftReview: reviewComments, highlights: reviewHighlights, comments: isDraft ? ra.comments : reviewComment };
       });
+      if (!matched) {
+        updatedAssignments.push({ reviewerId: currentUser.id, reviewerName: `${currentUser.firstName} ${currentUser.lastName}`, reviewerEmail: currentUser.email, status: isDraft ? 'assigned' as const : 'completed' as const, assignedAt: new Date().toISOString(), draftReview: reviewComments, highlights: reviewHighlights, comments: isDraft ? undefined : reviewComment });
+      }
       return { ...item, status: isDraft ? item.status : ('Under Review' as ManuscriptStatus), updatedAt: new Date().toISOString(), reviewerAssignments: updatedAssignments };
     });
     onUpdateManuscripts(updated);

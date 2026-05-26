@@ -12,7 +12,7 @@ import SidebarWorkflow from './components/SidebarWorkflow';
 import SubmissionWorkflow from './components/SubmissionWorkflow';
 import RoleDashboards from './components/RoleDashboards';
 import ManuscriptPreview from './components/ManuscriptPreview';
-import { changeFirebasePassword, signOutFirebase, subscribeFirebaseAuth } from './firebase';
+import { changeFirebasePassword, ensureFirebaseSession, signOutFirebase, subscribeFirebaseAuth } from './firebase';
 import { 
   GraduationCap, 
   User as UserIcon, 
@@ -67,7 +67,9 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) return;
-    DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    ensureFirebaseSession().finally(() => {
+      DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    });
     return DB.subscribeToManuscripts(setManuscripts);
   }, [currentUser?.id]);
 
