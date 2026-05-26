@@ -54,6 +54,13 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [officeEditMode, setOfficeEditMode] = useState(false);
   const [officeEditStep, setOfficeEditStep] = useState('title-meta');
+  const [editorialSection, setEditorialSection] = useState('Dashboard');
+  const [emailDraft, setEmailDraft] = useState<{ open: boolean; manuscript: Manuscript | null; subject: string; body: string }>({
+    open: false,
+    manuscript: null,
+    subject: '',
+    body: '',
+  });
 
   // Admin users edit state
   const [adminUsers, setAdminUsers] = useState<User[]>(() => DB.getUsers());
@@ -95,6 +102,15 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const email = template === 'accepted' ? acceptedPaymentRequest(manuscript) : publishedNotice(manuscript);
     await sendEmail(template, manuscript, email.subject, email.body);
     onShowNotification('Email processed through EmailJS.', 'success');
+  };
+
+  const openAuthorEmailModal = (manuscript: Manuscript, preset: 'custom' | 'accepted' | 'published' = 'custom') => {
+    const email = preset === 'accepted'
+      ? acceptedPaymentRequest(manuscript)
+      : preset === 'published'
+        ? publishedNotice(manuscript)
+        : { subject: `GBMN Manuscript ${manuscript.id}`, body: `Dear Author,\n\n\n\nRegards,\nGBMN Editorial Office` };
+    setEmailDraft({ open: true, manuscript, subject: email.subject, body: email.body });
   };
 
   const handleUpdateUserRole = (userId: string, newRole: any) => {
@@ -208,6 +224,101 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
       default:
         return <span className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm">{status}</span>;
     }
+  };
+
+  const renderModernEditorWorkspace = () => {
+    const nav = ['Dashboard', 'Manuscripts', 'Awaiting Action', 'Under Review', 'Revisions', 'Accepted', 'Published', 'Rejected', 'Authors', 'Reviewers', 'Payments', 'DOI / Publishing', 'Emails', 'Settings'];
+    const visible = manuscripts.filter((m) => {
+      const q = searchQuery.toLowerCase();
+      const ok = !q || m.title.toLowerCase().includes(q) || m.id.toLowerCase().includes(q) || m.authors.some(a => a.email.toLowerCase().includes(q));
+      if (!ok) return false;
+      if (editorialSection === 'Awaiting Action') return m.status === 'Submitted';
+      if (editorialSection === 'Under Review') return ['Under Review', 'Reviewer Assigned', 'In Review'].includes(m.status);
+      if (editorialSection === 'Revisions') return m.status === 'Revision Requested';
+      if (editorialSection === 'Accepted') return m.status === 'Accepted';
+      if (editorialSection === 'Published') return m.status === 'Published';
+      if (editorialSection === 'Rejected') return m.status === 'Rejected';
+      if (editorialSection === 'Payments') return !m.payment || m.payment.status !== 'verified';
+      if (editorialSection === 'DOI / Publishing') return !m.publicationInfo?.doi || m.status === 'Accepted';
+      return true;
+    });
+    const selected = selectedManuscript || visible[0] || null;
+    const metric = (label: string, value: number, section: string) => (
+      <button onClick={() => setEditorialSection(section)} className="rounded-xl border bg-white p-4 text-left shadow-xs hover:border-teal-400">
+        <span className="block text-[10px] font-bold uppercase text-slate-400">{label}</span>
+        <span className="mt-1 block text-2xl font-black text-teal-800">{value}</span>
+      </button>
+    );
+    const setStatus = (status: ManuscriptStatus) => selected && updateSelectedManuscript({ ...selected, status, updatedAt: new Date().toISOString() });
+    return (
+      <div className="rounded-3xl border bg-slate-50 overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr]">
+          <aside className="bg-slate-950 p-4 text-white">
+            <h2 className="text-sm font-black">GBMN Editorial</h2>
+            <p className="mb-5 text-[11px] text-slate-400">{currentUser.role}</p>
+            {nav.map(item => (
+              <button key={item} onClick={() => setEditorialSection(item)} className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-xs font-bold ${editorialSection === item ? 'bg-teal-600' : 'text-slate-300 hover:bg-white/10'}`}>{item}</button>
+            ))}
+          </aside>
+          <main className="space-y-5 p-4 md:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h1 className="text-xl font-black">{editorialSection}</h1><p className="text-xs text-slate-500">Clean editorial workflow and action center.</p></div>
+              <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search title, ID, author email..." className="w-full max-w-sm rounded-xl border bg-white px-4 py-2 text-xs" />
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {metric('Total', totalSubmissions, 'Manuscripts')}
+              {metric('Awaiting Action', manuscripts.filter(m => m.status === 'Submitted').length, 'Awaiting Action')}
+              {metric('Under Review', underReviewCount, 'Under Review')}
+              {metric('Published', manuscripts.filter(m => m.status === 'Published').length, 'Published')}
+            </div>
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_340px]">
+              <section className="rounded-2xl border bg-white shadow-xs overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] uppercase text-slate-500"><tr><th className="p-3">Manuscript</th><th>Author</th><th>Status</th><th>Payment</th><th>DOI</th><th>Submitted</th><th>Action</th></tr></thead>
+                  <tbody>{visible.map(m => (
+                    <tr key={m.id} onClick={() => setSelectedManuscript(m)} className={`cursor-pointer border-t hover:bg-teal-50 ${selected?.id === m.id ? 'bg-teal-50' : ''}`}>
+                      <td className="p-3"><b className="font-mono text-teal-800">{m.id}</b><div className="font-bold line-clamp-1">{m.title || 'Untitled'}</div><div className="text-[10px] text-slate-400">{m.articleType}</div></td>
+                      <td>{m.authors[0]?.firstName} {m.authors[0]?.lastName}<div className="text-[10px] text-slate-400">{m.authors[0]?.email}</div></td>
+                      <td>{renderStatusBadge(m.status)}</td><td>{m.payment?.status || 'Pending'}</td><td>{m.publicationInfo?.doi ? 'Assigned' : 'Pending'}</td><td>{new Date(m.submittedAt || m.createdAt).toLocaleDateString()}</td>
+                      <td><button onClick={(e) => { e.stopPropagation(); openAuthorEmailModal(m); }} className="rounded bg-teal-700 px-3 py-1.5 font-bold text-white">Email</button></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </section>
+              <aside className="space-y-3 rounded-2xl border bg-white p-4 shadow-xs xl:sticky xl:top-24 xl:self-start">
+                {selected ? <>
+                  <h3 className="text-sm font-black">{selected.title || selected.id}</h3>
+                  <p className="text-xs text-slate-500">{selected.authors[0]?.email}</p>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <button onClick={() => openAuthorEmailModal(selected)} className="rounded-lg bg-teal-700 px-3 py-2 font-bold text-white">Email Author</button>
+                    <button onClick={() => setOfficeEditMode(!officeEditMode)} className="rounded-lg bg-slate-900 px-3 py-2 font-bold text-white">Edit Article</button>
+                    <button onClick={() => setStatus('Revision Requested')} className="rounded-lg bg-amber-600 px-3 py-2 font-bold text-white">Revision</button>
+                    <button onClick={() => setStatus('Accepted')} className="rounded-lg bg-emerald-700 px-3 py-2 font-bold text-white">Accept</button>
+                    <button onClick={() => setStatus('Rejected')} className="rounded-lg bg-rose-700 px-3 py-2 font-bold text-white">Reject</button>
+                    <button onClick={() => setStatus('Published')} className="rounded-lg bg-teal-950 px-3 py-2 font-bold text-white">Publish</button>
+                  </div>
+                  <input value={selected.publicationInfo?.volumeIssue || ''} onChange={e => updateSelectedManuscript({ ...selected, publicationInfo: { ...(selected.publicationInfo || {}), volumeIssue: e.target.value }, updatedAt: new Date().toISOString() })} placeholder="VOLUME 4 ISSUE 2. APR-JUN 2026" className="w-full rounded border p-2 text-xs" />
+                  <input value={selected.publicationInfo?.doi || ''} onChange={e => updateSelectedManuscript({ ...selected, publicationInfo: { ...(selected.publicationInfo || {}), doi: e.target.value }, updatedAt: new Date().toISOString() })} placeholder="10.52340/GBMN..." className="w-full rounded border p-2 text-xs font-mono" />
+                  <button onClick={() => openAuthorEmailModal(selected, 'accepted')} className="w-full rounded border p-2 text-xs font-bold text-emerald-800">Acceptance Payment Email</button>
+                  <button onClick={() => openAuthorEmailModal(selected, 'published')} className="w-full rounded border p-2 text-xs font-bold text-teal-800">Published Email</button>
+                </> : <p className="text-xs text-slate-500">Select a manuscript.</p>}
+              </aside>
+            </div>
+            {selected && <section className="rounded-2xl border bg-white p-4 shadow-xs">{officeEditMode ? <SubmissionWorkflow manuscript={selected} onUpdateManuscript={updateSelectedManuscript} activeStep={officeEditStep} onStepChange={setOfficeEditStep} onShowNotification={onShowNotification} /> : <ManuscriptPreview manuscript={selected} onShowNotification={onShowNotification} />}</section>}
+            {emailDraft.open && emailDraft.manuscript && (
+              <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/40 p-4">
+                <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
+                  <h3 className="text-sm font-black">Email Author</h3><p className="text-xs text-slate-500">{emailDraft.manuscript.authors[0]?.email}</p>
+                  <input value={emailDraft.subject} onChange={e => setEmailDraft(prev => ({ ...prev, subject: e.target.value }))} className="mt-3 w-full rounded border p-2 text-sm" />
+                  <textarea value={emailDraft.body} onChange={e => setEmailDraft(prev => ({ ...prev, body: e.target.value }))} rows={12} className="mt-3 w-full rounded border p-3 text-sm" />
+                  <div className="mt-4 flex justify-end gap-2"><button onClick={() => setEmailDraft(prev => ({ ...prev, open: false }))} className="rounded border px-4 py-2 text-xs font-bold">Cancel</button><button onClick={async () => { await sendEmail('generic', emailDraft.manuscript!, emailDraft.subject, emailDraft.body); setEmailDraft(prev => ({ ...prev, open: false })); onShowNotification('Email sent.', 'success'); }} className="rounded bg-teal-700 px-4 py-2 text-xs font-bold text-white">Send Email</button></div>
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+      </div>
+    );
   };
 
   // Render Reviewer Dashboard
@@ -1099,7 +1210,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
   return (
     <div id="central-role-dashboards" className="space-y-6">
-      {currentUser.role === 'Editor' && renderEditorWorkspace()}
+      {currentUser.role === 'Editor' && renderModernEditorWorkspace()}
       {currentUser.role === 'Reviewer' && renderReviewerDashboard()}
       {currentUser.role === 'Managing Editor' && (
         <div className="space-y-8">
@@ -1107,7 +1218,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             <h3 className="text-sm font-bold text-teal-900">Managing Editor Full Access</h3>
             <p className="text-xs text-teal-800 mt-1">You can manage editorial decisions, reviewer assignment, financial verification, and audit review.</p>
           </div>
-          {renderEditorWorkspace()}
+          {renderModernEditorWorkspace()}
           {renderManagingEditorWorkspace()}
         </div>
       )}
@@ -1124,7 +1235,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               <button onClick={() => setAdminMode('users')} className={`px-3 py-1.5 rounded-md ${adminMode === 'users' ? 'bg-white text-slate-900' : 'text-white hover:bg-white/10'}`}>Users</button>
             </div>
           </div>
-          {adminMode === 'editorial' && renderEditorWorkspace()}
+          {adminMode === 'editorial' && renderModernEditorWorkspace()}
           {adminMode === 'finance' && renderManagingEditorWorkspace()}
           {adminMode === 'users' && renderAdministratorPanel()}
         </div>

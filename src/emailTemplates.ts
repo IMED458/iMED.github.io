@@ -33,6 +33,11 @@ export async function sendEmail(kind: keyof typeof templateIds, manuscript: Manu
     {
       to_email: to,
       to_name: `${manuscript.authors[0]?.firstName || 'Author'} ${manuscript.authors[0]?.lastName || ''}`.trim(),
+      from_name: 'GBMN Editorial Office',
+      from_email: 'gbmn@tsmu.edu',
+      company: 'Georgian Biomedical and Medical Nexus',
+      phone: '',
+      reply_to: 'gbmn@tsmu.edu',
       subject,
       message: body,
       manuscript_title: manuscript.title,
