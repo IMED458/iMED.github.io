@@ -54,6 +54,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [officeEditMode, setOfficeEditMode] = useState(false);
   const [officeEditStep, setOfficeEditStep] = useState('title-meta');
+  const [showEditorSidebar, setShowEditorSidebar] = useState(false);
   const [editorialSection, setEditorialSection] = useState('Dashboard');
   const [emailDraft, setEmailDraft] = useState<{ open: boolean; manuscript: Manuscript | null; subject: string; body: string }>({
     open: false,
@@ -321,7 +322,34 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                 </> : <p className="text-xs text-slate-500">Select a manuscript.</p>}
               </aside>
             </div>
-            {selected && <section className="rounded-2xl border bg-white p-4 shadow-xs">{officeEditMode ? <SubmissionWorkflow manuscript={selected} onUpdateManuscript={updateSelectedManuscript} activeStep={officeEditStep} onStepChange={setOfficeEditStep} onShowNotification={onShowNotification} /> : <ManuscriptPreview manuscript={selected} onShowNotification={onShowNotification} />}</section>}
+            {selected && (
+              <section className="rounded-2xl border bg-white p-4 shadow-xs">
+                {officeEditMode ? (
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="md:w-48 shrink-0">
+                      <div className="bg-slate-900 rounded-xl p-3 text-white text-xs space-y-1">
+                        <p className="font-black text-[10px] uppercase text-slate-400 mb-2">Sections</p>
+                        {['title-meta','authors','abstract','keywords','sections','references','ethics','conflicts','funding','editor-files','preview'].map(step => (
+                          <button key={step} onClick={() => setOfficeEditStep(step)}
+                            className={`w-full text-left px-2 py-1.5 rounded text-[11px] font-bold capitalize ${officeEditStep === step ? 'bg-teal-600' : 'text-slate-300 hover:bg-white/10'}`}>
+                            {step.replace(/-/g,' ')}
+                          </button>
+                        ))}
+                        <div className="border-t border-slate-700 pt-2 mt-2 space-y-1">
+                          <button onClick={() => { updateSelectedManuscript({ ...selected, updatedAt: new Date().toISOString() }); onShowNotification('Saved.', 'success'); }} className="w-full bg-teal-700 text-white font-bold px-2 py-1.5 rounded text-[11px]">Save Draft</button>
+                          <button onClick={() => { updateSelectedManuscript({ ...selected, updatedAt: new Date().toISOString() }); setOfficeEditMode(false); onShowNotification('Saved and closed.', 'success'); }} className="w-full bg-slate-600 text-white font-bold px-2 py-1.5 rounded text-[11px]">Save & Close</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <SubmissionWorkflow manuscript={selected} onUpdateManuscript={updateSelectedManuscript} activeStep={officeEditStep} onStepChange={setOfficeEditStep} onShowNotification={onShowNotification} />
+                    </div>
+                  </div>
+                ) : (
+                  <ManuscriptPreview manuscript={selected} onShowNotification={onShowNotification} />
+                )}
+              </section>
+            )}
             {emailDraft.open && emailDraft.manuscript && (
               <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/40 p-4">
                 <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
@@ -1004,13 +1032,40 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
                 {officeEditMode ? (
                   <div className="border-t pt-6">
-                    <SubmissionWorkflow
-                      manuscript={selectedManuscript}
-                      onUpdateManuscript={updateSelectedManuscript}
-                      activeStep={officeEditStep}
-                      onStepChange={setOfficeEditStep}
-                      onShowNotification={onShowNotification}
-                    />
+                    <div className="flex flex-col md:flex-row gap-6">
+                      <div className="md:w-56 shrink-0">
+                        <div className="bg-slate-900 rounded-xl p-3 text-white text-xs space-y-1">
+                          <p className="font-black text-[10px] uppercase text-slate-400 mb-2">Article Sections</p>
+                          {['getting-started','title-meta','authors','article-type','abstract','keywords','sections','references','supplementary','ethics','conflicts','funding','editor-files','preview'].map(step => (
+                            <button key={step} onClick={() => setOfficeEditStep(step)}
+                              className={`w-full text-left px-2 py-1.5 rounded text-[11px] font-bold capitalize ${officeEditStep === step ? 'bg-teal-600 text-white' : 'text-slate-300 hover:bg-white/10'}`}>
+                              {step.replace(/-/g,' ')}
+                            </button>
+                          ))}
+                          <div className="border-t border-slate-700 pt-2 mt-2 space-y-1">
+                            <button
+                              onClick={() => { updateSelectedManuscript({ ...selectedManuscript, updatedAt: new Date().toISOString() }); onShowNotification('Draft saved.', 'success'); }}
+                              className="w-full bg-teal-700 hover:bg-teal-600 text-white font-bold px-2 py-1.5 rounded text-[11px]">
+                              Save Draft
+                            </button>
+                            <button
+                              onClick={() => { updateSelectedManuscript({ ...selectedManuscript, updatedAt: new Date().toISOString() }); setOfficeEditMode(false); onShowNotification('Draft saved and closed.', 'success'); }}
+                              className="w-full bg-slate-600 hover:bg-slate-500 text-white font-bold px-2 py-1.5 rounded text-[11px]">
+                              Save Draft & Close
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <SubmissionWorkflow
+                          manuscript={selectedManuscript}
+                          onUpdateManuscript={updateSelectedManuscript}
+                          activeStep={officeEditStep}
+                          onStepChange={setOfficeEditStep}
+                          onShowNotification={onShowNotification}
+                        />
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="border-t pt-6">
