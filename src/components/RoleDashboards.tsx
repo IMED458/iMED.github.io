@@ -1011,11 +1011,11 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2 pt-3 border-t">
-                    <button onClick={() => handleReviewerSubmit(selectedManuscript, true)} className="border border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-slate-50 flex items-center gap-1.5">
+                    <button type="button" onClick={() => handleReviewerSubmit(selectedManuscript, true)} className="border border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-slate-50 flex items-center gap-1.5">
                       <Save className="h-3.5 w-3.5" /> Save Draft
                     </button>
-                    <button onClick={() => { handleReviewerSubmit(selectedManuscript, true); setSelectedManuscript(null); }} className="border border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-slate-50">Save Draft & Close</button>
-                    <button onClick={() => handleReviewerSubmit(selectedManuscript, false)} className="bg-teal-700 hover:bg-teal-800 text-white font-bold px-5 py-2 rounded-lg text-xs flex items-center gap-1.5">
+                    <button type="button" onClick={() => { handleReviewerSubmit(selectedManuscript, true); setSelectedManuscript(null); }} className="border border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-slate-50">Save Draft & Close</button>
+                    <button type="button" onClick={() => handleReviewerSubmit(selectedManuscript, false)} className="bg-teal-700 hover:bg-teal-800 text-white font-bold px-5 py-2 rounded-lg text-xs flex items-center gap-1.5">
                       <Send className="h-3.5 w-3.5" /> Submit Review
                     </button>
                     <button onClick={() => {

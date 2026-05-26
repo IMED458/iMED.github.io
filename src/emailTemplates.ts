@@ -1,8 +1,8 @@
 import { Manuscript } from './types';
 import emailjs from '@emailjs/browser';
 
-const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_fd48utr';
+const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'bwqBanPS6kMplQUWW';
 const templateIds = {
   generic: import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || 'template_ahj9jq9',
   submission: import.meta.env.VITE_EMAILJS_TEMPLATE_SUBMISSION || import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
@@ -42,10 +42,7 @@ export async function sendEmail(kind: keyof typeof templateIds, manuscript: Manu
   if (!to) throw new Error('Author email is missing.');
   const corrAuthor = manuscript.authors.find(a => a.isCorresponding) || manuscript.authors[0];
   const toName = `${corrAuthor?.firstName || 'Author'} ${corrAuthor?.lastName || ''}`.trim();
-  if (!emailJsEnabled) {
-    openEmail(to, subject, body);
-    return { fallback: true };
-  }
+  if (!emailJsEnabled) throw new Error('EmailJS is not configured.');
   await emailjs.send(
     serviceId,
     templateIds[kind] || templateIds.generic,
@@ -57,10 +54,7 @@ export async function sendEmail(kind: keyof typeof templateIds, manuscript: Manu
 
 export async function sendEmailToAddress(toEmail: string, toName: string, subject: string, body: string) {
   if (!toEmail) throw new Error('Recipient email is missing.');
-  if (!emailJsEnabled) {
-    openEmail(toEmail, subject, body);
-    return { fallback: true };
-  }
+  if (!emailJsEnabled) throw new Error('EmailJS is not configured.');
   await emailjs.send(
     serviceId,
     templateIds.generic,
