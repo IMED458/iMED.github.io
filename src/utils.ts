@@ -437,6 +437,17 @@ function mirrorArrayToFirestore<T extends { id: string }>(collectionName: string
 
 // Local-first database layer with Firebase Firestore mirroring.
 export const DB = {
+  subscribeManuscripts(callback: (rows: Manuscript[]) => void) {
+    if (!firebaseEnabled || !firestore) return () => {};
+    return onSnapshot(collection(firestore, 'manuscripts'), snapshot => {
+      const rows = snapshot.docs.map(item => item.data().payload as Manuscript).filter(Boolean);
+      if (!rows.length) return;
+      manuscriptMemory = rows;
+      setIndexedState('gbmn_manuscripts', rows).catch(console.warn);
+      callback(rows);
+    }, error => console.warn('Firestore manuscript live sync failed.', error));
+  },
+
   async getManuscriptsAsync(): Promise<Manuscript[]> {
     if (firebaseEnabled && firestore) {
       try {
