@@ -171,7 +171,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           <title>${stripHtml(manuscript.title || 'GBMN Manuscript')}</title>
           ${styles}
           <style>
-            @page { size: A4 portrait; margin: 32mm 13mm 29mm 13mm; }
+            @page { size: A4 portrait; margin: 19mm 13mm 28mm 13mm; }
             html, body {
               margin: 0 !important;
               padding: 0 !important;
@@ -366,13 +366,6 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           DOCX export replicates this structure exactly.
       ═══════════════════════════════════════════════ */}
       <div id="academic-manuscript-sheet">
-        <div className="gbmn-running-page-header" aria-hidden="true">
-          <span className="gbmn-running-line" />
-          <span className="gbmn-running-title">GEORGIAN BIOMEDICAL NEWS</span>
-          <span className="gbmn-running-line" />
-          <span className="gbmn-running-issue">{issueLabel(manuscript)}</span>
-        </div>
-
         {/* ── JOURNAL HEADER ── */}
         <div className="gbmn-journal-header">
           <div className="gbmn-logo-row">
@@ -616,7 +609,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           text-align: right;
           text-transform: uppercase;
         }
-        .gbmn-running-page-header { display: none; }  /* hidden on screen, shown only in print */
+        .gbmn-running-page-header { display: none; }
 
         /* ── TITLE BLOCK ─────────────────────────────── */
         .gbmn-title-block { margin-bottom: 16px; }
@@ -1009,44 +1002,9 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
           /* Force A4 page size — defined above with running header */
 
-          .gbmn-running-page-header {
-            position: fixed !important;
-            top: 6mm !important;
-            left: 13mm !important;
-            right: 13mm !important;
-            height: 10mm !important;
-            display: flex !important;
-            visibility: visible !important;
-            align-items: center !important;
-            gap: 5mm !important;
-            background: #ffffff !important;
-            z-index: 9999 !important;
-            font-family: Arial, sans-serif !important;
-            border-bottom: 0.5pt solid #e2e8f0 !important;
-          }
-          @page { size: A4 portrait; margin: 22mm 13mm 29mm 13mm; }
-          .gbmn-running-line {
-            display: block !important;
-            width: 12mm !important;
-            height: 2.4mm !important;
-            border-top: 1.2mm solid #0E8B8B !important;
-            border-bottom: 1.2mm solid #0E8B8B !important;
-            flex: 0 0 12mm !important;
-          }
-          .gbmn-running-title {
-            font-size: 14pt !important;
-            letter-spacing: 1px !important;
-            color: #000000 !important;
-            white-space: nowrap !important;
-          }
-          .gbmn-running-issue {
-            margin-left: auto !important;
-            font-size: 10pt !important;
-            font-weight: 700 !important;
-            color: #000000 !important;
-            white-space: nowrap !important;
-            text-transform: uppercase !important;
-          }
+          /* Clean A4 page — no fixed running header that overlaps content */
+          @page { size: A4 portrait; margin: 19mm 13mm 28mm 13mm; }
+          .gbmn-running-page-header { display: none !important; }
 
           /* Column layout must work in print */
           .gbmn-body-columns {
