@@ -366,12 +366,26 @@ export default function RichTextEditor({
     resetInsertState();
   };
 
-  const sanitizeRichPaste = (html: string) => {
+  const sanitizeRichPaste = (html: string, keepImages = false) => {
     const template = document.createElement('template');
     template.innerHTML = html;
+    // Remove img tags unless explicitly keeping them
+    if (!keepImages) {
+      template.content.querySelectorAll('img').forEach(img => img.remove());
+    }
+    // Remove meta, style, script, comment nodes
+    template.content.querySelectorAll('meta, style, script, link, [style]').forEach(el => {
+      if (el.tagName.toLowerCase() === 'span' || el.tagName.toLowerCase() === 'p') {
+        el.removeAttribute('style');
+        el.removeAttribute('class');
+      } else if (!['table','tbody','thead','tr','th','td','ul','ol','li','p','br','strong','b','em','i','u','sup','sub','h3'].includes(el.tagName.toLowerCase())) {
+        el.remove();
+      }
+    });
     template.content.querySelectorAll('*').forEach(element => {
       const tag = element.tagName.toLowerCase();
-      if (!['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'sup', 'sub', 'ul', 'ol', 'li', 'table', 'tbody', 'thead', 'tr', 'th', 'td', 'span', 'h3'].includes(tag)) {
+      const allowed = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'sup', 'sub', 'ul', 'ol', 'li', 'table', 'tbody', 'thead', 'tr', 'th', 'td', 'span', 'h3'];
+      if (!allowed.includes(tag)) {
         element.replaceWith(...Array.from(element.childNodes));
         return;
       }
@@ -405,7 +419,15 @@ export default function RichTextEditor({
     }
     if (html) {
       event.preventDefault();
-      insertHtml(sanitizeRichPaste(html));
+      // Strip embedded images from Word/Docs pastes — use plain text for clean paste
+      const sanitized = sanitizeRichPaste(html, false);
+      // If sanitized result is empty or has only whitespace, fall back to plain text
+      const textOnly = sanitized.replace(/<[^>]+>/g, '').trim();
+      if (textOnly) {
+        insertHtml(sanitized);
+      } else if (text) {
+        insertHtml(escapeHtml(text).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>'));
+      }
       return;
     }
     if (text) {
