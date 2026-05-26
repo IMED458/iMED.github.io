@@ -49,6 +49,7 @@ export default function App() {
   useEffect(() => {
     setCurrentUser(DB.getCurrentUser());
     setManuscripts(DB.getManuscripts());
+    DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
   }, []);
 
   const triggerNotification = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -74,6 +75,7 @@ export default function App() {
     if (newAuth) {
       // Refresh local submissions list
       setManuscripts(DB.getManuscripts());
+      DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
     }
   };
 

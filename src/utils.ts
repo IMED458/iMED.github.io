@@ -7,6 +7,39 @@ import { ArticleTypeConfig, Manuscript, User, SystemAuditLog, JournalSettings, A
 import { firebaseEnabled, firestore } from './firebase';
 import { doc, setDoc } from 'firebase/firestore';
 
+function openGbmnDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB unavailable'));
+    const request = indexedDB.open('gbmn-submission-system', 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('state');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function setIndexedState<T>(key: string, value: T) {
+  const db = await openGbmnDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('state', 'readwrite');
+    tx.objectStore('state').put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+async function getIndexedState<T>(key: string): Promise<T | null> {
+  const db = await openGbmnDb();
+  const value = await new Promise<T | null>((resolve, reject) => {
+    const tx = db.transaction('state', 'readonly');
+    const request = tx.objectStore('state').get(key);
+    request.onsuccess = () => resolve((request.result as T) || null);
+    request.onerror = () => reject(request.error);
+  });
+  db.close();
+  return value;
+}
+
 export const ARTICLE_TYPES: { [key: string]: ArticleTypeConfig } = {
   'clinical-cases': {
     key: 'clinical-cases',
@@ -387,6 +420,14 @@ function mirrorArrayToFirestore<T extends { id: string }>(collectionName: string
 
 // Local-first database layer with Firebase Firestore mirroring.
 export const DB = {
+  async getManuscriptsAsync(): Promise<Manuscript[]> {
+    try {
+      const stored = await getIndexedState<Manuscript[]>('gbmn_manuscripts');
+      if (stored?.length) return stored;
+    } catch {}
+    return this.getManuscripts();
+  },
+
   getUsers(): User[] {
     const data = localStorage.getItem('gbmn_users');
     if (!data) {
@@ -412,7 +453,13 @@ export const DB = {
   },
 
   setManuscripts(manuscripts: Manuscript[]) {
-    localStorage.setItem('gbmn_manuscripts', JSON.stringify(manuscripts));
+    setIndexedState('gbmn_manuscripts', manuscripts).catch(console.warn);
+    try {
+      localStorage.setItem('gbmn_manuscripts', JSON.stringify(manuscripts));
+    } catch {
+      localStorage.setItem('gbmn_manuscripts_indexed', 'true');
+      try { localStorage.removeItem('gbmn_manuscripts'); } catch {}
+    }
     mirrorArrayToFirestore('manuscripts', manuscripts);
   },
 

@@ -309,6 +309,25 @@ export default function RichTextEditor({
     insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-figure gbmn-media-${insertLayout}" data-layout="${insertLayout}" contenteditable="false" draggable="true" data-media-id="${mediaId}">${mediaActionsHtml()}<figcaption><strong>${escapeHtml(caption)}</strong>${legend?.trim() ? ` — ${escapeHtml(legend)}` : ''}</figcaption><img src="${src}" alt="${escapeHtml(caption)}"></figure><p><br></p>`);
   };
 
+  const readCompressedImage = (file: File) => new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = document.createElement('img');
+      img.onload = () => {
+        const max = 1400;
+        const scale = Math.min(1, max / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => resolve(String(reader.result || ''));
+      img.src = String(reader.result || '');
+    };
+    reader.readAsDataURL(file);
+  });
+
   const insertImageFile = (file: File, title?: string, legend?: string) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -335,12 +354,10 @@ export default function RichTextEditor({
       const file = imageUploadFile;
       const title = insertTitle;
       const legend = insertLegend;
-      const reader = new FileReader();
-      reader.onload = () => {
-        insertImageDataUrl(String(reader.result || ''), title.trim() || file.name, legend);
+      readCompressedImage(file).then((src) => {
+        insertImageDataUrl(src, title.trim() || file.name, legend);
         resetInsertState();
-      };
-      reader.readAsDataURL(file);
+      });
       return;
     } else {
       insertImageDataUrl(imageExistingSrc, insertTitle, insertLegend);
