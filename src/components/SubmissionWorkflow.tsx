@@ -8,6 +8,7 @@ import { Manuscript, AuthorDetails, ReferenceItem, FigureTableItem, Supplementar
 import { ARTICLE_TYPES, formatAMAReference, SAMPLE_MANUSCRIPT } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import RichTextEditor from './RichTextEditor';
+import { authorEmail as getAuthorEmail, openEmail, submissionConfirmation } from '../emailTemplates';
 import { 
   Users, 
   FileText, 
@@ -1787,6 +1788,8 @@ export default function SubmissionWorkflow({
                   }
                   const now = new Date().toISOString();
                   onUpdateManuscript({ ...manuscript, status: 'Submitted', submittedAt: now, updatedAt: now });
+                  const email = submissionConfirmation(manuscript);
+                  openEmail(getAuthorEmail(manuscript), email.subject, email.body);
                   onStepChange('getting-started');
                   onShowNotification('Manuscript submitted to the editorial office. Confirmation recorded.', 'success');
                 }}

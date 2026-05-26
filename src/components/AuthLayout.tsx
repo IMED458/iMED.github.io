@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { DB } from '../utils';
 import { Key, Mail } from 'lucide-react';
-import { firebaseEnabled, signInWithGoogle, startOrcidAuthentication } from '../firebase';
+import { firebaseEnabled, signInWithGoogle } from '../firebase';
 
 interface AuthLayoutProps {
   currentUser: User | null;
@@ -39,7 +39,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       const family = rest.join(' ') || 'Author';
       const users = DB.getUsers();
       const existing = users.find(u => u.email.toLowerCase() === (result.user.email || '').toLowerCase());
-      if (existing?.orcidId && existing?.institution) {
+      if (existing?.institution) {
         DB.setCurrentUser(existing);
         onUserChanged(existing);
         onShowNotification('Google sign-in completed.', 'success');
@@ -63,7 +63,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       setOrcidId(user.orcidId || '');
       setIsLogin(false);
       setIsReset(false);
-      onShowNotification('Google verified. Complete author profile with mandatory ORCID iD to finish registration.', 'info');
+      onShowNotification('Google verified. Complete missing author profile details to finish registration.', 'info');
     } catch (error) {
       const rawMessage = error instanceof Error ? error.message : '';
       const host = window.location.hostname;
@@ -71,14 +71,6 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         ? `Firebase Authorized domains-ში დაამატე ${host}. Firebase Console → Authentication → Settings → Authorized domains.`
         : rawMessage || 'Google sign-in is not available yet.';
       onShowNotification(message, 'error');
-    }
-  };
-
-  const handleOrcidSignIn = () => {
-    try {
-      startOrcidAuthentication();
-    } catch (error) {
-      onShowNotification(error instanceof Error ? error.message : 'ORCID sign-in is not configured yet.', 'info');
     }
   };
 
@@ -144,8 +136,8 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       }
     } else {
       // Register new user
-      if (!email || !firstName || !lastName || !institution || !orcidId) {
-        onShowNotification('Please fill in all required fields, including mandatory ORCID iD.', 'error');
+      if (!email || !firstName || !lastName || !institution) {
+        onShowNotification('Please fill in all required profile fields.', 'error');
         return;
       }
       const users = DB.getUsers();
@@ -232,14 +224,6 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
             >
               <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-base font-black text-blue-600 border">G</span>
               Continue with Google
-            </button>
-            <button
-              type="button"
-              onClick={handleOrcidSignIn}
-              className="w-full border border-lime-300 bg-lime-50 hover:bg-lime-100 text-lime-900 font-semibold py-2.5 px-4 rounded-lg text-sm flex items-center justify-center gap-2"
-            >
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#A6CE39] text-white text-xs font-black">iD</span>
-              Continue with ORCID iD
             </button>
             {!firebaseEnabled && (
               <p className="text-[10px] text-slate-400 -mt-2">
@@ -368,12 +352,11 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
 
                 <div>
                   <label htmlFor="reg-orcid" className="block text-xs font-semibold text-slate-600 mb-1">
-                    ORCID iD *
+                    ORCID iD (optional)
                   </label>
                   <input
                     id="reg-orcid"
                     type="text"
-                    required
                     value={orcidId}
                     onChange={(e) => setOrcidId(e.target.value)}
                     onBlur={autofillFromOrcid}

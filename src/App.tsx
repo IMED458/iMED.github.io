@@ -129,8 +129,8 @@ export default function App() {
 
   const saveProfileEditor = () => {
     if (!currentUser) return;
-    if (!profileDraft.firstName || !profileDraft.lastName || !profileDraft.email || !profileDraft.institution || !profileDraft.orcidId) {
-      triggerNotification('Profile requires first name, last name, email, institution, and ORCID iD.', 'error');
+    if (!profileDraft.firstName || !profileDraft.lastName || !profileDraft.email || !profileDraft.institution) {
+      triggerNotification('Profile requires first name, last name, email, and institution.', 'error');
       return;
     }
     const updatedUser = { ...currentUser, ...profileDraft, orcidId: profileDraft.orcidId };
@@ -363,7 +363,7 @@ export default function App() {
             <div className="mb-4 flex items-start justify-between gap-3 border-b pb-3">
               <div>
                 <h2 className="text-lg font-bold text-slate-900">Profile</h2>
-                <p className="text-xs text-slate-500">Update your GBMN account details. ORCID iD is mandatory.</p>
+                <p className="text-xs text-slate-500">Update your GBMN account details.</p>
               </div>
               <button onClick={() => setShowProfileEditor(false)} className="rounded-lg border px-3 py-1 text-xs font-bold text-slate-600">Close</button>
             </div>

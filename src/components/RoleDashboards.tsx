@@ -8,6 +8,7 @@ import { User, UserRole, Manuscript, ManuscriptStatus, SystemAuditLog, JournalSe
 import { DB, ARTICLE_TYPES } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import SubmissionWorkflow from './SubmissionWorkflow';
+import { acceptedPaymentRequest, authorEmail, openEmail, publishedNotice } from '../emailTemplates';
 import { 
   Users, 
   FileText, 
@@ -88,6 +89,12 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const list = manuscripts.map(item => item.id === updated.id ? updated : item);
     onUpdateManuscripts(list);
     setSelectedManuscript(updated);
+  };
+
+  const sendTemplateEmail = (manuscript: Manuscript, template: 'accepted' | 'published') => {
+    const email = template === 'accepted' ? acceptedPaymentRequest(manuscript) : publishedNotice(manuscript);
+    openEmail(authorEmail(manuscript), email.subject, email.body);
+    onShowNotification('Email draft opened in your mail client.', 'info');
   };
 
   const handleUpdateUserRole = (userId: string, newRole: any) => {
@@ -701,6 +708,27 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                       <option key={status} value={status}>{status}</option>
                     ))}
                   </select>
+                </div>
+
+                <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print space-y-2">
+                  <label className="block font-bold text-slate-700">Author email actions</label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => sendTemplateEmail(selectedManuscript, 'accepted')}
+                      className="rounded bg-emerald-700 px-3 py-2 font-bold text-white"
+                    >
+                      Accepted + 300 GEL Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendTemplateEmail(selectedManuscript, 'published')}
+                      className="rounded bg-teal-800 px-3 py-2 font-bold text-white"
+                    >
+                      Published Email
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">Download PDF/DOCX from the preview and attach it to the opened email draft.</p>
                 </div>
 
                 <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print grid grid-cols-1 md:grid-cols-2 gap-3">
