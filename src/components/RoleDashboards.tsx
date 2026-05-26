@@ -8,7 +8,7 @@ import { User, UserRole, Manuscript, ManuscriptStatus, SystemAuditLog, JournalSe
 import { DB, ARTICLE_TYPES } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import SubmissionWorkflow from './SubmissionWorkflow';
-import { acceptedPaymentRequest, publishedNotice, sendEmail } from '../emailTemplates';
+import { acceptanceNotice, paymentRequest, publishedNotice, sendEmail } from '../emailTemplates';
 import { 
   Users, 
   FileText, 
@@ -98,18 +98,24 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     setSelectedManuscript(updated);
   };
 
-  const sendTemplateEmail = async (manuscript: Manuscript, template: 'accepted' | 'published') => {
-    const email = template === 'accepted' ? acceptedPaymentRequest(manuscript) : publishedNotice(manuscript);
-    await sendEmail(template, manuscript, email.subject, email.body);
+  const sendTemplateEmail = async (manuscript: Manuscript, template: 'acceptance' | 'payment' | 'published') => {
+    const email = template === 'acceptance'
+      ? acceptanceNotice(manuscript)
+      : template === 'payment'
+        ? paymentRequest(manuscript)
+        : publishedNotice(manuscript);
+    await sendEmail(template === 'published' ? 'published' : 'accepted', manuscript, email.subject, email.body);
     onShowNotification('Email processed through EmailJS.', 'success');
   };
 
-  const openAuthorEmailModal = (manuscript: Manuscript, preset: 'custom' | 'accepted' | 'published' = 'custom') => {
-    const email = preset === 'accepted'
-      ? acceptedPaymentRequest(manuscript)
-      : preset === 'published'
-        ? publishedNotice(manuscript)
-        : { subject: `GBMN Manuscript ${manuscript.id}`, body: `Dear Author,\n\n\n\nRegards,\nGBMN Editorial Office` };
+  const openAuthorEmailModal = (manuscript: Manuscript, preset: 'custom' | 'acceptance' | 'payment' | 'published' = 'custom') => {
+    const email = preset === 'acceptance'
+      ? acceptanceNotice(manuscript)
+      : preset === 'payment'
+        ? paymentRequest(manuscript)
+        : preset === 'published'
+          ? publishedNotice(manuscript)
+          : { subject: `GBMN Manuscript ${manuscript.id}`, body: `Dear Author,\n\n\n\nRegards,\nGBMN Editorial Office` };
     setEmailDraft({ open: true, manuscript, subject: email.subject, body: email.body });
   };
 
@@ -251,8 +257,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     );
     const setStatus = (status: ManuscriptStatus) => selected && updateSelectedManuscript({ ...selected, status, updatedAt: new Date().toISOString() });
     return (
-      <div className="rounded-3xl border bg-slate-50 overflow-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr]">
+      <div className="min-h-[calc(100vh-88px)] bg-slate-50 overflow-hidden">
+        <div className="grid min-h-[calc(100vh-88px)] grid-cols-1 lg:grid-cols-[280px_1fr]">
           <aside className="bg-slate-950 p-4 text-white">
             <h2 className="text-sm font-black">GBMN Editorial</h2>
             <p className="mb-5 text-[11px] text-slate-400">{currentUser.role}</p>
@@ -260,7 +266,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               <button key={item} onClick={() => setEditorialSection(item)} className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-xs font-bold ${editorialSection === item ? 'bg-teal-600' : 'text-slate-300 hover:bg-white/10'}`}>{item}</button>
             ))}
           </aside>
-          <main className="space-y-5 p-4 md:p-6">
+          <main className="space-y-5 p-4 md:p-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h1 className="text-xl font-black">{editorialSection}</h1><p className="text-xs text-slate-500">Clean editorial workflow and action center.</p></div>
               <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search title, ID, author email..." className="w-full max-w-sm rounded-xl border bg-white px-4 py-2 text-xs" />
@@ -271,7 +277,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               {metric('Under Review', underReviewCount, 'Under Review')}
               {metric('Published', manuscripts.filter(m => m.status === 'Published').length, 'Published')}
             </div>
-            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_340px]">
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
               <section className="rounded-2xl border bg-white shadow-xs overflow-x-auto">
                 <table className="w-full min-w-[900px] text-left text-xs">
                   <thead className="bg-slate-50 text-[10px] uppercase text-slate-500"><tr><th className="p-3">Manuscript</th><th>Author</th><th>Status</th><th>Payment</th><th>DOI</th><th>Submitted</th><th>Action</th></tr></thead>
@@ -299,7 +305,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   </div>
                   <input value={selected.publicationInfo?.volumeIssue || ''} onChange={e => updateSelectedManuscript({ ...selected, publicationInfo: { ...(selected.publicationInfo || {}), volumeIssue: e.target.value }, updatedAt: new Date().toISOString() })} placeholder="VOLUME 4 ISSUE 2. APR-JUN 2026" className="w-full rounded border p-2 text-xs" />
                   <input value={selected.publicationInfo?.doi || ''} onChange={e => updateSelectedManuscript({ ...selected, publicationInfo: { ...(selected.publicationInfo || {}), doi: e.target.value }, updatedAt: new Date().toISOString() })} placeholder="10.52340/GBMN..." className="w-full rounded border p-2 text-xs font-mono" />
-                  <button onClick={() => openAuthorEmailModal(selected, 'accepted')} className="w-full rounded border p-2 text-xs font-bold text-emerald-800">Acceptance Payment Email</button>
+                  <button onClick={() => openAuthorEmailModal(selected, 'acceptance')} className="w-full rounded border p-2 text-xs font-bold text-emerald-800">Acceptance Email</button>
+                  <button onClick={() => openAuthorEmailModal(selected, 'payment')} className="w-full rounded border p-2 text-xs font-bold text-amber-800">Payment Email</button>
                   <button onClick={() => openAuthorEmailModal(selected, 'published')} className="w-full rounded border p-2 text-xs font-bold text-teal-800">Published Email</button>
                 </> : <p className="text-xs text-slate-500">Select a manuscript.</p>}
               </aside>
@@ -826,10 +833,17 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => sendTemplateEmail(selectedManuscript, 'accepted')}
+                      onClick={() => sendTemplateEmail(selectedManuscript, 'acceptance')}
                       className="rounded bg-emerald-700 px-3 py-2 font-bold text-white"
                     >
-                      Accepted + 300 GEL Email
+                      Acceptance Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendTemplateEmail(selectedManuscript, 'payment')}
+                      className="rounded bg-amber-700 px-3 py-2 font-bold text-white"
+                    >
+                      Payment Email
                     </button>
                     <button
                       type="button"

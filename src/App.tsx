@@ -41,6 +41,7 @@ export default function App() {
     institution: '',
     orcidId: '',
   });
+  const isEditorialUser = currentUser && currentUser.role !== 'Author';
   const [journalNotifications, setJournalNotifications] = useState<Array<{ id: string; text: string; time: string; read: boolean }>>([
     { id: 'n1', text: 'Welcome to GBMN peer submissions network! Check policies.', time: 'Just now', read: false },
     { id: 'n2', text: 'Shota Rustaveli national grant funding integration loaded.', time: '2 hours ago', read: true },
@@ -383,7 +384,7 @@ export default function App() {
       )}
 
       {/* 4. WORKPLACE CANVAS */}
-      <main id="main-workplace-canvas" className="flex-1 py-8 px-4 md:px-8 max-w-7xl mx-auto w-full">
+      <main id="main-workplace-canvas" className={`flex-1 w-full ${isEditorialUser ? 'py-0 px-0 max-w-none mx-0' : 'py-8 px-4 md:px-8 max-w-7xl mx-auto'}`}>
         
         {!currentUser ? (
           <AuthLayout 

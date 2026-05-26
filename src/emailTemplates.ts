@@ -56,10 +56,17 @@ export function submissionConfirmation(manuscript: Manuscript) {
   };
 }
 
-export function acceptedPaymentRequest(manuscript: Manuscript) {
+export function acceptanceNotice(manuscript: Manuscript) {
   return {
-    subject: 'GBMN Manuscript Accepted - Publication Charges',
-    body: `Dear Author,\nWe are happy to let you know that your manuscript has been accepted for the current Issue.\nPlease send the bank receipt for publication charges of 300 GEL.\n\nBank of Georgia \n\nBAGAGE22\n\nGE96BG0000000538156925\n\nThe scanned copy of the payment receipt must be sent to the mail: gbmn@tsmu.edu. \n\nWe will initiate the publication process after receiving the payment receipt.\nIf you need any clarification, please feel free to reply to this email.\nRegards,\nGBMN Team,\n\nManuscript: ${manuscript.title}\nID: ${manuscript.id}`,
+    subject: 'GBMN Manuscript Accepted',
+    body: `Dear Author,\n\nWe are happy to let you know that your manuscript has been accepted for the current Issue.\n\nRegards,\nGBMN Team,\n\nManuscript: ${manuscript.title}\nID: ${manuscript.id}`,
+  };
+}
+
+export function paymentRequest(manuscript: Manuscript) {
+  return {
+    subject: 'GBMN Publication Charge Payment Request',
+    body: `Dear Author,\n\nPlease send the bank receipt for publication charges of 300 GEL.\n\nBank of Georgia\n\nBAGAGE22\n\nGE96BG0000000538156925\n\nThe scanned copy of the payment receipt must be sent to the mail: gbmn@tsmu.edu.\n\nWe will initiate the publication process after receiving the payment receipt.\nIf you need any clarification, please feel free to reply to this email.\n\nRegards,\nGBMN Team,\n\nManuscript: ${manuscript.title}\nID: ${manuscript.id}`,
   };
 }
 

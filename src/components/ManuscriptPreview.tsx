@@ -171,7 +171,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           <title>${stripHtml(manuscript.title || 'GBMN Manuscript')}</title>
           ${styles}
           <style>
-            @page { size: A4 portrait; margin: 19mm 13mm 29mm 13mm; }
+            @page { size: A4 portrait; margin: 32mm 13mm 29mm 13mm; }
             html, body {
               margin: 0 !important;
               padding: 0 !important;
@@ -1008,40 +1008,40 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           /* Force A4 page size */
           @page {
             size: A4 portrait;
-            margin: 19mm 13mm 29mm 13mm;
+            margin: 32mm 13mm 29mm 13mm;
           }
 
           .gbmn-running-page-header {
             position: fixed !important;
-            top: 7mm !important;
+            top: 10mm !important;
             left: 13mm !important;
             right: 13mm !important;
             height: 8mm !important;
             display: flex !important;
             visibility: visible !important;
             align-items: center !important;
-            gap: 7mm !important;
+            gap: 5mm !important;
             background: #ffffff !important;
             z-index: 9999 !important;
             font-family: Arial, sans-serif !important;
           }
           .gbmn-running-line {
             display: block !important;
-            width: 16mm !important;
+            width: 12mm !important;
             height: 2.4mm !important;
             border-top: 1.2mm solid #0E8B8B !important;
             border-bottom: 1.2mm solid #0E8B8B !important;
-            flex: 0 0 16mm !important;
+            flex: 0 0 12mm !important;
           }
           .gbmn-running-title {
-            font-size: 17pt !important;
+            font-size: 14pt !important;
             letter-spacing: 1px !important;
             color: #000000 !important;
             white-space: nowrap !important;
           }
           .gbmn-running-issue {
             margin-left: auto !important;
-            font-size: 11pt !important;
+            font-size: 10pt !important;
             font-weight: 700 !important;
             color: #000000 !important;
             white-space: nowrap !important;
