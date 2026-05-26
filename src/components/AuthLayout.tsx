@@ -185,11 +185,12 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
     }
 
     if (isLogin) {
-      // Find matching simulated user
       const users = DB.getUsers();
       const match = users.find(u => u.email.toLowerCase() === email.toLowerCase());
       if (match) {
-        if (password !== demoPassword) {
+        const storedPw = (match as any).password;
+        const valid = storedPw ? password === storedPw : password === demoPassword;
+        if (!valid) {
           onShowNotification('Incorrect password for this account.', 'error');
           return;
         }
