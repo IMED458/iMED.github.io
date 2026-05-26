@@ -227,6 +227,7 @@ export interface Manuscript {
   reviewerAssignments: {
     reviewerId: string;
     reviewerName: string;
+    reviewerEmail?: string;
     status: 'assigned' | 'completed' | 'declined';
     assignedAt: string;
     comments?: ReviewerComment;

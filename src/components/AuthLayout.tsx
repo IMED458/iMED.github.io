@@ -45,6 +45,19 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
     onShowNotification(`Signed in as ${user.firstName} ${user.lastName} (${user.role})`, 'success');
   };
 
+  const ensureFirebasePasswordSession = async (loginEmail: string, loginPassword: string) => {
+    if (!firebaseEnabled) return;
+    try {
+      await signInWithPassword(loginEmail, loginPassword);
+    } catch {
+      try {
+        await createPasswordAccount(loginEmail, loginPassword);
+      } catch {
+        // Keep role login usable, but Firestore sync needs a Firebase session.
+      }
+    }
+  };
+
   const handleForcePasswordChange = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword.length < 6) { onShowNotification('Password must be at least 6 characters.', 'error'); return; }
@@ -174,6 +187,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       const demoMatch = DB.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
       const demoStoredPassword = demoMatch ? (demoMatch as any).password : '';
       if (demoMatch && (password === demoPassword || password === demoStoredPassword)) {
+        await ensureFirebasePasswordSession(email, password);
         completeLogin(demoMatch);
         return;
       }
@@ -193,6 +207,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         const users = DB.getUsers();
         const match = users.find(u => u.email.toLowerCase() === email.toLowerCase());
         if (match && (password === demoPassword || password === (match.password || ''))) {
+          await ensureFirebasePasswordSession(email, password);
           completeLogin(match);
           return;
         }

@@ -192,13 +192,13 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const handleAssignReviewer = async (manuscript: Manuscript, reviewerId: string) => {
     const reviewerObj = DB.getUsers().find(u => u.id === reviewerId);
     if (!reviewerObj) return;
-    if (manuscript.reviewerAssignments.some(ra => ra.reviewerId === reviewerId)) { onShowNotification('Reviewer already assigned.', 'error'); return; }
+    if (manuscript.reviewerAssignments.some(ra => ra.reviewerId === reviewerId || ra.reviewerEmail === reviewerObj.email)) { onShowNotification('Reviewer already assigned.', 'error'); return; }
     const reviewerFullName = `${reviewerObj.firstName} ${reviewerObj.lastName}`;
     updateSelectedManuscript({
       ...manuscript,
       status: 'Reviewer Assigned',
       updatedAt: new Date().toISOString(),
-      reviewerAssignments: [...manuscript.reviewerAssignments, { reviewerId, reviewerName: reviewerFullName, status: 'assigned', assignedAt: new Date().toISOString() }],
+      reviewerAssignments: [...manuscript.reviewerAssignments, { reviewerId, reviewerName: reviewerFullName, reviewerEmail: reviewerObj.email, status: 'assigned', assignedAt: new Date().toISOString() }],
     });
     onShowNotification(`Reviewer ${reviewerFullName} assigned.`, 'success');
     DB.addAuditLog({ userId: currentUser.id, userEmail: currentUser.email, action: 'REVIEWER_ASSIGNED', targetId: manuscript.id, details: `Dispatched to ${reviewerObj.email}` });
@@ -243,7 +243,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const updated = manuscripts.map(item => {
       if (item.id !== manuscript.id) return item;
       const updatedAssignments = item.reviewerAssignments.map(ra => {
-        if (ra.reviewerId !== currentUser.id) return ra;
+        if (ra.reviewerId !== currentUser.id && ra.reviewerEmail !== currentUser.email) return ra;
         return {
           ...ra,
           status: isDraft ? 'assigned' as const : 'completed' as const,
@@ -856,7 +856,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
   // ── Reviewer dashboard ───────────────────────────────────────────────────
   const renderReviewerDashboard = () => {
-    const assignedManuscripts = sortNewest(manuscripts.filter(m => m.reviewerAssignments.some(ra => ra.reviewerId === currentUser.id)));
+    const assignedManuscripts = sortNewest(manuscripts.filter(m => m.reviewerAssignments.some(ra => ra.reviewerId === currentUser.id || ra.reviewerEmail === currentUser.email)));
     return (
       <div className="min-h-[calc(100vh-88px)] flex flex-col md:flex-row bg-slate-50">
         <div className={`${selectedManuscript ? 'hidden md:flex md:flex-col' : 'flex flex-col'} w-full md:w-80 shrink-0 bg-white border-r border-slate-200`}>
@@ -868,7 +868,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             {assignedManuscripts.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-sm border-2 border-dashed rounded-xl">No assigned manuscripts.</div>
             ) : assignedManuscripts.map(m => {
-              const ra = m.reviewerAssignments.find(r => r.reviewerId === currentUser.id);
+              const ra = m.reviewerAssignments.find(r => r.reviewerId === currentUser.id || r.reviewerEmail === currentUser.email);
               return (
                 <div key={m.id} onClick={() => setSelectedManuscript(m)}
                   className={`p-3 border rounded-xl cursor-pointer transition-all text-xs ${selectedManuscript?.id === m.id ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-100' : ra?.status === 'completed' ? 'border-emerald-200 bg-emerald-50' : 'border-blue-200 bg-blue-50 hover:border-blue-400'}`}>
