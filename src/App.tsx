@@ -40,6 +40,8 @@ export default function App() {
     email: '',
     institution: '',
     orcidId: '',
+    newPassword: '',
+    confirmPassword: '',
   });
   const isEditorialUser = currentUser && currentUser.role !== 'Author';
   const [journalNotifications, setJournalNotifications] = useState<Array<{ id: string; text: string; time: string; read: boolean }>>([
@@ -47,10 +49,15 @@ export default function App() {
     { id: 'n2', text: 'Shota Rustaveli national grant funding integration loaded.', time: '2 hours ago', read: true },
   ]);
 
-  // Load state from local storage databases on mount
+  // Load state on mount — sync users from Firestore so all devices stay consistent
   useEffect(() => {
-    setCurrentUser(DB.getCurrentUser());
-    DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    DB.syncUsersFromFirestore().then(() => {
+      setCurrentUser(DB.getCurrentUser());
+      DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    }).catch(() => {
+      setCurrentUser(DB.getCurrentUser());
+      DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    });
   }, []);
 
   const triggerNotification = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -124,6 +131,8 @@ export default function App() {
       email: currentUser.email,
       institution: currentUser.institution,
       orcidId: currentUser.orcidId || '',
+      newPassword: '',
+      confirmPassword: '',
     });
     setShowProfileEditor(true);
   };
@@ -134,7 +143,25 @@ export default function App() {
       triggerNotification('Profile requires first name, last name, email, and institution.', 'error');
       return;
     }
-    const updatedUser = { ...currentUser, ...profileDraft, orcidId: profileDraft.orcidId };
+    if (profileDraft.newPassword) {
+      if (profileDraft.newPassword.length < 6) {
+        triggerNotification('Password must be at least 6 characters.', 'error');
+        return;
+      }
+      if (profileDraft.newPassword !== profileDraft.confirmPassword) {
+        triggerNotification('Passwords do not match.', 'error');
+        return;
+      }
+    }
+    const updatedUser = {
+      ...currentUser,
+      firstName: profileDraft.firstName,
+      lastName: profileDraft.lastName,
+      email: profileDraft.email,
+      institution: profileDraft.institution,
+      orcidId: profileDraft.orcidId || undefined,
+      ...(profileDraft.newPassword ? { password: profileDraft.newPassword } : {}),
+    };
     const users = DB.getUsers();
     const updatedUsers = users.some(user => user.id === currentUser.id)
       ? users.map(user => user.id === currentUser.id ? updatedUser : user)
@@ -143,7 +170,7 @@ export default function App() {
     DB.setCurrentUser(updatedUser);
     setCurrentUser(updatedUser);
     setShowProfileEditor(false);
-    triggerNotification('Profile updated.', 'success');
+    triggerNotification(profileDraft.newPassword ? 'Profile and password updated.' : 'Profile updated.', 'success');
   };
 
   const createEmptyDraft = (authorId: string): Manuscript => ({
@@ -374,6 +401,11 @@ export default function App() {
               <input value={profileDraft.email} onChange={event => setProfileDraft(prev => ({ ...prev, email: event.target.value }))} placeholder="Email" className="rounded-lg border border-slate-300 p-2" />
               <input value={profileDraft.institution} onChange={event => setProfileDraft(prev => ({ ...prev, institution: event.target.value }))} placeholder="Institution" className="rounded-lg border border-slate-300 p-2" />
               <input value={profileDraft.orcidId} onChange={event => setProfileDraft(prev => ({ ...prev, orcidId: event.target.value }))} placeholder="ORCID iD" className="rounded-lg border border-slate-300 p-2 font-mono" />
+              <div className="border-t border-slate-100 pt-3 mt-1">
+                <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Change Password (optional)</p>
+                <input type="password" value={profileDraft.newPassword} onChange={event => setProfileDraft(prev => ({ ...prev, newPassword: event.target.value }))} placeholder="New password (min 6 chars)" className="rounded-lg border border-slate-300 p-2 w-full mb-2" />
+                <input type="password" value={profileDraft.confirmPassword} onChange={event => setProfileDraft(prev => ({ ...prev, confirmPassword: event.target.value }))} placeholder="Confirm new password" className="rounded-lg border border-slate-300 p-2 w-full" />
+              </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setShowProfileEditor(false)} className="rounded-lg border px-4 py-2 text-xs font-bold text-slate-600">Cancel</button>
