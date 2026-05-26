@@ -9,7 +9,14 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updatePassword,
+  signOut,
+  onAuthStateChanged,
   type Auth,
+  type User as FirebaseUser,
 } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
@@ -75,6 +82,37 @@ export async function signInWithGoogle() {
 export async function getGoogleRedirectResult() {
   return null;
 }
+
+export async function signInWithPassword(email: string, password: string) {
+  if (!firebaseAuth) throw new Error('Firebase configuration is not connected yet.');
+  return signInWithEmailAndPassword(firebaseAuth, email, password);
+}
+
+export async function createPasswordAccount(email: string, password: string) {
+  if (!firebaseAuth) throw new Error('Firebase configuration is not connected yet.');
+  return createUserWithEmailAndPassword(firebaseAuth, email, password);
+}
+
+export async function sendFirebasePasswordReset(email: string) {
+  if (!firebaseAuth) throw new Error('Firebase configuration is not connected yet.');
+  return sendPasswordResetEmail(firebaseAuth, email);
+}
+
+export async function changeFirebasePassword(newPassword: string) {
+  if (!firebaseAuth?.currentUser) throw new Error('Please sign in again before changing password.');
+  return updatePassword(firebaseAuth.currentUser, newPassword);
+}
+
+export async function signOutFirebase() {
+  if (!firebaseAuth) return;
+  return signOut(firebaseAuth);
+}
+
+export function subscribeFirebaseAuth(callback: (user: FirebaseUser | null) => void) {
+  if (!firebaseAuth) return () => {};
+  return onAuthStateChanged(firebaseAuth, callback);
+}
+
 
 export function startOrcidAuthentication() {
   const clientId = import.meta.env.VITE_ORCID_CLIENT_ID;

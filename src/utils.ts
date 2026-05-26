@@ -5,7 +5,7 @@
 
 import { ArticleTypeConfig, Manuscript, User, SystemAuditLog, JournalSettings, AuthorDetails } from './types';
 import { firebaseEnabled, firestore } from './firebase';
-import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 
 function openGbmnDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -440,6 +440,31 @@ export const DB = {
     return [SAMPLE_MANUSCRIPT];
   },
 
+  async getUserByIdAsync(userId: string): Promise<User | null> {
+    if (firebaseEnabled && firestore) {
+      try {
+        const snap = await getDoc(doc(firestore, 'users', userId));
+        if (snap.exists()) return snap.data() as User;
+      } catch (error) {
+        console.warn('Firestore user read failed.', error);
+      }
+    }
+    return this.getUsers().find(user => user.id === userId) || null;
+  },
+
+  async getUsersAsync(): Promise<User[]> {
+    if (firebaseEnabled && firestore) {
+      try {
+        const snap = await getDocs(collection(firestore, 'users'));
+        const rows = snap.docs.map(row => row.data() as User);
+        if (rows.length) return rows;
+      } catch (error) {
+        console.warn('Firestore users read failed.', error);
+      }
+    }
+    return this.getUsers();
+  },
+
   getUsers(): User[] {
     // Primary: localStorage cache (fast); Firestore mirror keeps devices in sync
     const data = localStorage.getItem('gbmn_users');
@@ -455,18 +480,25 @@ export const DB = {
     mirrorArrayToFirestore('users', users);
   },
 
-  /** Sync users FROM Firestore into localStorage (call on app mount on every device). */
+  /** Sync users FROM Firestore into local cache (call on app mount on every device). */
   async syncUsersFromFirestore(): Promise<void> {
     if (!firebaseEnabled || !firestore) return;
     try {
       const snapshot = await getDocs(collection(firestore, 'users'));
-      const rows: User[] = snapshot.docs.map(d => d.data().payload as User).filter(Boolean);
-      if (rows.length) {
-        localStorage.setItem('gbmn_users', JSON.stringify(rows));
-      }
+      const rows: User[] = snapshot.docs.map(d => (d.data().payload || d.data()) as User).filter(Boolean);
+      if (rows.length) localStorage.setItem('gbmn_users', JSON.stringify(rows));
     } catch (e) {
       console.warn('Firestore user sync failed', e);
     }
+  },
+
+  setUser(user: User) {
+    const users = this.getUsers();
+    const next = users.some(item => item.id === user.id)
+      ? users.map(item => item.id === user.id ? user : item)
+      : [...users, user];
+    this.setUsers(next);
+    mirrorToFirestore('users', user.id, user);
   },
 
   getManuscripts(): Manuscript[] {
@@ -487,9 +519,7 @@ export const DB = {
   },
 
   getCurrentUser(): User | null {
-    const data = localStorage.getItem('gbmn_current_user');
-    if (!data) return null;
-    try { return JSON.parse(data); } catch { return null; }
+    return null;
   },
 
   setCurrentUser(user: User | null) {
@@ -505,7 +535,6 @@ export const DB = {
         isVerified: user.isVerified,
         joinedDate: user.joinedDate,
       };
-      localStorage.setItem('gbmn_current_user', JSON.stringify(sessionUser));
       mirrorToFirestore('sessions', sessionUser.id, sessionUser);
       // Also persist to Firestore users collection so other devices pick it up
       const allUsers = this.getUsers();
@@ -515,7 +544,7 @@ export const DB = {
         this.setUsers(updated);
       }
     } else {
-      localStorage.removeItem('gbmn_current_user');
+      return;
     }
   },
 

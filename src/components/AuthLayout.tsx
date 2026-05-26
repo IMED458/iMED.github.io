@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User } from '../types';
 import { DB } from '../utils';
 import { Key, Mail } from 'lucide-react';
-import { firebaseEnabled, signInWithGoogle } from '../firebase';
+import { createPasswordAccount, firebaseEnabled, getGoogleRedirectResult, sendFirebasePasswordReset, signInWithGoogle, signInWithPassword } from '../firebase';
 
 interface AuthLayoutProps {
   currentUser: User | null;
@@ -58,7 +58,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         onShowNotification('Please complete your profile to continue.', 'info');
         return;
       }
-      const user = existing || {
+      const user: User = existing || {
         id: result.user.uid,
         email: result.user.email || '',
         firstName: given,
@@ -175,25 +175,25 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
     }
   };
 
-  const handleAction = (e: React.FormEvent) => {
+  const handleAction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isReset) {
-      onShowNotification(`Password reset instructions successfully sent to ${email}.`, 'success');
+      try {
+        await sendFirebasePasswordReset(email);
+        onShowNotification(`Password reset instructions successfully sent to ${email}.`, 'success');
+      } catch (error) {
+        onShowNotification(error instanceof Error ? error.message : 'Password reset failed.', 'error');
+      }
       setIsReset(false);
       setIsLogin(true);
       return;
     }
 
     if (isLogin) {
-      const users = DB.getUsers();
-      const match = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (match) {
-        const storedPw = (match as any).password;
-        const valid = storedPw ? password === storedPw : password === demoPassword;
-        if (!valid) {
-          onShowNotification('Incorrect password for this account.', 'error');
-          return;
-        }
+      try {
+        const credential = await signInWithPassword(email, password);
+        const match = await DB.getUserByIdAsync(credential.user.uid) || DB.getUsers().find(u => u.email.toLowerCase() === email.toLowerCase());
+        if (!match) throw new Error('Profile is missing. Please complete registration.');
         DB.setCurrentUser(match);
         onUserChanged(match);
         onShowNotification(`Signed in as ${match.firstName} ${match.lastName} (${match.role})`, 'success');
@@ -204,13 +204,25 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
           targetId: match.id,
           details: `User completed authentication form into dashboard with role: ${match.role}`
         });
-      } else {
-        onShowNotification('No account exists with this email. Create an account first or use a registered role account.', 'error');
+      } catch (error) {
+        const users = DB.getUsers();
+        const match = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        if (match && password === demoPassword) {
+          DB.setCurrentUser(match);
+          onUserChanged(match);
+          onShowNotification(`Signed in as ${match.firstName} ${match.lastName} (${match.role})`, 'success');
+          return;
+        }
+        onShowNotification(error instanceof Error ? error.message : 'Could not sign in.', 'error');
       }
     } else {
       // Register new user
       if (!email || !firstName || !lastName || !institution) {
         onShowNotification('Please fill in all required profile fields.', 'error');
+        return;
+      }
+      if (!pendingProviderUid && password.length < 6) {
+        onShowNotification('Password must be at least 6 characters.', 'error');
         return;
       }
       const users = DB.getUsers();
@@ -219,9 +231,10 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         onShowNotification('Email is already registered.', 'error');
         return;
       }
+      const firebaseUserId = pendingProviderUid || (await createPasswordAccount(email, password)).user.uid;
 
       const newUser: User = {
-        id: pendingProviderUid || `user-${Date.now()}`,
+        id: firebaseUserId,
         email,
         firstName,
         lastName,
@@ -236,6 +249,7 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         ? users.map(item => item.email.toLowerCase() === email.toLowerCase() ? { ...item, ...newUser } : item)
         : [...users, newUser];
       DB.setUsers(updatedUsers);
+      DB.setUser(newUser);
       DB.setCurrentUser(newUser);
       onUserChanged(newUser);
       onShowNotification(`Account successfully created! Logged in as ${newUser.firstName} ${newUser.lastName}.`, 'success');
@@ -422,6 +436,24 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 px-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-teal-600"
                   />
                 </div>
+
+                {!pendingProviderUid && (
+                  <div>
+                    <label htmlFor="reg-pass" className="block text-xs font-semibold text-slate-600 mb-1">Create Password *</label>
+                    <div className="relative">
+                      <input
+                        id="reg-pass"
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Minimum 6 characters"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 pl-9 pr-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-teal-600"
+                      />
+                      <Key className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor="reg-orcid" className="block text-xs font-semibold text-slate-600 mb-1">

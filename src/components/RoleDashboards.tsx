@@ -47,6 +47,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [reviewComments, setReviewComments] = useState('');
   const [reviewPrivate, setReviewPrivate] = useState('');
   const [reviewRecommend, setReviewRecommend] = useState<'accept' | 'minor-revision' | 'major-revision' | 'reject'>('accept');
+  const [reviewPdf, setReviewPdf] = useState<{ fileName: string; fileUrl: string } | null>(null);
 
   // Decision Form
   const [editorComments, setEditorComments] = useState('');
@@ -78,6 +79,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   });
 
   useEffect(() => {
+    DB.getUsersAsync().then(setAdminUsers).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!selectedManuscript) return;
     const latest = manuscripts.find(item => item.id === selectedManuscript.id);
     if (latest && latest !== selectedManuscript) setSelectedManuscript(latest);
@@ -97,6 +102,54 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const list = manuscripts.map(item => item.id === updated.id ? updated : item);
     onUpdateManuscripts(list);
     setSelectedManuscript(updated);
+  };
+
+  const createEditorialDraft = () => {
+    const base = manuscripts[0];
+    if (!base) return;
+    const draft: Manuscript = {
+      ...base,
+      id: `GBMN-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`,
+      status: 'Draft',
+      authorId: currentUser.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      submittedAt: undefined,
+      title: '',
+      runningTitle: '',
+      authors: [{
+        id: currentUser.id,
+        firstName: currentUser.firstName,
+        lastName: currentUser.lastName,
+        email: currentUser.email,
+        phone: '',
+        orcidId: currentUser.orcidId || '',
+        specialty: '',
+        country: '',
+        city: '',
+        institution: currentUser.institution,
+        department: '',
+        affiliation: currentUser.institution,
+        academicTitle: '',
+        contributionRole: '',
+        contributionTags: ['Agreed to be accountable for all aspects of the work', 'Will review the final version to be published'],
+        isCorresponding: true,
+      }],
+      abstractContents: {},
+      sections: {},
+      figuresAndTables: [],
+      references: [],
+      supplementaryFiles: [],
+      editorFiles: [],
+      reviewerAssignments: [],
+      editorDecisionLog: [],
+    };
+    const list = [...manuscripts, draft];
+    onUpdateManuscripts(list);
+    setSelectedManuscript(draft);
+    setOfficeEditMode(true);
+    setOfficeEditStep('title-meta');
+    onShowNotification('Editorial draft created. You can submit it as your own manuscript.', 'success');
   };
 
   const sendTemplateEmail = async (manuscript: Manuscript, template: 'acceptance' | 'payment' | 'published') => {
@@ -270,7 +323,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
           <main className="space-y-5 p-4 md:p-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h1 className="text-xl font-black">{editorialSection}</h1><p className="text-xs text-slate-500">Clean editorial workflow and action center.</p></div>
-              <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search title, ID, author email..." className="w-full max-w-sm rounded-xl border bg-white px-4 py-2 text-xs" />
+              <div className="flex w-full flex-wrap justify-end gap-2 md:w-auto">
+                <button onClick={createEditorialDraft} className="rounded-xl bg-teal-700 px-4 py-2 text-xs font-black text-white">Submit Own Manuscript</button>
+                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search title, ID, author email..." className="w-full max-w-sm rounded-xl border bg-white px-4 py-2 text-xs" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {metric('Total', totalSubmissions, 'Manuscripts')}
@@ -415,13 +471,26 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
           return { 
             ...item, 
             status: statusUpdate === 'completed' ? 'Submitted' as any : item.status, 
-            reviewerAssignments: updatedAssignments 
+            reviewerAssignments: updatedAssignments,
+            editorFiles: reviewPdf && statusUpdate === 'completed'
+              ? [
+                  ...item.editorFiles.filter(file => file.id !== `review-pdf-${currentUser.id}`),
+                  {
+                    id: `review-pdf-${currentUser.id}`,
+                    fileName: reviewPdf.fileName,
+                    fileUrl: reviewPdf.fileUrl,
+                    type: 'peer-review-pdf',
+                    uploadedAt: new Date().toISOString(),
+                  }
+                ]
+              : item.editorFiles
           };
         }
         return item;
       });
       onUpdateManuscripts(updated);
       onShowNotification('Structured reviewer evaluation matrix recorded!', 'success');
+      setReviewPdf(null);
       setSelectedManuscript(null);
 
       DB.addAuditLog({
@@ -596,6 +665,23 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                 </div>
 
                 <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Peer Review PDF Upload (optional)</label>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => setReviewPdf({ fileName: file.name, fileUrl: String(reader.result || '') });
+                      reader.readAsDataURL(file);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2 text-xs"
+                  />
+                  {reviewPdf && <p className="mt-1 text-[10px] font-bold text-teal-700">{reviewPdf.fileName} ready.</p>}
+                </div>
+
+                <div>
                   <label className="block font-semibold text-slate-700 mb-1">Referee Consensus Recommendation *</label>
                   <select
                     value={reviewRecommend}
@@ -627,7 +713,30 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
               {/* View inline paper button */}
               <div className="border-t pt-3">
-                <ManuscriptPreview manuscript={selectedManuscript} />
+                <div className="mb-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selection = window.getSelection();
+                      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+                      const range = selection.getRangeAt(0);
+                      const mark = document.createElement('mark');
+                      mark.className = 'bg-yellow-200 px-0.5';
+                      try {
+                        range.surroundContents(mark);
+                        selection.removeAllRanges();
+                      } catch {
+                        onShowNotification('Select a clean text fragment to highlight.', 'error');
+                      }
+                    }}
+                    className="rounded bg-yellow-100 px-3 py-1.5 text-[11px] font-bold text-yellow-900"
+                  >
+                    Highlight selected text
+                  </button>
+                </div>
+                <div className="max-h-[760px] overflow-y-auto rounded-xl border bg-white p-3">
+                  <ManuscriptPreview manuscript={selectedManuscript} />
+                </div>
               </div>
             </div>
           )}
@@ -999,7 +1108,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                         className="w-full bg-white border border-slate-300 rounded p-1.5 focus:outline-hidden"
                       >
                         <option value="">-- Choose Academic Referee --</option>
-                        {DB.getUsers().filter(u => u.role === 'Reviewer').map(rev => (
+                        {adminUsers.filter(u => u.role === 'Reviewer').map(rev => (
                           <option key={rev.id} value={rev.id}>
                             {rev.firstName} {rev.lastName} ({rev.institution})
                           </option>
@@ -1066,9 +1175,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                         />
                       </div>
                     </div>
+
                   </div>
                 ) : (
-                  <div className="border-t pt-6">
+                  <div className="max-h-[850px] overflow-y-auto rounded-xl border bg-white p-3">
                     <ManuscriptPreview manuscript={selectedManuscript} onShowNotification={onShowNotification} />
                   </div>
                 )}

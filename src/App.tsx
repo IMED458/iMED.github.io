@@ -12,6 +12,7 @@ import SidebarWorkflow from './components/SidebarWorkflow';
 import SubmissionWorkflow from './components/SubmissionWorkflow';
 import RoleDashboards from './components/RoleDashboards';
 import ManuscriptPreview from './components/ManuscriptPreview';
+import { changeFirebasePassword, signOutFirebase, subscribeFirebaseAuth } from './firebase';
 import { 
   GraduationCap, 
   User as UserIcon, 
@@ -49,15 +50,19 @@ export default function App() {
     { id: 'n2', text: 'Shota Rustaveli national grant funding integration loaded.', time: '2 hours ago', read: true },
   ]);
 
-  // Load state on mount — sync users from Firestore so all devices stay consistent
+  // Load persistent cloud state on mount and sync visible role users across devices.
   useEffect(() => {
-    DB.syncUsersFromFirestore().then(() => {
-      setCurrentUser(DB.getCurrentUser());
-      DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
-    }).catch(() => {
-      setCurrentUser(DB.getCurrentUser());
-      DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    const unsubscribe = subscribeFirebaseAuth(async firebaseUser => {
+      await DB.syncUsersFromFirestore().catch(() => {});
+      if (!firebaseUser) {
+        setCurrentUser(null);
+        return;
+      }
+      const profile = await DB.getUserByIdAsync(firebaseUser.uid);
+      if (profile) setCurrentUser(profile);
     });
+    DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    return unsubscribe;
   }, []);
 
   const triggerNotification = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -117,8 +122,9 @@ export default function App() {
     DB.setManuscripts(newList);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     DB.setCurrentUser(null);
+    await signOutFirebase();
     setCurrentUser(null);
     triggerNotification('Logged out from publishing dashboard.', 'info');
   };
@@ -137,37 +143,38 @@ export default function App() {
     setShowProfileEditor(true);
   };
 
-  const saveProfileEditor = () => {
+  const saveProfileEditor = async () => {
     if (!currentUser) return;
     if (!profileDraft.firstName || !profileDraft.lastName || !profileDraft.email || !profileDraft.institution) {
       triggerNotification('Profile requires first name, last name, email, and institution.', 'error');
       return;
     }
-    if (profileDraft.newPassword) {
-      if (profileDraft.newPassword.length < 6) {
+    const { newPassword, confirmPassword, ...profileFields } = profileDraft;
+    if (newPassword) {
+      if (newPassword.length < 6) {
         triggerNotification('Password must be at least 6 characters.', 'error');
         return;
       }
-      if (profileDraft.newPassword !== profileDraft.confirmPassword) {
+      if (newPassword !== confirmPassword) {
         triggerNotification('Passwords do not match.', 'error');
         return;
       }
     }
-    const updatedUser = {
-      ...currentUser,
-      firstName: profileDraft.firstName,
-      lastName: profileDraft.lastName,
-      email: profileDraft.email,
-      institution: profileDraft.institution,
-      orcidId: profileDraft.orcidId || undefined,
-      ...(profileDraft.newPassword ? { password: profileDraft.newPassword } : {}),
-    };
+    const updatedUser = { ...currentUser, ...profileFields, orcidId: profileDraft.orcidId || undefined };
     const users = DB.getUsers();
     const updatedUsers = users.some(user => user.id === currentUser.id)
       ? users.map(user => user.id === currentUser.id ? updatedUser : user)
       : [...users, updatedUser];
     DB.setUsers(updatedUsers);
+    DB.setUser(updatedUser);
     DB.setCurrentUser(updatedUser);
+    if (newPassword) {
+      if (newPassword.length < 6) {
+        triggerNotification('New password must be at least 6 characters.', 'error');
+        return;
+      }
+      await changeFirebasePassword(newPassword);
+    }
     setCurrentUser(updatedUser);
     setShowProfileEditor(false);
     triggerNotification(profileDraft.newPassword ? 'Profile and password updated.' : 'Profile updated.', 'success');

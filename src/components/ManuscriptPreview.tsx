@@ -986,9 +986,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
           /* The sheet becomes the page */
           #academic-manuscript-sheet {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
+            position: static !important;
             width: 100% !important;
             min-height: auto !important;
             padding: 0 !important;
@@ -1005,6 +1003,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           /* Clean A4 page — no fixed running header that overlaps content */
           @page { size: A4 portrait; margin: 19mm 13mm 28mm 13mm; }
           .gbmn-running-page-header { display: none !important; }
+
 
           /* Column layout must work in print */
           .gbmn-body-columns {
