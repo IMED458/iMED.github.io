@@ -1,8 +1,8 @@
 import { Manuscript } from './types';
 import emailjs from '@emailjs/browser';
 
-const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
-const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '';
+const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_fd48utr';
+const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'bwqBanPS6kMplQUWW';
 const templateIds = {
   generic: import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
   submission: import.meta.env.VITE_EMAILJS_TEMPLATE_SUBMISSION || import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
