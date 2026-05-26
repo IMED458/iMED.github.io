@@ -6,6 +6,8 @@
 import { useState, useEffect } from 'react';
 import { User, Manuscript } from './types';
 import { DB } from './utils';
+import { firebaseStorage } from './firebase';
+import { getDownloadURL, ref, uploadString } from 'firebase/storage';
 import AuthLayout from './components/AuthLayout';
 import SidebarWorkflow from './components/SidebarWorkflow';
 import SubmissionWorkflow from './components/SubmissionWorkflow';
@@ -48,7 +50,6 @@ export default function App() {
   // Load state from local storage databases on mount
   useEffect(() => {
     setCurrentUser(DB.getCurrentUser());
-    setManuscripts(DB.getManuscripts());
     DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
   }, []);
 
@@ -74,19 +75,36 @@ export default function App() {
     setCurrentUser(newAuth);
     if (newAuth) {
       // Refresh local submissions list
-      setManuscripts(DB.getManuscripts());
       DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
     }
   };
 
-  const handleUpdateManuscript = (updated: Manuscript) => {
+  const uploadEmbeddedImages = async (manuscript: Manuscript): Promise<Manuscript> => {
+    if (!firebaseStorage) return manuscript;
+    const replaceImages = async (html: string, section: string) => {
+      const matches = Array.from(new Set(html.match(/data:image\/[^"')\s]+/g) || []));
+      let nextHtml = html;
+      for (const [index, dataUrl] of matches.entries()) {
+        const storageRef = ref(firebaseStorage, `manuscripts/${manuscript.id}/embedded/${section}-${Date.now()}-${index}.jpg`);
+        await uploadString(storageRef, dataUrl, 'data_url');
+        nextHtml = nextHtml.replaceAll(dataUrl, await getDownloadURL(storageRef));
+      }
+      return nextHtml;
+    };
+    const sections = { ...manuscript.sections };
+    for (const key of Object.keys(sections)) sections[key] = await replaceImages(sections[key] || '', key);
+    return { ...manuscript, sections };
+  };
+
+  const handleUpdateManuscript = async (updated: Manuscript) => {
+    const cloudReady = await uploadEmbeddedImages(updated);
     const exists = manuscripts.some(m => m.id === updated.id);
     const list = exists
-      ? manuscripts.map(m => m.id === updated.id ? updated : m)
-      : [...manuscripts, updated];
+      ? manuscripts.map(m => m.id === updated.id ? cloudReady : m)
+      : [...manuscripts, cloudReady];
     setManuscripts(list);
     DB.setManuscripts(list);
-    setSelectedManuscriptId(updated.id);
+    setSelectedManuscriptId(cloudReady.id);
   };
 
   const handleUpdateManuscriptsList = (newList: Manuscript[]) => {

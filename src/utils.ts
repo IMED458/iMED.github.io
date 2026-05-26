@@ -5,7 +5,7 @@
 
 import { ArticleTypeConfig, Manuscript, User, SystemAuditLog, JournalSettings, AuthorDetails } from './types';
 import { firebaseEnabled, firestore } from './firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
 
 function openGbmnDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -421,11 +421,23 @@ function mirrorArrayToFirestore<T extends { id: string }>(collectionName: string
 // Local-first database layer with Firebase Firestore mirroring.
 export const DB = {
   async getManuscriptsAsync(): Promise<Manuscript[]> {
+    if (firebaseEnabled && firestore) {
+      try {
+        const snapshot = await getDocs(collection(firestore, 'manuscripts'));
+        const rows = snapshot.docs.map(item => item.data().payload as Manuscript).filter(Boolean);
+        if (rows.length) {
+          await setIndexedState('gbmn_manuscripts', rows);
+          return rows;
+        }
+      } catch (error) {
+        console.warn('Firestore manuscript read failed.', error);
+      }
+    }
     try {
       const stored = await getIndexedState<Manuscript[]>('gbmn_manuscripts');
       if (stored?.length) return stored;
     } catch {}
-    return this.getManuscripts();
+    return [SAMPLE_MANUSCRIPT];
   },
 
   getUsers(): User[] {
@@ -454,12 +466,8 @@ export const DB = {
 
   setManuscripts(manuscripts: Manuscript[]) {
     setIndexedState('gbmn_manuscripts', manuscripts).catch(console.warn);
-    try {
-      localStorage.setItem('gbmn_manuscripts', JSON.stringify(manuscripts));
-    } catch {
-      localStorage.setItem('gbmn_manuscripts_indexed', 'true');
-      try { localStorage.removeItem('gbmn_manuscripts'); } catch {}
-    }
+    localStorage.removeItem('gbmn_manuscripts');
+    localStorage.setItem('gbmn_manuscripts_indexed', 'true');
     mirrorArrayToFirestore('manuscripts', manuscripts);
   },
 
