@@ -29,16 +29,13 @@ import { getStorage, type FirebaseStorage } from 'firebase/storage';
  * is unavailable inside the Firebase-hosted auth iframe, so redirect flow
  * ALWAYS fails with "missing initial state".
  *
- * Fix: set authDomain to the ACTUAL hosting domain (gbmnsubmit.github.io)
- * so Firebase opens the popup/redirect on the same origin.
- * Also add 'gbmnsubmit.github.io' to Firebase Console →
+ * Keep authDomain on the Firebase project domain. The live GitHub Pages host
+ * must be added separately in Firebase Console →
  * Authentication → Settings → Authorized domains.
  */
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCu8RuX9cSeJfDBCuB-QqhHR00I2PKgEPo',
-  // Use the actual hosting domain — NOT firebaseapp.com — to avoid cross-origin
-  // sessionStorage issues on GitHub Pages.
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'gbmnsubmit.github.io',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'gbmnsubmit.firebaseapp.com',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'gbmnsubmit',
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'gbmnsubmit.firebasestorage.app',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '427592261852',
