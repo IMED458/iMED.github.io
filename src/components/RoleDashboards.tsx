@@ -863,7 +863,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   };
 
   const renderReviewerDashboard = () => {
-    const assignedManuscripts = sortNewest(manuscripts.filter(m => m.reviewerAssignments.some(reviewerMatchesCurrentUser)));
+    const directAssigned = manuscripts.filter(m => m.reviewerAssignments.some(reviewerMatchesCurrentUser));
+    const assignedManuscripts = sortNewest(directAssigned.length ? directAssigned : manuscripts.filter(m => m.status !== 'Draft'));
     return (
       <div className="min-h-[calc(100vh-88px)] flex flex-col md:flex-row bg-slate-50">
         <div className={`${selectedManuscript ? 'hidden md:flex md:flex-col' : 'flex flex-col'} w-full md:w-80 shrink-0 bg-white border-r border-slate-200`}>
