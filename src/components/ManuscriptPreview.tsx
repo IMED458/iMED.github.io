@@ -616,7 +616,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           text-align: right;
           text-transform: uppercase;
         }
-        .gbmn-running-page-header { display: none; }
+        .gbmn-running-page-header { display: none; }  /* hidden on screen, shown only in print */
 
         /* ── TITLE BLOCK ─────────────────────────────── */
         .gbmn-title-block { margin-bottom: 16px; }
@@ -820,9 +820,11 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         .gbmn-inline-media img {
           display: block;
           max-width: 100%;
-          max-height: 260px;
+          max-height: 300px;
+          width: auto;
+          height: auto;
           object-fit: contain;
-          margin: 4px auto 4px;
+          margin: 4px auto 6px;
         }
         .gbmn-media-placeholder {
           height: 150px;
@@ -1005,18 +1007,14 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
             line-height: 1.36 !important;
           }
 
-          /* Force A4 page size */
-          @page {
-            size: A4 portrait;
-            margin: 32mm 13mm 29mm 13mm;
-          }
+          /* Force A4 page size — defined above with running header */
 
           .gbmn-running-page-header {
             position: fixed !important;
-            top: 10mm !important;
+            top: 6mm !important;
             left: 13mm !important;
             right: 13mm !important;
-            height: 8mm !important;
+            height: 10mm !important;
             display: flex !important;
             visibility: visible !important;
             align-items: center !important;
@@ -1024,7 +1022,9 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
             background: #ffffff !important;
             z-index: 9999 !important;
             font-family: Arial, sans-serif !important;
+            border-bottom: 0.5pt solid #e2e8f0 !important;
           }
+          @page { size: A4 portrait; margin: 22mm 13mm 29mm 13mm; }
           .gbmn-running-line {
             display: block !important;
             width: 12mm !important;
@@ -1104,6 +1104,12 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           }
           .gbmn-rule-line { background: #0E8B8B !important; }
           .gbmn-logo-image { display: block !important; }
+          .gbmn-inline-media img {
+            display: block !important;
+            max-width: 100% !important;
+            height: auto !important;
+            object-fit: contain !important;
+          }
           .gbmn-author-num,
           .gbmn-corresponding-mark { color: #0E8B8B !important; }
         }
