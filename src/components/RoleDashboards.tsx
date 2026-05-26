@@ -211,6 +211,17 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     }
   };
 
+  const handleRemoveReviewer = (manuscript: Manuscript, reviewerId: string) => {
+    const reviewer = manuscript.reviewerAssignments.find(ra => ra.reviewerId === reviewerId);
+    updateSelectedManuscript({
+      ...manuscript,
+      reviewerAssignments: manuscript.reviewerAssignments.filter(ra => ra.reviewerId !== reviewerId),
+      status: manuscript.reviewerAssignments.length <= 1 ? 'Submitted' : manuscript.status,
+      updatedAt: new Date().toISOString(),
+    });
+    onShowNotification(`Reviewer removed: ${reviewer?.reviewerName || reviewerId}`, 'success');
+  };
+
   const handleCommitEditorialDecision = (manuscript: Manuscript, decision: 'accept' | 'minor-revision' | 'major-revision' | 'reject' | 'publish') => {
     const statusMap: Record<string, ManuscriptStatus> = {
       'accept': 'Accepted', 'minor-revision': 'Revision Requested',
@@ -246,7 +257,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             methodologyScore: reviewScoreMethod,
             originalityScore: reviewScoreOrig,
             scientificMeritScore: reviewScoreMerit,
-            constructiveComments: reviewComments || 'See attached evaluation.',
+            constructiveComments: reviewComments || '<p>See attached evaluation.</p>',
             confidentialToEditor: reviewPrivate,
             recommendation: reviewRecommend,
             submittedAt: new Date().toISOString(),
@@ -398,6 +409,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                 {manuscript.reviewerAssignments.map(ra => (
                   <span key={ra.reviewerId} className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ra.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ra.status === 'declined' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                     {ra.reviewerName} · {ra.status}
+                    <button type="button" onClick={() => handleRemoveReviewer(manuscript, ra.reviewerId)} className="ml-1 text-rose-600 hover:text-rose-800" title="Remove reviewer">×</button>
                   </span>
                 ))}
               </div>
@@ -960,9 +972,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   </div>
                   <div className="border rounded-xl p-4 space-y-2">
                     <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">3. Constructive Comments to Authors *</h5>
-                    <textarea rows={6} value={reviewComments} onChange={e => { setReviewComments(e.target.value); setReviewDraftSaved(false); }}
-                      placeholder="Provide detailed commentary on methodology, results, statistical analysis, writing clarity, and required revisions…"
-                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                    <RichTextEditor value={reviewComments} onChange={value => { setReviewComments(value); setReviewDraftSaved(false); }}
+                      placeholder="Provide detailed commentary on methodology, results, statistical analysis, writing clarity, and required revisions…" minHeight="220px" />
                   </div>
                   <div className="border rounded-xl p-4 space-y-2">
                     <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">4. Confidential Comments to Editor</h5>
