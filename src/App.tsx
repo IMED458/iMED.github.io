@@ -53,7 +53,7 @@ export default function App() {
 
   // Load persistent cloud state on mount and sync visible role users across devices.
   useEffect(() => {
-    const unsubscribe = subscribeFirebaseAuth(async firebaseUser => {
+    const unsubAuth = subscribeFirebaseAuth(async firebaseUser => {
       await DB.syncUsersFromFirestore().catch(() => {});
       if (!firebaseUser) {
         setCurrentUser(null);
@@ -62,8 +62,12 @@ export default function App() {
       const profile = await DB.getUserByIdAsync(firebaseUser.uid);
       if (profile) setCurrentUser(profile);
     });
-    DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
-    return unsubscribe;
+    // Real-time cross-device sync — fires whenever any device writes a manuscript
+    const unsubManuscripts = DB.subscribeToManuscripts(setManuscripts);
+    return () => {
+      unsubAuth();
+      unsubManuscripts();
+    };
   }, []);
 
   const triggerNotification = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -86,10 +90,7 @@ export default function App() {
 
   const handleUserChanged = (newAuth: User | null) => {
     setCurrentUser(newAuth);
-    if (newAuth) {
-      // Refresh local submissions list
-      DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
-    }
+    // Real-time subscription handles manuscript updates automatically
   };
 
   const uploadEmbeddedImages = async (manuscript: Manuscript): Promise<Manuscript> => {

@@ -35,6 +35,8 @@ import {
   User as UserIcon,
   Award,
   MessageSquare,
+  Menu,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface RoleDashboardsProps {
@@ -64,6 +66,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [showDecisionPanel, setShowDecisionPanel] = useState(false);
   const [assignEditorId, setAssignEditorId] = useState('');
   const [assignReviewerId, setAssignReviewerId] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [reviewScoreEthical, setReviewScoreEthical] = useState('None identified');
   const [reviewScoreMethod, setReviewScoreMethod] = useState(5);
   const [reviewScoreOrig, setReviewScoreOrig] = useState(5);
@@ -554,6 +557,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
       { id: 'Reviewers', icon: Users, label: 'Reviewers' },
       { id: 'Payments', icon: TrendingUp, label: 'Payments' },
       { id: 'Emails', icon: MessageSquare, label: 'Emails' },
+      { id: 'My Manuscripts', icon: UserIcon, label: 'My Manuscripts' },
+      { id: 'Submit Manuscript', icon: Plus, label: 'Submit Manuscript' },
       { id: 'Settings', icon: Settings2, label: 'Settings' },
     ];
     const navItems = isEditor ? editorNavItems : adminNavItems;

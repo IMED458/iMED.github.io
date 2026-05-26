@@ -5,7 +5,7 @@
 
 import { ArticleTypeConfig, Manuscript, User, SystemAuditLog, JournalSettings, AuthorDetails } from './types';
 import { firebaseEnabled, firestore } from './firebase';
-import { collection, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, setDoc, onSnapshot } from 'firebase/firestore';
 
 let manuscriptMemory: Manuscript[] = [];
 
@@ -545,7 +545,58 @@ export const DB = {
     setIndexedState('gbmn_manuscripts', manuscripts).catch(console.warn);
     localStorage.removeItem('gbmn_manuscripts');
     localStorage.setItem('gbmn_manuscripts_indexed', 'true');
-    mirrorArrayToFirestore('manuscripts', manuscripts);
+    // Write each manuscript as its own Firestore document for real-time listeners
+    if (firebaseEnabled && firestore) {
+      manuscripts.forEach(m => {
+        void setDoc(doc(firestore!, 'manuscripts', m.id), { payload: m, updatedAt: new Date().toISOString() })
+          .catch(err => console.warn('Firestore manuscript write failed:', err));
+      });
+    }
+  },
+
+  subscribeToManuscripts(callback: (manuscripts: Manuscript[]) => void): () => void {
+    if (!firebaseEnabled || !firestore) {
+      this.getManuscriptsAsync().then(callback).catch(() => callback([SAMPLE_MANUSCRIPT]));
+      return () => {};
+    }
+    const unsubscribe = onSnapshot(
+      collection(firestore, 'manuscripts'),
+      (snapshot) => {
+        if (snapshot.empty) {
+          this.getManuscriptsAsync().then(callback).catch(() => {});
+          return;
+        }
+        const rows = snapshot.docs.map(d => d.data().payload as Manuscript).filter(Boolean);
+        if (rows.length > 0) {
+          manuscriptMemory = rows;
+          setIndexedState('gbmn_manuscripts', rows).catch(() => {});
+          callback(rows);
+        }
+      },
+      (error) => {
+        console.warn('Firestore manuscript listener error:', error);
+        this.getManuscriptsAsync().then(callback).catch(() => {});
+      }
+    );
+    return unsubscribe;
+  },
+
+  subscribeToUsers(callback: (users: User[]) => void): () => void {
+    if (!firebaseEnabled || !firestore) return () => {};
+    const unsubscribe = onSnapshot(
+      collection(firestore, 'users'),
+      (snapshot) => {
+        if (snapshot.empty) return;
+        const rows = snapshot.docs.map(d => (d.data().payload || d.data()) as User).filter(Boolean);
+        if (rows.length > 0) {
+          const merged = withRequiredSystemUsers(rows);
+          localStorage.setItem('gbmn_users', JSON.stringify(merged));
+          callback(merged);
+        }
+      },
+      (error) => { console.warn('Firestore user listener error:', error); }
+    );
+    return unsubscribe;
   },
 
   getCurrentUser(): User | null {
