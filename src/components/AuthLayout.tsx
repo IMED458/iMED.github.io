@@ -7,8 +7,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import { DB } from '../utils';
 import { Key, Mail } from 'lucide-react';
-import { firebaseEnabled, signInWithGoogle, getGoogleRedirectResult } from '../firebase';
-import { useEffect } from 'react';
+import { firebaseEnabled, signInWithGoogle } from '../firebase';
 
 interface AuthLayoutProps {
   currentUser: User | null;
@@ -129,11 +128,20 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
       setIsReset(false);
       onShowNotification('Google verified. Complete missing author profile details to finish registration.', 'info');
     } catch (error) {
-      const rawMessage = error instanceof Error ? error.message : '';
+      const rawMessage = error instanceof Error ? error.message : String(error);
       const host = window.location.hostname;
-      const message = rawMessage.includes('auth/unauthorized-domain')
-        ? `Firebase Authorized domains-ში დაამატე ${host}. Firebase Console → Authentication → Settings → Authorized domains.`
-        : rawMessage || 'Google sign-in is not available yet.';
+      let message: string;
+      if (rawMessage.includes('auth/unauthorized-domain')) {
+        message = `Firebase Console-ში დაამატე "${host}" Authorized Domains-ში: Authentication → Settings → Authorized domains.`;
+      } else if (rawMessage.includes('auth/popup-blocked')) {
+        message = 'Popup დაბლოკილია. გთხოვ popup-ები დაუშვა ამ საიტისთვის და სცადო კვლავ.';
+      } else if (rawMessage.includes('auth/popup-closed-by-user') || rawMessage.includes('auth/cancelled-popup-request')) {
+        message = 'Google Sign-In გაუქმდა. სცადე ხელახლა.';
+      } else if (rawMessage.includes('missing initial state')) {
+        message = 'ბრაუზერის sessionStorage მიუწვდომელია. გახსენი სხვა ჩანართში ან ბრაუზერში.';
+      } else {
+        message = rawMessage || 'Google sign-in ვერ მოხერხდა.';
+      }
       onShowNotification(message, 'error');
     }
   };
