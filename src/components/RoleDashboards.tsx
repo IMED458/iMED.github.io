@@ -8,7 +8,7 @@ import { User, UserRole, Manuscript, ManuscriptStatus, SystemAuditLog, JournalSe
 import { DB, ARTICLE_TYPES } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import SubmissionWorkflow from './SubmissionWorkflow';
-import { acceptedPaymentRequest, authorEmail, openEmail, publishedNotice } from '../emailTemplates';
+import { acceptedPaymentRequest, publishedNotice, sendEmail } from '../emailTemplates';
 import { 
   Users, 
   FileText, 
@@ -91,10 +91,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     setSelectedManuscript(updated);
   };
 
-  const sendTemplateEmail = (manuscript: Manuscript, template: 'accepted' | 'published') => {
+  const sendTemplateEmail = async (manuscript: Manuscript, template: 'accepted' | 'published') => {
     const email = template === 'accepted' ? acceptedPaymentRequest(manuscript) : publishedNotice(manuscript);
-    openEmail(authorEmail(manuscript), email.subject, email.body);
-    onShowNotification('Email draft opened in your mail client.', 'info');
+    await sendEmail(template, manuscript, email.subject, email.body);
+    onShowNotification('Email processed through EmailJS.', 'success');
   };
 
   const handleUpdateUserRole = (userId: string, newRole: any) => {

@@ -1,4 +1,16 @@
 import { Manuscript } from './types';
+import emailjs from '@emailjs/browser';
+
+const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
+const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '';
+const templateIds = {
+  generic: import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
+  submission: import.meta.env.VITE_EMAILJS_TEMPLATE_SUBMISSION || import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
+  accepted: import.meta.env.VITE_EMAILJS_TEMPLATE_ACCEPTED || import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
+  published: import.meta.env.VITE_EMAILJS_TEMPLATE_PUBLISHED || import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
+};
+
+export const emailJsEnabled = Boolean(serviceId && publicKey && templateIds.generic);
 
 export function authorEmail(manuscript: Manuscript) {
   return manuscript.authors.find(author => author.isCorresponding)?.email || manuscript.authors[0]?.email || '';
@@ -6,6 +18,30 @@ export function authorEmail(manuscript: Manuscript) {
 
 export function openEmail(to: string, subject: string, body: string) {
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+export async function sendEmail(kind: keyof typeof templateIds, manuscript: Manuscript, subject: string, body: string) {
+  const to = authorEmail(manuscript);
+  if (!to) throw new Error('Author email is missing.');
+  if (!emailJsEnabled) {
+    openEmail(to, subject, body);
+    return { fallback: true };
+  }
+  await emailjs.send(
+    serviceId,
+    templateIds[kind] || templateIds.generic,
+    {
+      to_email: to,
+      to_name: `${manuscript.authors[0]?.firstName || 'Author'} ${manuscript.authors[0]?.lastName || ''}`.trim(),
+      subject,
+      message: body,
+      manuscript_title: manuscript.title,
+      manuscript_id: manuscript.id,
+      journal_email: 'gbmn@tsmu.edu',
+    },
+    { publicKey }
+  );
+  return { fallback: false };
 }
 
 export function submissionConfirmation(manuscript: Manuscript) {

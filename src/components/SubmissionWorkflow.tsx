@@ -8,7 +8,7 @@ import { Manuscript, AuthorDetails, ReferenceItem, FigureTableItem, Supplementar
 import { ARTICLE_TYPES, formatAMAReference, SAMPLE_MANUSCRIPT } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import RichTextEditor from './RichTextEditor';
-import { authorEmail as getAuthorEmail, openEmail, submissionConfirmation } from '../emailTemplates';
+import { sendEmail, submissionConfirmation } from '../emailTemplates';
 import { 
   Users, 
   FileText, 
@@ -1777,7 +1777,7 @@ export default function SubmissionWorkflow({
             <div className="pt-2 text-center">
               <button
                 id="final-package-submit-btn"
-                onClick={() => {
+                onClick={async () => {
                   if (!manuscript.title.trim()) {
                     onShowNotification('Submission error: Full title is missing from metadata.', 'error');
                     return;
@@ -1789,9 +1789,9 @@ export default function SubmissionWorkflow({
                   const now = new Date().toISOString();
                   onUpdateManuscript({ ...manuscript, status: 'Submitted', submittedAt: now, updatedAt: now });
                   const email = submissionConfirmation(manuscript);
-                  openEmail(getAuthorEmail(manuscript), email.subject, email.body);
+                  await sendEmail('submission', manuscript, email.subject, email.body);
                   onStepChange('getting-started');
-                  onShowNotification('Manuscript submitted to the editorial office. Confirmation recorded.', 'success');
+                  onShowNotification('Manuscript submitted and confirmation email processed.', 'success');
                 }}
                 className="inline-flex items-center gap-2 bg-teal-900 hover:bg-teal-800 text-white font-bold py-4 px-8 rounded-xl shadow-lg cursor-pointer transition-all text-sm uppercase tracking-wide"
               >
