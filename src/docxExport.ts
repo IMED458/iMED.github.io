@@ -158,13 +158,20 @@ function formatKeywords(value?: string) {
 }
 
 async function fetchPublicImageBytes(fileName: string) {
-  try {
-    const response = await fetch(`${import.meta.env.BASE_URL}${fileName}`);
-    if (!response.ok) return null;
-    return new Uint8Array(await response.arrayBuffer());
-  } catch {
-    return null;
+  const urls = [
+    `${import.meta.env.BASE_URL}${fileName}`,
+    `/${fileName}`,
+    `${window.location.origin}${import.meta.env.BASE_URL}${fileName}`,
+  ];
+  for (const url of urls) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) return new Uint8Array(await response.arrayBuffer());
+    } catch {
+      continue;
+    }
   }
+  return null;
 }
 
 function dataUrlToImage(dataUrl: string) {
@@ -179,16 +186,39 @@ function dataUrlToImage(dataUrl: string) {
 
 async function imageSourceToImage(src: string) {
   if (src.startsWith('data:image/')) return dataUrlToImage(src);
-  if (!/^https?:\/\//i.test(src)) return null;
-  try {
-    const response = await fetch(src);
-    if (!response.ok) return null;
-    const contentType = response.headers.get('content-type') || '';
-    const ext = contentType.includes('png') ? 'png' : contentType.includes('gif') ? 'gif' : contentType.includes('bmp') ? 'bmp' : 'jpg';
-    return { type: ext as 'png' | 'jpg' | 'gif' | 'bmp', bytes: new Uint8Array(await response.arrayBuffer()) };
-  } catch {
-    return null;
+  if (src.startsWith('blob:') || src.startsWith('http')) {
+    try {
+      // Try direct fetch first (works for same-origin and CORS-enabled)
+      const response = await fetch(src, { mode: 'cors' });
+      if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        const ext = contentType.includes('png') ? 'png' : contentType.includes('gif') ? 'gif' : contentType.includes('bmp') ? 'bmp' : 'jpg';
+        return { type: ext as 'png' | 'jpg' | 'gif' | 'bmp', bytes: new Uint8Array(await response.arrayBuffer()) };
+      }
+    } catch {
+      // CORS blocked — try canvas proxy for blob URLs
+      if (src.startsWith('blob:')) {
+        try {
+          const img = new Image();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = reject;
+            img.src = src;
+          });
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || 300;
+          canvas.height = img.naturalHeight || 200;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+          const dataUrl = canvas.toDataURL('image/png');
+          return dataUrlToImage(dataUrl);
+        } catch {
+          return null;
+        }
+      }
+    }
   }
+  return null;
 }
 
 function measureImage(src: string): Promise<{ width: number; height: number }> {
@@ -247,6 +277,8 @@ const TableBordersNone = {
 // ─── Build a DOCX table from an HTMLTableElement ────────────
 
 function docxTableFromElement(table: HTMLTableElement, availableWidth = COLUMN_WIDTH) {
+  // Allow slightly larger max width for readability
+  const effectiveWidth = Math.min(availableWidth, BODY_WIDTH);
   const rows = Array.from(table.rows);
   const columnCount = Math.max(1, ...rows.map(row => row.cells.length));
   const columnWidth = Math.floor(availableWidth / columnCount);
