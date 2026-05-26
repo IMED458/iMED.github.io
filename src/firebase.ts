@@ -9,7 +9,14 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updatePassword,
+  signOut,
+  onAuthStateChanged,
   type Auth,
+  type User as FirebaseUser,
 } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
@@ -22,16 +29,13 @@ import { getStorage, type FirebaseStorage } from 'firebase/storage';
  * is unavailable inside the Firebase-hosted auth iframe, so redirect flow
  * ALWAYS fails with "missing initial state".
  *
- * Fix: set authDomain to the ACTUAL hosting domain (gbmnsubmit.github.io)
- * so Firebase opens the popup/redirect on the same origin.
- * Also add 'gbmnsubmit.github.io' to Firebase Console →
+ * Keep authDomain on the Firebase project domain. The live GitHub Pages host
+ * must be added separately in Firebase Console →
  * Authentication → Settings → Authorized domains.
  */
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'AIzaSyCu8RuX9cSeJfDBCuB-QqhHR00I2PKgEPo',
-  // Use the actual hosting domain — NOT firebaseapp.com — to avoid cross-origin
-  // sessionStorage issues on GitHub Pages.
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'gbmnsubmit.github.io',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'gbmnsubmit.firebaseapp.com',
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'gbmnsubmit',
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'gbmnsubmit.firebasestorage.app',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '427592261852',
@@ -71,10 +75,36 @@ export async function signInWithGoogle() {
   return signInWithPopup(firebaseAuth, provider);
 }
 
-/** No-op — redirect flow removed. Kept for import compatibility. */
-export async function getGoogleRedirectResult() {
-  return null;
+export async function signInWithPassword(email: string, password: string) {
+  if (!firebaseAuth) throw new Error('Firebase configuration is not connected yet.');
+  return signInWithEmailAndPassword(firebaseAuth, email, password);
 }
+
+export async function createPasswordAccount(email: string, password: string) {
+  if (!firebaseAuth) throw new Error('Firebase configuration is not connected yet.');
+  return createUserWithEmailAndPassword(firebaseAuth, email, password);
+}
+
+export async function sendFirebasePasswordReset(email: string) {
+  if (!firebaseAuth) throw new Error('Firebase configuration is not connected yet.');
+  return sendPasswordResetEmail(firebaseAuth, email);
+}
+
+export async function changeFirebasePassword(newPassword: string) {
+  if (!firebaseAuth?.currentUser) throw new Error('Please sign in again before changing password.');
+  return updatePassword(firebaseAuth.currentUser, newPassword);
+}
+
+export async function signOutFirebase() {
+  if (!firebaseAuth) return;
+  return signOut(firebaseAuth);
+}
+
+export function subscribeFirebaseAuth(callback: (user: FirebaseUser | null) => void) {
+  if (!firebaseAuth) return () => {};
+  return onAuthStateChanged(firebaseAuth, callback);
+}
+
 
 export function startOrcidAuthentication() {
   const clientId = import.meta.env.VITE_ORCID_CLIENT_ID;

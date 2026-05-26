@@ -6,6 +6,9 @@
 import React, { useEffect, useState, useRef, FormEvent } from 'react';
 import { User, UserRole, Manuscript, ManuscriptStatus, SystemAuditLog, JournalSettings, ReviewHighlight } from '../types';
 import { DB, ARTICLE_TYPES } from '../utils';
+import React, { useEffect, useState, FormEvent } from 'react';
+import { User, UserRole, Manuscript, ManuscriptStatus, SystemAuditLog, JournalSettings, ReferenceItem, FigureTableItem } from '../types';
+import { DB, ARTICLE_TYPES, createManuscriptId } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import SubmissionWorkflow from './SubmissionWorkflow';
 import RichTextEditor from './RichTextEditor';
@@ -89,6 +92,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [showHighlightNote, setShowHighlightNote] = useState(false);
   const [pendingHighlightText, setPendingHighlightText] = useState('');
   const [highlightNote, setHighlightNote] = useState('');
+  const [reviewPdf, setReviewPdf] = useState<{ fileName: string; fileUrl: string } | null>(null);
 
   // Admin
   const [adminMode, setAdminMode] = useState<'editorial' | 'finance' | 'users'>('editorial');
@@ -117,6 +121,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     'Revision Requested', 'Editorial Decision', 'Accepted', 'In Production',
     'Completed', 'Rejected', 'Published',
   ];
+
+  useEffect(() => {
+    DB.getUsersAsync().then(setAdminUsers).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!selectedManuscript) return;
@@ -161,6 +169,54 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   };
 
   // ─── EMAIL ───────────────────────────────────────────────────────────────────
+  const createEditorialDraft = () => {
+    const base = manuscripts[0];
+    if (!base) return;
+    const draft: Manuscript = {
+      ...base,
+      id: createManuscriptId(),
+      status: 'Draft',
+      authorId: currentUser.id,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      submittedAt: undefined,
+      title: '',
+      runningTitle: '',
+      authors: [{
+        id: currentUser.id,
+        firstName: currentUser.firstName,
+        lastName: currentUser.lastName,
+        email: currentUser.email,
+        phone: '',
+        orcidId: currentUser.orcidId || '',
+        specialty: '',
+        country: '',
+        city: '',
+        institution: currentUser.institution,
+        department: '',
+        affiliation: currentUser.institution,
+        academicTitle: '',
+        contributionRole: '',
+        contributionTags: ['Agreed to be accountable for all aspects of the work', 'Will review the final version to be published'],
+        isCorresponding: true,
+      }],
+      abstractContents: {},
+      sections: {},
+      figuresAndTables: [],
+      references: [],
+      supplementaryFiles: [],
+      editorFiles: [],
+      reviewerAssignments: [],
+      editorDecisionLog: [],
+    };
+    const list = [...manuscripts, draft];
+    onUpdateManuscripts(list);
+    setSelectedManuscript(draft);
+    setOfficeEditMode(true);
+    setOfficeEditStep('title-meta');
+    onShowNotification('Editorial draft created. You can submit it as your own manuscript.', 'success');
+  };
+
   const sendTemplateEmail = async (manuscript: Manuscript, template: 'acceptance' | 'payment' | 'published') => {
     const email = template === 'acceptance' ? acceptanceNotice(manuscript)
       : template === 'payment' ? paymentRequest(manuscript)
@@ -450,6 +506,22 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               >
                 {manuscriptStatuses.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
+      <div className="min-h-[calc(100vh-88px)] bg-slate-50 overflow-hidden">
+        <div className="grid min-h-[calc(100vh-88px)] grid-cols-1 lg:grid-cols-[280px_1fr]">
+          <aside className="bg-slate-950 p-4 text-white">
+            <h2 className="text-sm font-black">GBMN Editorial</h2>
+            <p className="mb-5 text-[11px] text-slate-400">{currentUser.role}</p>
+            {nav.map(item => (
+              <button key={item} onClick={() => setEditorialSection(item)} className={`mb-1 w-full rounded-lg px-3 py-2 text-left text-xs font-bold ${editorialSection === item ? 'bg-teal-600' : 'text-slate-300 hover:bg-white/10'}`}>{item}</button>
+            ))}
+          </aside>
+          <main className="space-y-5 p-4 md:p-8">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h1 className="text-xl font-black">{editorialSection}</h1><p className="text-xs text-slate-500">Clean editorial workflow and action center.</p></div>
+              <div className="flex w-full flex-wrap justify-end gap-2 md:w-auto">
+                <button onClick={createEditorialDraft} className="rounded-xl bg-teal-700 px-4 py-2 text-xs font-black text-white">Submit Own Manuscript</button>
+                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search title, ID, author email..." className="w-full max-w-sm rounded-xl border bg-white px-4 py-2 text-xs" />
+              </div>
             </div>
             {/* Assign Editor */}
             <div>
@@ -498,6 +570,86 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     {ra.reviewerName} · {ra.status}
                   </span>
                 ))}
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+              <section className="rounded-2xl border bg-white shadow-xs overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left text-xs">
+                  <thead className="bg-slate-50 text-[10px] uppercase text-slate-500"><tr><th className="p-3">Manuscript</th><th>Author</th><th>Status</th><th>Payment</th><th>DOI</th><th>Submitted</th><th>Action</th></tr></thead>
+                  <tbody>{visible.map(m => (
+                    <tr key={m.id} onClick={() => setSelectedManuscript(m)} className={`cursor-pointer border-t hover:bg-teal-50 ${selected?.id === m.id ? 'bg-teal-50' : ''}`}>
+                      <td className="p-3"><b className="font-mono text-teal-800">{m.id}</b><div className="font-bold line-clamp-1">{m.title || 'Untitled'}</div><div className="text-[10px] text-slate-400">{m.articleType}</div></td>
+                      <td>{m.authors[0]?.firstName} {m.authors[0]?.lastName}<div className="text-[10px] text-slate-400">{m.authors[0]?.email}</div></td>
+                      <td>{renderStatusBadge(m.status)}</td><td>{m.payment?.status || 'Pending'}</td><td>{m.publicationInfo?.doi ? 'Assigned' : 'Pending'}</td><td>{new Date(m.submittedAt || m.createdAt).toLocaleDateString()}</td>
+                      <td><button onClick={(e) => { e.stopPropagation(); openAuthorEmailModal(m); }} className="rounded bg-teal-700 px-3 py-1.5 font-bold text-white">Email</button></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </section>
+              <aside className="space-y-3 rounded-2xl border bg-white p-4 shadow-xs xl:sticky xl:top-24 xl:self-start">
+                {selected ? <>
+                  <h3 className="text-sm font-black">{selected.title || selected.id}</h3>
+                  <p className="text-xs text-slate-500">{selected.authors[0]?.email}</p>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <button onClick={() => openAuthorEmailModal(selected)} className="rounded-lg bg-teal-700 px-3 py-2 font-bold text-white">Email Author</button>
+                    <button onClick={() => setOfficeEditMode(!officeEditMode)} className="rounded-lg bg-slate-900 px-3 py-2 font-bold text-white">Edit Article</button>
+                    <button onClick={() => setStatus('Revision Requested')} className="rounded-lg bg-amber-600 px-3 py-2 font-bold text-white">Revision</button>
+                    <button onClick={() => setStatus('Accepted')} className="rounded-lg bg-emerald-700 px-3 py-2 font-bold text-white">Accept</button>
+                    <button onClick={() => setStatus('Rejected')} className="rounded-lg bg-rose-700 px-3 py-2 font-bold text-white">Reject</button>
+                    <button onClick={() => setStatus('Published')} className="rounded-lg bg-teal-950 px-3 py-2 font-bold text-white">Publish</button>
+                  </div>
+                  <input value={selected.publicationInfo?.volumeIssue || ''} onChange={e => updateSelectedManuscript({ ...selected, publicationInfo: { ...(selected.publicationInfo || {}), volumeIssue: e.target.value }, updatedAt: new Date().toISOString() })} placeholder="VOLUME 4 ISSUE 2. APR-JUN 2026" className="w-full rounded border p-2 text-xs" />
+                  <input value={selected.publicationInfo?.doi || ''} onChange={e => updateSelectedManuscript({ ...selected, publicationInfo: { ...(selected.publicationInfo || {}), doi: e.target.value }, updatedAt: new Date().toISOString() })} placeholder="10.52340/GBMN..." className="w-full rounded border p-2 text-xs font-mono" />
+                  <button onClick={() => { onUpdateManuscripts(manuscripts.map(m => m.id === selected.id ? selected : m)); onShowNotification('Saved.', 'success'); }} className="w-full rounded bg-teal-700 px-3 py-2 text-xs font-bold text-white">Save Changes</button>
+                  {/* Author-uploaded files */}
+                  {selected.editorFiles && selected.editorFiles.length > 0 && (
+                    <div className="border-t pt-2 space-y-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Author Files</p>
+                      {selected.editorFiles.map(f => (
+                        <a key={f.id} href={f.fileUrl} download={f.fileName} className="block text-[11px] font-bold text-teal-700 hover:underline truncate">{f.fileName}</a>
+                      ))}
+                    </div>
+                  )}
+                  <button onClick={() => openAuthorEmailModal(selected, 'acceptance')} className="w-full rounded border p-2 text-xs font-bold text-emerald-800">Acceptance Email</button>
+                  <button onClick={() => openAuthorEmailModal(selected, 'payment')} className="w-full rounded border p-2 text-xs font-bold text-amber-800">Payment Email</button>
+                  <button onClick={() => openAuthorEmailModal(selected, 'published')} className="w-full rounded border p-2 text-xs font-bold text-teal-800">Published Email</button>
+                </> : <p className="text-xs text-slate-500">Select a manuscript.</p>}
+              </aside>
+            </div>
+            {selected && (
+              <section className="rounded-2xl border bg-white p-4 shadow-xs">
+                {officeEditMode ? (
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="md:w-48 shrink-0">
+                      <div className="bg-slate-900 rounded-xl p-3 text-white text-xs space-y-1">
+                        <p className="font-black text-[10px] uppercase text-slate-400 mb-2">Sections</p>
+                        {['title-meta','authors','abstract','keywords','sections','references','ethics','conflicts','funding','editor-files','preview'].map(step => (
+                          <button key={step} onClick={() => setOfficeEditStep(step)}
+                            className={`w-full text-left px-2 py-1.5 rounded text-[11px] font-bold capitalize ${officeEditStep === step ? 'bg-teal-600' : 'text-slate-300 hover:bg-white/10'}`}>
+                            {step.replace(/-/g,' ')}
+                          </button>
+                        ))}
+                        <div className="border-t border-slate-700 pt-2 mt-2 space-y-1">
+                          <button onClick={() => { updateSelectedManuscript({ ...selected, updatedAt: new Date().toISOString() }); onShowNotification('Saved.', 'success'); }} className="w-full bg-teal-700 text-white font-bold px-2 py-1.5 rounded text-[11px]">Save Draft</button>
+                          <button onClick={() => { updateSelectedManuscript({ ...selected, updatedAt: new Date().toISOString() }); setOfficeEditMode(false); onShowNotification('Saved and closed.', 'success'); }} className="w-full bg-slate-600 text-white font-bold px-2 py-1.5 rounded text-[11px]">Save & Close</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <SubmissionWorkflow manuscript={selected} onUpdateManuscript={updateSelectedManuscript} activeStep={officeEditStep} onStepChange={setOfficeEditStep} onShowNotification={onShowNotification} />
+                    </div>
+                  </div>
+                ) : (
+                  <ManuscriptPreview manuscript={selected} onShowNotification={onShowNotification} />
+                )}
+              </section>
+            )}
+            {emailDraft.open && emailDraft.manuscript && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 p-4">
+                <div className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl">
+                  <h3 className="text-sm font-black">Email Author</h3><p className="text-xs text-slate-500">{emailDraft.manuscript.authors[0]?.email}</p>
+                  <input value={emailDraft.subject} onChange={e => setEmailDraft(prev => ({ ...prev, subject: e.target.value }))} className="mt-3 w-full rounded border p-2 text-sm" />
+                  <textarea value={emailDraft.body} onChange={e => setEmailDraft(prev => ({ ...prev, body: e.target.value }))} rows={12} className="mt-3 w-full rounded border p-3 text-sm" />
+                  <div className="mt-4 flex justify-end gap-2"><button onClick={() => setEmailDraft(prev => ({ ...prev, open: false }))} className="rounded border px-4 py-2 text-xs font-bold">Cancel</button><button onClick={async () => { await sendEmail('generic', emailDraft.manuscript!, emailDraft.subject, emailDraft.body); setEmailDraft(prev => ({ ...prev, open: false })); onShowNotification('Email sent.', 'success'); }} className="rounded bg-teal-700 px-4 py-2 text-xs font-bold text-white">Send Email</button></div>
+                </div>
               </div>
             )}
           </div>
@@ -701,6 +853,71 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     };
 
     const visibleManuscripts = getFilteredManuscripts();
+    const reviewerStatusBadge = (status?: string) => {
+      if (status === 'completed') return <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Completed</span>;
+      if (status === 'declined') return <span className="bg-rose-100 text-rose-800 border border-rose-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">Declined</span>;
+      return <span className="bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full text-[9px] font-black uppercase">New / Pending</span>;
+    };
+
+    const handleInviteAction = (m: Manuscript, statusUpdate: 'completed' | 'declined') => {
+      const updated: Manuscript[] = manuscripts.map(item => {
+        if (item.id === m.id) {
+          const updatedAssignments = item.reviewerAssignments.map(ra => {
+            if (ra.reviewerId === currentUser.id) {
+              return { 
+                ...ra, 
+                status: statusUpdate as 'assigned' | 'completed' | 'declined',
+                comments: statusUpdate === 'completed' ? {
+                  id: `rev-com-${Date.now()}`,
+                  reviewerId: currentUser.id,
+                  reviewerName: `${currentUser.firstName} ${currentUser.lastName}`,
+                  ethicalConcerns: reviewScoreEthical,
+                  methodologyScore: reviewScoreMethod,
+                  originalityScore: reviewScoreOrig,
+                  scientificMeritScore: reviewScoreMerit,
+                  constructiveComments: reviewComments || 'Study is of superior design. Suggested minor linguistic improvements.',
+                  confidentialToEditor: reviewPrivate,
+                  recommendation: reviewRecommend,
+                  submittedAt: new Date().toISOString()
+                } : undefined
+              };
+            }
+            return ra;
+          });
+          
+          return { 
+            ...item, 
+            status: statusUpdate === 'completed' ? 'Submitted' as any : item.status, 
+            reviewerAssignments: updatedAssignments,
+            editorFiles: reviewPdf && statusUpdate === 'completed'
+              ? [
+                  ...item.editorFiles.filter(file => file.id !== `review-pdf-${currentUser.id}`),
+                  {
+                    id: `review-pdf-${currentUser.id}`,
+                    fileName: reviewPdf.fileName,
+                    fileUrl: reviewPdf.fileUrl,
+                    type: 'peer-review-pdf',
+                    uploadedAt: new Date().toISOString(),
+                  }
+                ]
+              : item.editorFiles
+          };
+        }
+        return item;
+      });
+      onUpdateManuscripts(updated);
+      onShowNotification('Structured reviewer evaluation matrix recorded!', 'success');
+      setReviewPdf(null);
+      setSelectedManuscript(null);
+
+      DB.addAuditLog({
+        userId: currentUser.id,
+        userEmail: currentUser.email,
+        action: 'REVIEW_SUBMITTED',
+        targetId: m.id,
+        details: `Submitting referee response. Recommendation target: ${reviewRecommend}`
+      });
+    };
 
     return (
       <div className="min-h-[calc(100vh-88px)] bg-slate-50">
@@ -1213,6 +1430,101 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     </button>
                   </div>
                   {reviewDraftSaved && <p className="text-[11px] text-teal-700 font-semibold">✓ Draft saved</p>}
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Constructive Comments to Authors *</label>
+                  <textarea
+                    rows={4}
+                    value={reviewComments}
+                    onChange={(e) => setReviewComments(e.target.value)}
+                    placeholder="Enter detailed paragraph reviewing biochemical, methodological, or editorial adjustments required..."
+                    className="w-full bg-slate-50 border border-slate-350 rounded-lg p-2.5 font-sans"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Private Comments to Editor (Confidential)</label>
+                  <input
+                    type="text"
+                    value={reviewPrivate}
+                    onChange={(e) => setReviewPrivate(e.target.value)}
+                    placeholder="Add direct recommendation insights for editorial eyes only..."
+                    className="w-full bg-slate-50 border border-slate-350 rounded-lg p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Peer Review PDF Upload (optional)</label>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => setReviewPdf({ fileName: file.name, fileUrl: String(reader.result || '') });
+                      reader.readAsDataURL(file);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 bg-slate-50 p-2 text-xs"
+                  />
+                  {reviewPdf && <p className="mt-1 text-[10px] font-bold text-teal-700">{reviewPdf.fileName} ready.</p>}
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Referee Consensus Recommendation *</label>
+                  <select
+                    value={reviewRecommend}
+                    onChange={(e) => setReviewRecommend(e.target.value as any)}
+                    className="w-full bg-teal-50 border border-teal-350 rounded-lg p-2.5 font-bold text-teal-800"
+                  >
+                    <option value="accept">Accept Manuscript Unedited</option>
+                    <option value="minor-revision">Accept with Minor Revisions</option>
+                    <option value="major-revision">Re-evaluate after Major Revisions</option>
+                    <option value="reject">Decline / Reject Submission</option>
+                  </select>
+                </div>
+
+                <div className="flex gap-2 pt-3">
+                  <button
+                    onClick={() => handleInviteAction(selectedManuscript, 'completed')}
+                    className="flex-1 bg-teal-700 hover:bg-teal-800 text-white font-semibold py-2 rounded-lg text-xs"
+                  >
+                    Submit Advisory Review Block
+                  </button>
+                  <button
+                    onClick={() => handleInviteAction(selectedManuscript, 'declined')}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 border p-2 rounded-lg text-xs font-semibold"
+                  >
+                    Decline Review Invitation
+                  </button>
+                </div>
+              </div>
+
+              {/* View inline paper button */}
+              <div className="border-t pt-3">
+                <div className="mb-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const selection = window.getSelection();
+                      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+                      const range = selection.getRangeAt(0);
+                      const mark = document.createElement('mark');
+                      mark.className = 'bg-yellow-200 px-0.5';
+                      try {
+                        range.surroundContents(mark);
+                        selection.removeAllRanges();
+                      } catch {
+                        onShowNotification('Select a clean text fragment to highlight.', 'error');
+                      }
+                    }}
+                    className="rounded bg-yellow-100 px-3 py-1.5 text-[11px] font-bold text-yellow-900"
+                  >
+                    Highlight selected text
+                  </button>
+                </div>
+                <div className="max-h-[760px] overflow-y-auto rounded-xl border bg-white p-3">
+                  <ManuscriptPreview manuscript={selectedManuscript} />
                 </div>
               </div>
             </div>
@@ -1325,6 +1637,304 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                       <button onClick={() => { const u = adminUsers.map(x => x.id === user.id ? { ...x, isVerified: !x.isVerified } : x); setAdminUsers(u); DB.setUsers(u); onShowNotification('Updated.', 'success'); }}
                         className={`px-2 py-1 rounded text-[10px] font-bold border ${user.isVerified ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
                         {user.isVerified ? 'Verified' : 'Unverified'}
+          {/* ACTIVE DECISION/REVIEW WORKPLANE */}
+          <div className="lg:col-span-8 space-y-4">
+            {selectedManuscript ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-6">
+                
+                <div id="editor-action-header" className="flex flex-wrap justify-between items-center gap-2 border-b pb-4 no-print">
+                  <div>
+                    <h3 className="font-bold text-md text-slate-800 flex items-center gap-1.5">
+                      <FileText className="h-5 w-5 text-teal-700" />
+                      Manuscript Pipeline Review
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Evaluate credentials, financial clearance, IRBs, and draft recommendations.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setOfficeEditMode(!officeEditMode)}
+                      className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all"
+                    >
+                      {officeEditMode ? 'Return to Preview' : 'Edit Full Article'}
+                    </button>
+                    <button
+                      onClick={() => setShowDecisionModal(true)}
+                      className="bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all"
+                    >
+                      Issue Formal Decision
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print space-y-2">
+                  <label className="block font-bold text-slate-700 mb-1">Editorial status visible to author</label>
+                  <select
+                    value={selectedManuscript.status}
+                    onChange={(event) => updateSelectedManuscript({ ...selectedManuscript, status: event.target.value as ManuscriptStatus, updatedAt: new Date().toISOString() })}
+                    className="w-full bg-white border border-slate-300 rounded p-2 font-semibold text-slate-800"
+                  >
+                    {manuscriptStatuses.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { updateSelectedManuscript({ ...selectedManuscript, updatedAt: new Date().toISOString() }); onShowNotification('Manuscript changes saved.', 'success'); }}
+                      className="flex-1 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { updateSelectedManuscript({ ...selectedManuscript, status: 'Draft', updatedAt: new Date().toISOString() }); onShowNotification('Marked as Draft.', 'info'); }}
+                      className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg"
+                    >
+                      Mark as Draft
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print space-y-2">
+                  <label className="block font-bold text-slate-700">Author email actions</label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => sendTemplateEmail(selectedManuscript, 'acceptance')}
+                      className="rounded bg-emerald-700 px-3 py-2 font-bold text-white"
+                    >
+                      Acceptance Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendTemplateEmail(selectedManuscript, 'payment')}
+                      className="rounded bg-amber-700 px-3 py-2 font-bold text-white"
+                    >
+                      Payment Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendTemplateEmail(selectedManuscript, 'published')}
+                      className="rounded bg-teal-800 px-3 py-2 font-bold text-white"
+                    >
+                      Published Email
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">Download PDF/DOCX from the preview and attach it to the opened email draft.</p>
+                </div>
+
+                <div className="bg-slate-50 border p-3 rounded-xl text-xs no-print grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">Issue / Volume label</label>
+                    <input
+                      value={selectedManuscript.publicationInfo?.volumeIssue || ''}
+                      onChange={(event) => updateSelectedManuscript({
+                        ...selectedManuscript,
+                        publicationInfo: { ...(selectedManuscript.publicationInfo || {}), volumeIssue: event.target.value },
+                        updatedAt: new Date().toISOString()
+                      })}
+                      placeholder="VOLUME 4 ISSUE 2. APR-JUN 2026"
+                      className="w-full bg-white border border-slate-300 rounded p-2 font-semibold text-slate-800"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">DOI</label>
+                    <input
+                      value={selectedManuscript.publicationInfo?.doi || ''}
+                      onChange={(event) => updateSelectedManuscript({
+                        ...selectedManuscript,
+                        publicationInfo: { ...(selectedManuscript.publicationInfo || {}), doi: event.target.value },
+                        updatedAt: new Date().toISOString()
+                      })}
+                      placeholder="10.52340/GBMN.2026.01.01.167"
+                      className="w-full bg-white border border-slate-300 rounded p-2 font-mono text-teal-800"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { onUpdateManuscripts(manuscripts.map(m => m.id === selectedManuscript.id ? selectedManuscript : m)); onShowNotification('Publication info saved.', 'success'); }}
+                  className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold px-4 py-2 rounded-lg"
+                >
+                  Save DOI / Issue
+                </button>
+
+                {/* Submitting author specs + uploaded files */}
+                <div id="editor-submission-author-card" className="bg-slate-50 border p-4 rounded-xl grid grid-cols-2 md:grid-cols-4 gap-4 text-xs no-print">
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Primary Author</span>
+                    <span className="font-medium text-slate-700">
+                      {selectedManuscript.authors[0]?.firstName} {selectedManuscript.authors[0]?.lastName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block">ORCID Identification</span>
+                    <span className="font-mono text-teal-700">{selectedManuscript.authors[0]?.orcidId || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Ethics Release (IRB)</span>
+                    <span className={selectedManuscript.ethics.humanSubjectsApproved === 'yes' ? 'text-green-700 font-semibold' : 'text-slate-600'}>
+                      {selectedManuscript.ethics.humanSubjectsApproved.toUpperCase()} ({selectedManuscript.ethics.irbApprovalNumber || 'Exempt'})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Author uploaded files */}
+                {selectedManuscript.editorFiles && selectedManuscript.editorFiles.length > 0 && (
+                  <div className="bg-white border p-3 rounded-xl text-xs no-print">
+                    <h4 className="font-bold text-slate-700 mb-2">Author-Uploaded Files</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedManuscript.editorFiles.map(f => (
+                        <a key={f.id} href={f.fileUrl} download={f.fileName}
+                          className="inline-flex items-center gap-1 bg-teal-50 border border-teal-200 text-teal-800 px-3 py-1.5 rounded-lg font-bold text-[11px] hover:bg-teal-100">
+                          ⬇ {f.fileName}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Assigned Reviewer Stats & comments matrix */}
+                <div id="editor-reviewer-pipeline" className="border-t pt-4 space-y-3 no-print">
+                  <h4 className="font-bold text-xs text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                    <Users className="h-4 w-4 text-teal-700" />
+                    Reviewers Assigned Index
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Add Reviewer */}
+                    <div className="bg-slate-50 p-3 rounded-lg border text-xs space-y-2">
+                      <span className="font-bold block text-slate-800">Delegate Peer Referee:</span>
+                      <select 
+                        onChange={(e) => {
+                          if (e.target.value) handleAssignReviewer(selectedManuscript, e.target.value);
+                          e.target.value = '';
+                        }}
+                        className="w-full bg-white border border-slate-300 rounded p-1.5 focus:outline-hidden"
+                      >
+                        <option value="">-- Choose Academic Referee --</option>
+                        {adminUsers.filter(u => u.role === 'Reviewer').map(rev => (
+                          <option key={rev.id} value={rev.id}>
+                            {rev.firstName} {rev.lastName} ({rev.institution})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Check Reviewers progress */}
+                    <div className="space-y-2">
+                      {selectedManuscript.reviewerAssignments.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">No reviewers delegated yet. Use selector to allocate independent assessment.</p>
+                      ) : (
+                        selectedManuscript.reviewerAssignments.map((ra) => (
+                          <div key={ra.reviewerId} className="bg-amber-50/44 border border-amber-100 p-2 text-xs rounded-sm">
+                            <div className="flex justify-between">
+                              <span className="font-bold text-slate-800">{ra.reviewerName}</span>
+                              <span className="font-semibold text-teal-800 uppercase text-[9px]">{ra.status}</span>
+                            </div>
+                            {ra.comments && (
+                              <div className="mt-1.5 border-t border-amber-200/55 pt-1 space-y-1">
+                                <p className="italic">"{ra.comments.constructiveComments}"</p>
+                                <p className="font-semibold text-[10px]">Recommendation: <span className="text-rose-700 uppercase">{ra.comments.recommendation}</span></p>
+                              </div>
+                            )}
+                          </div>
+                      )))}
+                    </div>
+                  </div>
+                </div>
+
+                {officeEditMode ? (
+                  <div className="border-t pt-6">
+                    <div className="flex flex-col md:flex-row gap-6">
+                      <div className="md:w-56 shrink-0">
+                        <div className="bg-slate-900 rounded-xl p-3 text-white text-xs space-y-1">
+                          <p className="font-black text-[10px] uppercase text-slate-400 mb-2">Article Sections</p>
+                          {['getting-started','title-meta','authors','article-type','abstract','keywords','sections','references','supplementary','ethics','conflicts','funding','editor-files','preview'].map(step => (
+                            <button key={step} onClick={() => setOfficeEditStep(step)}
+                              className={`w-full text-left px-2 py-1.5 rounded text-[11px] font-bold capitalize ${officeEditStep === step ? 'bg-teal-600 text-white' : 'text-slate-300 hover:bg-white/10'}`}>
+                              {step.replace(/-/g,' ')}
+                            </button>
+                          ))}
+                          <div className="border-t border-slate-700 pt-2 mt-2 space-y-1">
+                            <button
+                              onClick={() => { updateSelectedManuscript({ ...selectedManuscript, updatedAt: new Date().toISOString() }); onShowNotification('Draft saved.', 'success'); }}
+                              className="w-full bg-teal-700 hover:bg-teal-600 text-white font-bold px-2 py-1.5 rounded text-[11px]">
+                              Save Draft
+                            </button>
+                            <button
+                              onClick={() => { updateSelectedManuscript({ ...selectedManuscript, updatedAt: new Date().toISOString() }); setOfficeEditMode(false); onShowNotification('Draft saved and closed.', 'success'); }}
+                              className="w-full bg-slate-600 hover:bg-slate-500 text-white font-bold px-2 py-1.5 rounded text-[11px]">
+                              Save Draft & Close
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <SubmissionWorkflow
+                          manuscript={selectedManuscript}
+                          onUpdateManuscript={updateSelectedManuscript}
+                          activeStep={officeEditStep}
+                          onStepChange={setOfficeEditStep}
+                          onShowNotification={onShowNotification}
+                        />
+                      </div>
+                    </div>
+
+                  </div>
+                ) : (
+                  <div className="max-h-[850px] overflow-y-auto rounded-xl border bg-white p-3">
+                    <ManuscriptPreview manuscript={selectedManuscript} onShowNotification={onShowNotification} />
+                  </div>
+                )}
+
+                {/* Issue Decision Modal Content */}
+                {showDecisionModal && (
+                  <div className="bg-white border border-teal-500 rounded-xl p-4 mt-4 space-y-4 shadow-xl no-print animate-fade-in text-xs">
+                    <h5 className="font-bold text-sm text-teal-850">Submit Final Editorial Office Verdict</h5>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block font-semibold mb-1">Constructive feedback / reasons for author *</label>
+                        <textarea
+                          rows={4}
+                          value={editorComments}
+                          onChange={(e) => setEditorComments(e.target.value)}
+                          placeholder="Provide specific notes regarding structural, statistical, or formatting revisions requested..."
+                          className="w-full bg-slate-50 border p-2 rounded"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleCommitEditorialDecision(selectedManuscript, 'accept')}
+                          className="flex-1 bg-green-700 text-white font-semibold py-2 rounded shadow-xs cursor-pointer text-center"
+                        >
+                          Accept Manuscript
+                        </button>
+                        <button
+                          onClick={() => handleCommitEditorialDecision(selectedManuscript, 'minor-revision')}
+                          className="flex-1 bg-amber-600 text-white font-semibold py-2 rounded shadow-xs cursor-pointer text-center"
+                        >
+                          Request Revisions
+                        </button>
+                        <button
+                          onClick={() => handleCommitEditorialDecision(selectedManuscript, 'reject')}
+                          className="flex-1 bg-rose-700 text-white font-semibold py-2 rounded shadow-xs cursor-pointer text-center"
+                        >
+                          Decline Paper
+                        </button>
+                        <button
+                          onClick={() => handleCommitEditorialDecision(selectedManuscript, 'publish')}
+                          className="flex-1 bg-teal-800 text-white font-semibold py-2 rounded shadow-xs cursor-pointer text-center"
+                        >
+                          Publish Live Online
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => setShowDecisionModal(false)}
+                        className="w-full text-center text-xs text-slate-400 hover:underline mt-2"
+                      >
+                        Cancel verdict and return
                       </button>
                     </td>
                     <td className="p-2">

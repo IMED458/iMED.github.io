@@ -5,13 +5,14 @@
 
 import { useState, useEffect } from 'react';
 import { User, Manuscript } from './types';
-import { DB } from './utils';
+import { createManuscriptId, DB } from './utils';
 import { uploadImageDataUrlToCloudinary } from './cloudinary';
 import AuthLayout from './components/AuthLayout';
 import SidebarWorkflow from './components/SidebarWorkflow';
 import SubmissionWorkflow from './components/SubmissionWorkflow';
 import RoleDashboards from './components/RoleDashboards';
 import ManuscriptPreview from './components/ManuscriptPreview';
+import { changeFirebasePassword, signOutFirebase, subscribeFirebaseAuth } from './firebase';
 import { 
   GraduationCap, 
   User as UserIcon, 
@@ -19,6 +20,7 @@ import {
   Bell, 
   Sparkles, 
   AlertCircle,
+  Info,
   FileText,
   Plus,
   Clock
@@ -49,15 +51,19 @@ export default function App() {
     { id: 'n2', text: 'Shota Rustaveli national grant funding integration loaded.', time: '2 hours ago', read: true },
   ]);
 
-  // Load state on mount — sync users from Firestore so all devices stay consistent
+  // Load persistent cloud state on mount and sync visible role users across devices.
   useEffect(() => {
-    DB.syncUsersFromFirestore().then(() => {
-      setCurrentUser(DB.getCurrentUser());
-      DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
-    }).catch(() => {
-      setCurrentUser(DB.getCurrentUser());
-      DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    const unsubscribe = subscribeFirebaseAuth(async firebaseUser => {
+      await DB.syncUsersFromFirestore().catch(() => {});
+      if (!firebaseUser) {
+        setCurrentUser(null);
+        return;
+      }
+      const profile = await DB.getUserByIdAsync(firebaseUser.uid);
+      if (profile) setCurrentUser(profile);
     });
+    DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
+    return unsubscribe;
   }, []);
 
   const triggerNotification = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -117,8 +123,9 @@ export default function App() {
     DB.setManuscripts(newList);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     DB.setCurrentUser(null);
+    await signOutFirebase();
     setCurrentUser(null);
     triggerNotification('Logged out from publishing dashboard.', 'info');
   };
@@ -137,44 +144,41 @@ export default function App() {
     setShowProfileEditor(true);
   };
 
-  const saveProfileEditor = () => {
+  const saveProfileEditor = async () => {
     if (!currentUser) return;
     if (!profileDraft.firstName || !profileDraft.lastName || !profileDraft.email || !profileDraft.institution) {
       triggerNotification('Profile requires first name, last name, email, and institution.', 'error');
       return;
     }
-    if (profileDraft.newPassword) {
-      if (profileDraft.newPassword.length < 6) {
+    const { newPassword, confirmPassword, ...profileFields } = profileDraft;
+    if (newPassword) {
+      if (newPassword.length < 6) {
         triggerNotification('Password must be at least 6 characters.', 'error');
         return;
       }
-      if (profileDraft.newPassword !== profileDraft.confirmPassword) {
+      if (newPassword !== confirmPassword) {
         triggerNotification('Passwords do not match.', 'error');
         return;
       }
     }
-    const updatedUser = {
-      ...currentUser,
-      firstName: profileDraft.firstName,
-      lastName: profileDraft.lastName,
-      email: profileDraft.email,
-      institution: profileDraft.institution,
-      orcidId: profileDraft.orcidId || undefined,
-      ...(profileDraft.newPassword ? { password: profileDraft.newPassword } : {}),
-    };
+    const updatedUser = { ...currentUser, ...profileFields, orcidId: profileDraft.orcidId || undefined };
     const users = DB.getUsers();
     const updatedUsers = users.some(user => user.id === currentUser.id)
       ? users.map(user => user.id === currentUser.id ? updatedUser : user)
       : [...users, updatedUser];
     DB.setUsers(updatedUsers);
+    DB.setUser(updatedUser);
     DB.setCurrentUser(updatedUser);
+    if (newPassword) {
+      await changeFirebasePassword(newPassword);
+    }
     setCurrentUser(updatedUser);
     setShowProfileEditor(false);
     triggerNotification(profileDraft.newPassword ? 'Profile and password updated.' : 'Profile updated.', 'success');
   };
 
   const createEmptyDraft = (authorId: string): Manuscript => ({
-      id: `GBMN-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000) + 1000}`,
+      id: createManuscriptId(),
       status: 'Draft',
       authorId,
       createdAt: new Date().toISOString(),
@@ -273,7 +277,7 @@ export default function App() {
     if (currentUser?.role === 'Author' && authorManuscripts.length > 0 && !selectedManuscriptId) {
       setSelectedManuscriptId(authorManuscripts[0].id);
     }
-  }, [currentUser, authorManuscripts.length, selectedManuscriptId]);
+  }, [currentUser?.id, currentUser?.role, manuscripts, selectedManuscriptId]);
 
   return (
     <div id="gbmn-application" className="min-h-screen flex flex-col font-sans bg-slate-50 antialiased selection:bg-teal-700 selection:text-white">
@@ -286,6 +290,8 @@ export default function App() {
         >
           {toast.type === 'error' ? (
             <AlertCircle className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
+          ) : toast.type === 'info' ? (
+            <Info className="h-5 w-5 text-sky-600 mt-0.5 shrink-0" />
           ) : (
             <Sparkles className="h-5 w-5 text-teal-600 mt-0.5 shrink-0" />
           )}
@@ -334,7 +340,7 @@ export default function App() {
               
               {/* Notification Menu List */}
               {showNotificationBell && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border p-3 shadow-2xl rounded-xl z-55 divide-y divide-slate-100 text-xs">
+                <div className="absolute right-0 mt-2 w-80 bg-white border p-3 shadow-2xl rounded-xl z-[55] divide-y divide-slate-100 text-xs">
                   <div className="font-bold pb-1 text-slate-900 text-xs flex justify-between">
                     <span>Journal mailbox updates</span>
                     <button 
@@ -386,7 +392,7 @@ export default function App() {
       </header>
 
       {showProfileEditor && currentUser && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/30 p-4 no-print">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/30 p-4 no-print">
           <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-3 border-b pb-3">
               <div>

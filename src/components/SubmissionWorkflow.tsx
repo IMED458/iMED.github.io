@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Manuscript, AuthorDetails, ReferenceItem, FigureTableItem, SupplementaryFile } from '../types';
-import { ARTICLE_TYPES, formatAMAReference, SAMPLE_MANUSCRIPT } from '../utils';
+import { ARTICLE_TYPES, createManuscriptId, formatAMAReference, SAMPLE_MANUSCRIPT } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import RichTextEditor from './RichTextEditor';
 import { sendEmail, submissionConfirmation } from '../emailTemplates';
@@ -70,7 +70,7 @@ export default function SubmissionWorkflow({
   const loadSampleSubmissionModel = () => {
     onUpdateManuscript({
       ...SAMPLE_MANUSCRIPT,
-      id: `GBMN-${new Date().getFullYear()}-${Math.floor(Math.random() * 900) + 100}`,
+      id: createManuscriptId(),
       status: 'Draft',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
