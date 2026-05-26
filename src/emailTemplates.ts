@@ -4,7 +4,7 @@ import emailjs from '@emailjs/browser';
 const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_fd48utr';
 const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'bwqBanPS6kMplQUWW';
 const templateIds = {
-  generic: import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
+  generic: import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || 'template_ahj9jq9',
   submission: import.meta.env.VITE_EMAILJS_TEMPLATE_SUBMISSION || import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
   accepted: import.meta.env.VITE_EMAILJS_TEMPLATE_ACCEPTED || import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
   published: import.meta.env.VITE_EMAILJS_TEMPLATE_PUBLISHED || import.meta.env.VITE_EMAILJS_TEMPLATE_GENERIC || '',
