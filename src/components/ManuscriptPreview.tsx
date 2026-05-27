@@ -162,6 +162,26 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
       .map(style => style.outerHTML)
       .join('\n');
 
+    // ── Running page header SVG (pages 2+ only) ──────────────────────────
+    // Parse volume/issue into two lines: e.g. "VOLUME 4 ISSUE 2. APR-JUN 2026"
+    const rawVi = manuscript.publicationInfo?.volumeIssue?.trim() || '';
+    const viMatch = rawVi.match(/^(.*?)\.\s*(.+)$/) || [];
+    const viLine1 = (viMatch[1] || rawVi || 'VOLUME X ISSUE X').toUpperCase();
+    const viLine2 = (viMatch[2] || String(new Date().getFullYear())).toUpperCase();
+    const hSvg = [
+      '<svg viewBox="0 0 900 70" width="696" height="54" xmlns="http://www.w3.org/2000/svg">',
+      '<rect width="900" height="70" fill="white"/>',
+      '<line x1="30" y1="34" x2="75" y2="34" stroke="#0e7a7a" stroke-width="4"/>',
+      '<line x1="30" y1="42" x2="75" y2="42" stroke="#0e7a7a" stroke-width="1.5"/>',
+      '<text x="88" y="44" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="700" letter-spacing="2.5" fill="#0d1f3c">GEORGIAN BIOMEDICAL NEWS</text>',
+      '<line x1="490" y1="34" x2="620" y2="34" stroke="#0e7a7a" stroke-width="4"/>',
+      '<line x1="490" y1="42" x2="620" y2="42" stroke="#0e7a7a" stroke-width="1.5"/>',
+      `<text x="634" y="36" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="400" letter-spacing="1" fill="#0d1f3c">${viLine1}</text>`,
+      `<text x="634" y="50" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="400" letter-spacing="1" fill="#0d1f3c">${viLine2}</text>`,
+      '</svg>',
+    ].join('');
+    const hSvgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(hSvg)}`;
+
     printWindow.document.open();
     printWindow.document.write(`<!doctype html>
       <html>
@@ -171,21 +191,20 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           <title>${stripHtml(manuscript.title || 'GBMN Manuscript')}</title>
           ${styles}
           <style>
-            /* Page 1: original margins, no running header */
+            /* Page 1: original top margin, NO running header */
             @page :first {
               size: A4 portrait;
               margin: 19mm 13mm 28mm 13mm;
-              @top-left   { content: none; border: none; }
-              @top-center { content: none; border: none; }
-              @top-right  { content: none; border: none; }
+              @top-left { content: none; }
             }
-            /* Pages 2+: taller top margin to hold running header */
+            /* Pages 2+: extra top margin + SVG running header */
             @page {
               size: A4 portrait;
-              margin: 26mm 13mm 28mm 13mm;
-              @top-left   { content: ""; border-top: 2pt solid #0E8B8B; border-bottom: 2pt solid #0E8B8B; padding: 3pt 0; }
-              @top-center { content: "GEORGIAN BIOMEDICAL NEWS"; font-family: Arial,sans-serif; font-size: 8pt; font-weight: bold; color: #0A3C3C; letter-spacing: 0.12em; border-top: 2pt solid #0E8B8B; border-bottom: 2pt solid #0E8B8B; padding: 3pt 14pt; white-space: nowrap; }
-              @top-right  { content: ""; border-top: 2pt solid #0E8B8B; border-bottom: 2pt solid #0E8B8B; padding: 3pt 0; }
+              margin: 22mm 13mm 28mm 13mm;
+              @top-left {
+                content: url("${hSvgUrl}");
+                vertical-align: bottom;
+              }
             }
             html, body {
               margin: 0 !important;
@@ -734,10 +753,10 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
         /* ── BODY COLUMNS ────────────────────────────── */
         .gbmn-body-columns {
-          column-count: 2;
-          -webkit-column-count: 2;
-          column-gap: 0.6cm;
-          -webkit-column-gap: 0.6cm;
+          column-count: 2 !important;
+          -webkit-column-count: 2 !important;
+          column-gap: 0.6cm !important;
+          -webkit-column-gap: 0.6cm !important;
           column-fill: auto;
           font-size: 11pt;
           line-height: 1.36;
@@ -783,13 +802,15 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         }
 
         /* DROP CAP for first section first letter */
-        .preview-rich-dropcap p:first-of-type::first-letter {
-          float: left;
-          font-size: 48pt;
-          line-height: 38pt;
-          font-weight: 400;
-          margin: 4px 6px 0 0;
-          color: #111111;
+        .preview-rich-dropcap > p:first-child::first-letter,
+        .preview-rich-dropcap > p:first-of-type::first-letter {
+          float: left !important;
+          font-size: 48pt !important;
+          line-height: 36pt !important;
+          font-weight: 700 !important;
+          margin: 2px 8px 0 0 !important;
+          color: #111111 !important;
+          font-family: "Times New Roman", Georgia, serif !important;
         }
 
         /* ── INLINE CITATION LINKS ───────────────────── */
@@ -1016,10 +1037,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
             line-height: 1.36 !important;
           }
 
-          /* Force A4 page size — defined above with running header */
-
-          /* Clean A4 page — no fixed running header that overlaps content */
-          @page { size: A4 portrait; margin: 19mm 13mm 28mm 13mm; }
+          /* @page rules are defined above (first-page + running-header) */
           .gbmn-running-page-header { display: none !important; }
 
 
@@ -1065,9 +1083,14 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           .gbmn-section-heading { color: #D72626 !important; }
           .preview-rich h3 { color: #0E8B8B !important; }
           .gbmn-references-heading { color: #000000 !important; }
-          .preview-rich-dropcap p:first-of-type::first-letter {
+          .preview-rich-dropcap > p:first-child::first-letter,
+          .preview-rich-dropcap > p:first-of-type::first-letter {
+            float: left !important;
             font-size: 48pt !important;
-            line-height: 38pt !important;
+            line-height: 36pt !important;
+            font-weight: 700 !important;
+            margin: 2px 8px 0 0 !important;
+            color: #111111 !important;
           }
           .gbmn-inline-table th { background: #DCE8D0 !important; }
           .gbmn-inline-table tr:nth-child(even) td { background: #D9E3D1 !important; }
