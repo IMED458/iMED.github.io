@@ -560,7 +560,9 @@ export const DB = {
       const fs = firestore;
       ensureFirebaseSession().catch(() => null).finally(() => {
         manuscripts.forEach(m => {
-          setDoc(doc(fs, 'manuscripts', m.id), { payload: m, updatedAt: new Date().toISOString() })
+          // Firestore forbids nested arrays (e.g. tableData: string[][]).
+          // Serialise the entire payload as a JSON string to bypass this restriction.
+          setDoc(doc(fs, 'manuscripts', m.id), { payload: JSON.stringify(m), updatedAt: new Date().toISOString() })
             .then(() => console.log('[GBMN] ✓ Firestore write ok:', m.id))
             .catch((err: unknown) => {
               const msg = (err instanceof Error) ? err.message : String(err);
@@ -580,7 +582,7 @@ export const DB = {
     if (firebaseEnabled && firestore) {
       const fs = firestore;
       ensureFirebaseSession().catch(() => null).finally(() => {
-        setDoc(doc(fs, 'manuscripts', manuscript.id), { payload: manuscript, updatedAt: new Date().toISOString() })
+        setDoc(doc(fs, 'manuscripts', manuscript.id), { payload: JSON.stringify(manuscript), updatedAt: new Date().toISOString() })
           .then(() => console.log('[GBMN] ✓ Firestore write ok:', manuscript.id))
           .catch((err: unknown) => {
             const msg = (err instanceof Error) ? err.message : String(err);
@@ -599,7 +601,15 @@ export const DB = {
     const unsubscribe = onSnapshot(
       collection(firestore, 'manuscripts'),
       (snapshot) => {
-        const rows = snapshot.docs.map(d => d.data().payload as Manuscript).filter(Boolean);
+        // payload may be a JSON string (new format) or a plain object (legacy)
+        const rows = snapshot.docs.map(d => {
+          const raw = d.data().payload;
+          try {
+            return (typeof raw === 'string' ? JSON.parse(raw) : raw) as Manuscript;
+          } catch {
+            return null;
+          }
+        }).filter(Boolean) as Manuscript[];
         if (rows.length > 0) {
           manuscriptMemory = rows;
           setIndexedState('gbmn_manuscripts', rows).catch(() => {});
