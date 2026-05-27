@@ -48,6 +48,12 @@ jobs:
           </html>
           EOF
 
+      - name: Deploy Firestore security rules
+        if: ${{ secrets.FIREBASE_TOKEN != '' }}
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: npx firebase-tools@latest deploy --only firestore:rules --project gbmnsubmit --token "$FIREBASE_TOKEN" --non-interactive || echo "⚠️  Firestore rules deploy skipped (set FIREBASE_TOKEN secret to enable)"
+
       - name: Build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}

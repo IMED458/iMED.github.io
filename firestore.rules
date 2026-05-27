@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Manuscripts: any authenticated user (including anonymous) can read/write.
+    // Anonymous sign-in is used automatically for demo accounts.
+    match /manuscripts/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Users / sessions / settings / audit log
+    match /users/{id} {
+      allow read, write: if request.auth != null;
+    }
+    match /sessions/{id} {
+      allow read, write: if request.auth != null;
+    }
+    match /settings/{id} {
+      allow read, write: if request.auth != null;
+    }
+    match /audit_log/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

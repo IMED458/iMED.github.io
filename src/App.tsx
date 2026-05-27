@@ -79,17 +79,32 @@ export default function App() {
     };
   }, []);
 
-  // Re-subscribe to manuscripts whenever the logged-in user changes (handles demo
-  // users who bypass Firebase auth) and ensure an anonymous Firebase session so
-  // Firestore security rules that require auth don't block the listener.
+  // Re-subscribe to manuscripts whenever the logged-in user changes.
+  // IMPORTANT: we wait for ensureFirebaseSession() to complete BEFORE creating
+  // the onSnapshot listener — otherwise it starts without auth and Firestore
+  // security rules immediately terminate it with PERMISSION_DENIED.
   useEffect(() => {
     if (!currentUser) return;
-    ensureFirebaseSession().finally(() => {
+    let cancelled = false;
+    ensureFirebaseSession().catch(() => null).finally(() => {
+      if (cancelled) return;
+      manuscriptSubRef.current?.();
+      manuscriptSubRef.current = DB.subscribeToManuscripts(setManuscripts);
       DB.getManuscriptsAsync().then(setManuscripts).catch(() => {});
     });
-    manuscriptSubRef.current?.();
-    manuscriptSubRef.current = DB.subscribeToManuscripts(setManuscripts);
+    return () => { cancelled = true; };
   }, [currentUser?.id]);
+
+  // Show a toast whenever a Firestore write fails so the error is visible
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const msg = (e as CustomEvent<string>).detail;
+      triggerNotification(`Cloud sync error: ${msg}`, 'error');
+    };
+    window.addEventListener('gbmn:sync-error', handler);
+    return () => window.removeEventListener('gbmn:sync-error', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const triggerNotification = (message: string, type: 'success' | 'info' | 'error' = 'success') => {
     setToast({ message, type });

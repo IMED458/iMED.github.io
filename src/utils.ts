@@ -556,14 +556,17 @@ export const DB = {
     setIndexedState('gbmn_manuscripts', manuscripts).catch(console.warn);
     localStorage.removeItem('gbmn_manuscripts');
     localStorage.setItem('gbmn_manuscripts_indexed', 'true');
-    // Ensure a Firebase auth session (anonymous if needed) before writing so
-    // Firestore security rules that require request.auth are satisfied even for
-    // demo accounts that bypass Firebase email/password auth.
     if (firebaseEnabled && firestore) {
-      ensureFirebaseSession().catch(() => {}).finally(() => {
+      const fs = firestore;
+      ensureFirebaseSession().catch(() => null).finally(() => {
         manuscripts.forEach(m => {
-          void setDoc(doc(firestore!, 'manuscripts', m.id), { payload: m, updatedAt: new Date().toISOString() })
-            .catch(err => console.warn('Firestore manuscript write failed:', err));
+          setDoc(doc(fs, 'manuscripts', m.id), { payload: m, updatedAt: new Date().toISOString() })
+            .then(() => console.log('[GBMN] ✓ Firestore write ok:', m.id))
+            .catch((err: unknown) => {
+              const msg = (err instanceof Error) ? err.message : String(err);
+              console.error('[GBMN] ✗ Firestore write failed:', msg);
+              window.dispatchEvent(new CustomEvent('gbmn:sync-error', { detail: msg }));
+            });
         });
       });
     }
@@ -575,9 +578,15 @@ export const DB = {
     if (!manuscriptMemory.some(m => m.id === manuscript.id)) manuscriptMemory.push(manuscript);
     setIndexedState('gbmn_manuscripts', manuscriptMemory).catch(console.warn);
     if (firebaseEnabled && firestore) {
-      ensureFirebaseSession().catch(() => {}).finally(() => {
-        void setDoc(doc(firestore!, 'manuscripts', manuscript.id), { payload: manuscript, updatedAt: new Date().toISOString() })
-          .catch(err => console.warn('Firestore manuscript write failed:', err));
+      const fs = firestore;
+      ensureFirebaseSession().catch(() => null).finally(() => {
+        setDoc(doc(fs, 'manuscripts', manuscript.id), { payload: manuscript, updatedAt: new Date().toISOString() })
+          .then(() => console.log('[GBMN] ✓ Firestore write ok:', manuscript.id))
+          .catch((err: unknown) => {
+            const msg = (err instanceof Error) ? err.message : String(err);
+            console.error('[GBMN] ✗ Firestore write failed:', msg);
+            window.dispatchEvent(new CustomEvent('gbmn:sync-error', { detail: msg }));
+          });
       });
     }
   },
