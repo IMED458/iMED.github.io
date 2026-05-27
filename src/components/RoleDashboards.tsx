@@ -81,14 +81,29 @@ function printReviewAsPdf(params: {
   } = params;
 
   const recLabel: Record<string, string> = {
-    'accept': 'Accept',
-    'minor-revision': 'Minor Revision',
-    'major-revision': 'Major Revision',
+    'accept': 'Accept Manuscript Unedited',
+    'minor-revision': 'Minor Revision Required',
+    'major-revision': 'Major Revision Required',
     'reject': 'Reject',
   };
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-  const scoreRow = (label: string, score: number) =>
-    `<tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:bold">${label}</td><td style="padding:4px 8px;border:1px solid #e2e8f0;text-align:center">${score} / 10</td></tr>`;
+  const firstAuthor = manuscript.authors[0];
+  const firstAuthorName = firstAuthor ? `${firstAuthor.firstName || ''} ${firstAuthor.lastName || ''}`.trim() : '—';
+
+  // Score row helper — shows X / 10 with right-aligned value
+  const scoreRow = (label: string, score: number, even: boolean) =>
+    `<tr style="background:${even ? '#f9fafb' : '#ffffff'}">
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:10pt;color:#1e293b;font-weight:600">${label}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:10pt;color:#1e293b;text-align:right;font-weight:700">${score}&thinsp;/&thinsp;10</td>
+    </tr>`;
+
+  // Section wrapper: teal bold header + ruled line + content box
+  const section = (num: number, title: string, body: string, subsub?: string) => `
+    <div style="margin-top:16pt">
+      <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">${num}. ${title}${subsub ? `<span style="font-weight:400;font-size:9.5pt;text-transform:none;color:#475569"> ${subsub}</span>` : ''}</div>
+      <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+      <div style="border:1px solid #d1d5db;border-radius:4px;padding:10pt 12pt;font-size:10.5pt;line-height:1.6;color:#1e293b;background:#fff">${body}</div>
+    </div>`;
 
   const printWindow = window.open('', '_blank', 'width=900,height=1200');
   if (!printWindow) { onNotify('Popup blocked — please allow popups for this site.', 'error'); return; }
@@ -100,96 +115,165 @@ function printReviewAsPdf(params: {
   <meta charset="utf-8"/>
   <title>Peer Review Report — ${manuscript.id}</title>
   <style>
-    @page { size: A4 portrait; margin: 22mm 18mm 28mm 18mm; }
+    @page { size: A4 portrait; margin: 20mm 18mm 24mm 18mm; }
     *{box-sizing:border-box}
-    body{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;line-height:1.55;color:#111;background:#fff;margin:0;padding:0}
-    .hdr{margin-bottom:6pt}
-    .hdr-label{font-size:10pt;font-weight:bold}
-    .hdr-title{font-size:13pt;font-style:italic;font-weight:bold;margin-top:2pt}
-    .sec-head{font-size:10.5pt;font-weight:bold;margin:14pt 0 4pt}
-    .subsec{font-size:10.5pt;font-weight:bold;margin:10pt 0 3pt}
-    p{margin:0 0 6pt}
-    ul{margin:2pt 0 6pt;padding-left:20pt}
-    li{margin-bottom:2pt}
-    .rec-box{border:2px solid #0f766e;border-radius:4px;padding:7pt 12pt;background:#f0fdf4;font-size:11pt;font-weight:bold;color:#065f46;display:inline-block;margin-top:4pt}
-    .score-table{border-collapse:collapse;width:50%;margin-top:4pt}
-    .score-table td{padding:4px 10px;border:1px solid #cbd5e1;font-size:10pt}
-    .score-table .pub-row td{font-weight:bold;background:#f8fafc}
-    .conf-box{background:#fafafa;border:1px dashed #cbd5e1;border-radius:3px;padding:7pt 10pt;font-size:10pt;margin-top:4pt}
-    .hl-item{font-size:9.5pt;padding:4pt 8pt;background:#fef9c3;border:1px solid #fde68a;border-radius:3px;margin-bottom:3pt}
-    .footer{border-top:1px solid #cbd5e1;padding-top:6pt;margin-top:20pt;font-size:8.5pt;color:#64748b;display:flex;justify-content:space-between}
-    .sig-wrap{display:flex;justify-content:flex-end;margin-top:24pt}
-    .sig-line{border-top:1px solid #334155;width:200pt;padding-top:3pt;font-size:9pt;color:#334155}
-    hr{border:none;border-top:1px solid #e2e8f0;margin:10pt 0}
+    body{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;line-height:1.55;color:#1e293b;background:#fff;margin:0;padding:0}
+    p{margin:0 0 5pt} ul{margin:2pt 0 5pt;padding-left:18pt} li{margin-bottom:2pt}
+    table{border-collapse:collapse}
+    .info-table td{padding:4pt 8pt;font-size:10pt;vertical-align:top}
+    .info-label{font-weight:700;color:#1e293b;white-space:nowrap}
+    .info-value{color:#374151}
   </style>
 </head>
 <body>
-  <div class="hdr">
-    <div class="hdr-label">Peer Review Report</div>
-    <div class="hdr-label">Manuscript Title:</div>
-    <div class="hdr-title">${manuscript.title}</div>
-  </div>
-  <div style="font-size:9pt;color:#555;margin-bottom:12pt">
-    Manuscript ID: <strong>${manuscript.id}</strong> &nbsp;·&nbsp;
-    Article Type: <strong>${manuscript.articleType}</strong> &nbsp;·&nbsp;
-    Specialty: <strong>${manuscript.specialty}</strong><br/>
-    Author: <strong>${(manuscript.authors[0]?.firstName || '')} ${(manuscript.authors[0]?.lastName || '')}</strong> &nbsp;·&nbsp;
-    Reviewer: <strong>${reviewerName}</strong> &nbsp;·&nbsp;
-    Date: <strong>${today}</strong>
-  </div>
-  <hr/>
 
-  <div class="sec-head">1. Summary</div>
-  <div>${summary || '<p><em>No summary provided.</em></p>'}</div>
-
-  <div class="sec-head">2. Major Comments</div>
-  <div>${majorComments || '<p><em>No major comments.</em></p>'}</div>
-
-  <div class="sec-head">3. Minor Comments</div>
-  <div>${minorComments || '<p><em>No minor comments.</em></p>'}</div>
-
-  <div class="sec-head">4. Strengths</div>
-  <div>${strengths || '<p><em>Not specified.</em></p>'}</div>
-
-  <div class="sec-head">5. Limitations <span style="font-weight:normal;font-size:9.5pt">(to be strengthened in manuscript)</span></div>
-  <div>${limitations || '<p><em>Not specified.</em></p>'}</div>
-
-  <div class="sec-head">6. Recommendation to the Editor</div>
-  <div>Decision: <span class="rec-box">${recLabel[recommendation] || recommendation}</span></div>
-
-  <div class="sec-head">7. Required Revisions (Actionable)</div>
-  <div class="subsec">Essential (must address):</div>
-  <div>${requiredEssential || '<p><em>None listed.</em></p>'}</div>
-  <div class="subsec">Recommended (improves quality):</div>
-  <div>${requiredRecommended || '<p><em>None listed.</em></p>'}</div>
-
-  <div class="sec-head">8. Final Evaluation Scores</div>
-  <table class="score-table">
-    <tr><td style="padding:4px 10px;border:1px solid #cbd5e1;font-weight:bold;background:#f8fafc">Category</td><td style="padding:4px 10px;border:1px solid #cbd5e1;font-weight:bold;background:#f8fafc;text-align:center">Score</td></tr>
-    ${scoreRow('Originality', scoreOriginality)}
-    ${scoreRow('Methodology', scoreMethodology)}
-    ${scoreRow('Statistical Rigor', scoreStatistical)}
-    ${scoreRow('Clinical Relevance', scoreClinical)}
-    ${scoreRow('Presentation', scorePresentation)}
-    <tr class="pub-row"><td style="padding:4px 10px;border:1px solid #cbd5e1;font-weight:bold">Publishability</td><td style="padding:4px 10px;border:1px solid #cbd5e1;font-weight:bold;text-align:center">${scorePublishability || '—'}</td></tr>
+  <!-- ═══ HEADER ═══ -->
+  <table style="width:100%;border-bottom:2px solid #0f766e;padding-bottom:8pt;margin-bottom:0">
+    <tr>
+      <td style="vertical-align:bottom">
+        <div style="font-size:22pt;font-weight:900;color:#0f766e;letter-spacing:-0.5px;line-height:1">GBMN</div>
+        <div style="font-size:9pt;font-style:italic;color:#475569;margin-top:1pt">Georgian Biomedical and Medical Nexus</div>
+      </td>
+      <td style="vertical-align:bottom;text-align:right">
+        <div style="font-size:8.5pt;color:#64748b">Confidential Peer Review Document</div>
+        <div style="font-size:8.5pt;color:#64748b">Date: ${today}</div>
+      </td>
+    </tr>
   </table>
 
-  ${highlights.length > 0 ? `<div class="sec-head">Text Highlights (${highlights.length})</div>
-  ${highlights.map((h, i) => `<div class="hl-item"><strong>[${i + 1}]</strong> &ldquo;${h.text}&rdquo;${h.note ? ` &mdash; <em>${h.note}</em>` : ''}</div>`).join('')}` : ''}
+  <!-- ═══ TITLE ═══ -->
+  <div style="text-align:center;font-size:14pt;font-weight:900;letter-spacing:0.06em;margin:14pt 0 12pt;color:#0f172a">PEER REVIEW REPORT</div>
 
-  ${confidential ? `<div class="sec-head">Confidential Comments to Editor</div><div class="conf-box">${confidential}</div>` : ''}
+  <!-- ═══ MANUSCRIPT INFO BOX ═══ -->
+  <table style="width:100%;border:1px solid #d1d5db;border-radius:6px;border-collapse:separate;margin-bottom:4pt">
+    <tr>
+      <td class="info-table" style="width:50%;padding:7pt 12pt 3pt 12pt">
+        <span class="info-label">Manuscript ID:</span> <span class="info-value">${manuscript.id}</span>
+      </td>
+      <td class="info-table" style="width:50%;padding:7pt 12pt 3pt 12pt">
+        <span class="info-label">Article Type:</span> <span class="info-value">${manuscript.articleType}</span>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding:2pt 12pt 3pt 12pt;font-size:10pt">
+        <span class="info-label">Title:</span> <span class="info-value">${manuscript.title}</span>
+      </td>
+    </tr>
+    <tr>
+      <td class="info-table" style="padding:2pt 12pt 3pt 12pt">
+        <span class="info-label">First Author:</span> <span class="info-value">${firstAuthorName}</span>
+      </td>
+      <td class="info-table" style="padding:2pt 12pt 3pt 12pt">
+        <span class="info-label">Specialty:</span> <span class="info-value">${manuscript.specialty}</span>
+      </td>
+    </tr>
+    <tr>
+      <td class="info-table" style="padding:2pt 12pt 8pt 12pt">
+        <span class="info-label">Reviewer:</span> <span class="info-value">${reviewerName}</span>
+      </td>
+      <td class="info-table" style="padding:2pt 12pt 8pt 12pt">
+        <span class="info-label">Review Date:</span> <span class="info-value">${today}</span>
+      </td>
+    </tr>
+  </table>
 
-  <div class="sig-wrap">
-    <div>
-      <div class="sig-line">${reviewerName}</div>
-      <div style="font-size:8.5pt;color:#64748b;margin-top:3pt">Reviewer Signature &nbsp;·&nbsp; ${today}</div>
+  <!-- ═══ SECTION 1 — SUMMARY ═══ -->
+  ${section(1, 'Summary', summary || '<em style="color:#6b7280">No summary provided.</em>')}
+
+  <!-- ═══ SECTION 2 — MAJOR COMMENTS ═══ -->
+  ${section(2, 'Major Comments', majorComments || '<em style="color:#6b7280">No major comments.</em>')}
+
+  <!-- ═══ SECTION 3 — MINOR COMMENTS ═══ -->
+  ${section(3, 'Minor Comments', minorComments || '<em style="color:#6b7280">No minor comments.</em>')}
+
+  <!-- ═══ SECTION 4 — STRENGTHS ═══ -->
+  ${section(4, 'Strengths', strengths || '<em style="color:#6b7280">Not specified.</em>')}
+
+  <!-- ═══ SECTION 5 — LIMITATIONS ═══ -->
+  ${section(5, 'Limitations', limitations || '<em style="color:#6b7280">Not specified.</em>', '(to be strengthened in manuscript)')}
+
+  <!-- ═══ SECTION 6 — RECOMMENDATION ═══ -->
+  <div style="margin-top:16pt">
+    <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">6. Recommendation to the Editor</div>
+    <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+    <div style="border:1px solid #d1d5db;border-radius:4px;padding:10pt 12pt">
+      <div style="text-align:center;font-size:12pt;font-weight:900;color:#0f172a;border:2px solid #0f766e;border-radius:5px;padding:8pt 20pt;display:inline-block;margin:0 auto;min-width:220pt">
+        ${recLabel[recommendation] || recommendation}
+      </div>
     </div>
   </div>
 
-  <div class="footer">
+  <!-- ═══ SECTION 7 — REQUIRED REVISIONS ═══ -->
+  <div style="margin-top:16pt">
+    <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">7. Required Revisions <span style="font-weight:400;font-size:9.5pt;text-transform:none;color:#475569">(Actionable)</span></div>
+    <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+    <div style="border:1px solid #d1d5db;border-radius:4px;padding:10pt 12pt;font-size:10.5pt;line-height:1.6;color:#1e293b;background:#fff">
+      <div style="font-weight:700;margin-bottom:4pt">Essential <span style="font-weight:400;font-size:9.5pt">(must address):</span></div>
+      <div style="margin-bottom:10pt">${requiredEssential || '<em style="color:#6b7280">None listed.</em>'}</div>
+      <div style="font-weight:700;margin-bottom:4pt">Recommended <span style="font-weight:400;font-size:9.5pt">(improves quality):</span></div>
+      <div>${requiredRecommended || '<em style="color:#6b7280">None listed.</em>'}</div>
+    </div>
+  </div>
+
+  <!-- ═══ SECTION 8 — FINAL EVALUATION SCORES ═══ -->
+  <div style="margin-top:16pt">
+    <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">8. Final Evaluation Scores</div>
+    <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+    <table style="width:100%;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;border-collapse:separate;border-spacing:0">
+      <thead>
+        <tr style="background:#f1faf8">
+          <th style="padding:7px 12px;text-align:left;font-size:10pt;color:#0f766e;border-bottom:1px solid #d1d5db;font-weight:700">Category</th>
+          <th style="padding:7px 12px;text-align:right;font-size:10pt;color:#0f766e;border-bottom:1px solid #d1d5db;font-weight:700">Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${scoreRow('Originality', scoreOriginality, false)}
+        ${scoreRow('Methodology', scoreMethodology, true)}
+        ${scoreRow('Statistical Rigor', scoreStatistical, false)}
+        ${scoreRow('Clinical Relevance', scoreClinical, true)}
+        ${scoreRow('Presentation', scorePresentation, false)}
+        <tr style="background:#f1faf8">
+          <td style="padding:7px 12px;font-size:10pt;color:#0f172a;font-weight:700;border-top:1px solid #d1d5db">Publishability</td>
+          <td style="padding:7px 12px;font-size:10pt;color:#0f172a;font-weight:700;text-align:right;border-top:1px solid #d1d5db">${scorePublishability || '—'}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ═══ HIGHLIGHTS (if any) ═══ -->
+  ${highlights.length > 0 ? `
+  <div style="margin-top:16pt">
+    <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">Text Highlights <span style="font-weight:400;font-size:9.5pt;text-transform:none;color:#475569">(${highlights.length})</span></div>
+    <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+    <div style="border:1px solid #d1d5db;border-radius:4px;padding:8pt 12pt">
+      ${highlights.map((h, i) => `<div style="font-size:9.5pt;padding:4pt 8pt;background:#fef9c3;border:1px solid #fde68a;border-radius:3px;margin-bottom:4pt"><strong>[${i + 1}]</strong> &ldquo;${h.text}&rdquo;${h.note ? ` &mdash; <em>${h.note}</em>` : ''}</div>`).join('')}
+    </div>
+  </div>` : ''}
+
+  <!-- ═══ CONFIDENTIAL COMMENTS (if any) ═══ -->
+  ${confidential ? `
+  <div style="margin-top:16pt">
+    <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">Confidential Comments to Editor</div>
+    <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+    <div style="border:1px solid #d1d5db;border-radius:4px;padding:10pt 12pt;font-size:10.5pt;color:#1e293b;background:#fff">${confidential}</div>
+  </div>` : ''}
+
+  <!-- ═══ SIGNATURE ═══ -->
+  <div style="display:flex;justify-content:flex-end;margin-top:28pt">
+    <div style="text-align:left;min-width:180pt">
+      <div style="border-top:1.5px solid #334155;padding-top:5pt">
+        <div style="font-size:10.5pt;color:#1e293b;font-weight:600">${reviewerName}</div>
+        <div style="font-size:9pt;color:#64748b;margin-top:1pt">Reviewer Signature</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div style="border-top:1px solid #d1d5db;margin-top:16pt;padding-top:6pt;display:flex;justify-content:space-between;font-size:8pt;color:#64748b">
     <span>GBMN &mdash; Georgian Biomedical and Medical Nexus &middot; gbmn@tsmu.edu</span>
     <span>Confidential &mdash; For Editorial Use Only</span>
   </div>
+
 </body>
 </html>`);
   printWindow.document.close();
