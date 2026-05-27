@@ -5,7 +5,7 @@
 
 import { ArticleTypeConfig, Manuscript, User, SystemAuditLog, JournalSettings, AuthorDetails } from './types';
 import { ensureFirebaseSession, firebaseEnabled, firestore } from './firebase';
-import { collection, doc, getDoc, getDocs, setDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, deleteDoc, getDoc, getDocs, setDoc, onSnapshot } from 'firebase/firestore';
 
 let manuscriptMemory: Manuscript[] = [];
 
@@ -589,6 +589,20 @@ export const DB = {
             console.error('[GBMN] ✗ Firestore write failed:', msg);
             window.dispatchEvent(new CustomEvent('gbmn:sync-error', { detail: msg }));
           });
+      });
+    }
+  },
+
+  /** Permanently delete a manuscript from local state and Firestore. */
+  deleteManuscript(id: string) {
+    manuscriptMemory = manuscriptMemory.filter(m => m.id !== id);
+    setIndexedState('gbmn_manuscripts', manuscriptMemory).catch(console.warn);
+    if (firebaseEnabled && firestore) {
+      const fs = firestore;
+      ensureFirebaseSession().catch(() => null).finally(() => {
+        deleteDoc(doc(fs, 'manuscripts', id))
+          .then(() => console.log('[GBMN] ✓ Firestore delete ok:', id))
+          .catch((err: unknown) => console.error('[GBMN] ✗ Firestore delete failed:', err));
       });
     }
   },

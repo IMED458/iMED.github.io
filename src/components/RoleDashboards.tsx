@@ -37,12 +37,14 @@ import {
   MessageSquare,
   Menu,
   ArrowLeft,
+  Trash2,
 } from 'lucide-react';
 
 interface RoleDashboardsProps {
   currentUser: User;
   manuscripts: Manuscript[];
   onUpdateManuscripts: (newManuscripts: Manuscript[]) => void;
+  onDeleteManuscript?: (id: string) => void;
   onShowNotification: (msg: string, type: 'success' | 'info' | 'error') => void;
 }
 
@@ -54,7 +56,7 @@ function sortNewest(list: Manuscript[]): Manuscript[] {
   );
 }
 
-export default function RoleDashboards({ currentUser, manuscripts, onUpdateManuscripts, onShowNotification }: RoleDashboardsProps) {
+export default function RoleDashboards({ currentUser, manuscripts, onUpdateManuscripts, onDeleteManuscript, onShowNotification }: RoleDashboardsProps) {
   const [selectedManuscript, setSelectedManuscript] = useState<Manuscript | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'reviewed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -340,8 +342,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const renderManuscriptListItem = (m: Manuscript, isSelected: boolean, onClick: () => void) => {
     const isNew = m.status === 'Submitted' && m.reviewerAssignments.length === 0 && m.editorDecisionLog.length === 0;
     const daysSince = Math.floor((Date.now() - new Date(m.submittedAt || m.createdAt).getTime()) / 86400000);
+    const canDelete = !!onDeleteManuscript && (currentUser.role === 'Administrator' || m.status === 'Draft');
     return (
-      <div key={m.id} onClick={onClick} className={`p-3 border rounded-xl cursor-pointer transition-all text-xs ${isSelected ? 'bg-teal-50 border-teal-500 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+      <div key={m.id} className={`relative group p-3 border rounded-xl cursor-pointer transition-all text-xs ${isSelected ? 'bg-teal-50 border-teal-500 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}
+        onClick={onClick}>
         <div className="flex justify-between items-center gap-1 mb-1">
           <span className="font-mono font-bold text-teal-800 text-[10px]">{m.id}</span>
           <div className="flex gap-1 items-center">
@@ -355,6 +359,15 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
           <span>{daysSince === 0 ? 'Today' : `${daysSince}d ago`}</span>
         </div>
         {m.assignedEditorName && <p className="text-[10px] text-teal-700 font-semibold mt-1">Editor: {m.assignedEditorName}</p>}
+        {canDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDeleteManuscript!(m.id); }}
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-lg text-red-500 hover:bg-red-50 transition"
+            title="Delete manuscript"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     );
   };

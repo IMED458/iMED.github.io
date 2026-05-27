@@ -365,6 +365,8 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           Print CSS maps this directly to A4 paper.
           DOCX export replicates this structure exactly.
       ═══════════════════════════════════════════════ */}
+      {/* overflow-x: auto ensures the 794px sheet is always fully visible */}
+      <div style={{ overflowX: 'auto' }}>
       <div id="academic-manuscript-sheet">
         {/* ── JOURNAL HEADER ── */}
         <div className="gbmn-journal-header">
@@ -539,6 +541,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         </div>
 
       </div>{/* end #academic-manuscript-sheet */}
+      </div>{/* end overflow-x:auto wrapper */}
 
       {/* ═══════════════════════════════════════════════
           MASTER STYLES
@@ -1071,12 +1074,14 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           .gbmn-corresponding-mark { color: #0E8B8B !important; }
         }
 
-        /* ── NARROW SCREEN (mobile) ──────────────────── */
-        @media (max-width: 860px) {
+        /* ── NARROW SCREEN (mobile only — 500px) ───────── */
+        /* The 794px sheet sits inside an overflow-x:auto wrapper so it  */
+        /* always shows 2 columns; only collapse to 1 on tiny phones.    */
+        @media (max-width: 500px) {
           #academic-manuscript-sheet {
             width: 100% !important;
             min-height: auto !important;
-            padding: 24px 18px !important;
+            padding: 16px 12px !important;
           }
           .gbmn-body-columns { column-count: 1 !important; }
         }

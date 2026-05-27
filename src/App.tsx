@@ -14,16 +14,17 @@ import RoleDashboards from './components/RoleDashboards';
 import ManuscriptPreview from './components/ManuscriptPreview';
 import { changeFirebasePassword, ensureFirebaseSession, signOutFirebase, subscribeFirebaseAuth } from './firebase';
 import { 
-  GraduationCap, 
-  User as UserIcon, 
-  LogOut, 
-  Bell, 
-  Sparkles, 
+  GraduationCap,
+  User as UserIcon,
+  LogOut,
+  Bell,
+  Sparkles,
   AlertCircle,
   Info,
   FileText,
   Plus,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
     confirmPassword: '',
   });
   const isEditorialUser = currentUser && currentUser.role !== 'Author';
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; title: string } | null>(null);
   const [journalNotifications, setJournalNotifications] = useState<Array<{ id: string; text: string; time: string; read: boolean }>>([
     { id: 'n1', text: 'Welcome to GBMN peer submissions network! Check policies.', time: 'Just now', read: false },
     { id: 'n2', text: 'Shota Rustaveli national grant funding integration loaded.', time: '2 hours ago', read: true },
@@ -159,6 +161,17 @@ export default function App() {
   const handleUpdateManuscriptsList = (newList: Manuscript[]) => {
     setManuscripts(newList);
     DB.setManuscripts(newList);
+  };
+
+  const handleDeleteManuscript = (id: string) => {
+    const list = manuscripts.filter(m => m.id !== id);
+    setManuscripts(list);
+    if (selectedManuscriptId === id) {
+      setSelectedManuscriptId(list[0]?.id || null);
+      setActiveStep('getting-started');
+    }
+    DB.deleteManuscript(id);
+    triggerNotification('Manuscript deleted.', 'info');
   };
 
   const handleLogout = async () => {
@@ -459,6 +472,32 @@ export default function App() {
         </div>
       )}
 
+      {/* DELETE CONFIRMATION MODAL */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 p-4 no-print">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl animate-fade-in">
+            <h3 className="text-base font-bold text-slate-900">Delete Manuscript?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              <strong className="text-slate-800">"{deleteConfirm.title || 'Untitled draft'}"</strong> will be permanently removed from your account and the cloud. This cannot be undone.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { handleDeleteManuscript(deleteConfirm.id); setDeleteConfirm(null); }}
+                className="rounded-lg bg-red-600 hover:bg-red-700 px-4 py-2 text-xs font-bold text-white"
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 4. WORKPLACE CANVAS */}
       <main id="main-workplace-canvas" className={`flex-1 w-full ${isEditorialUser ? 'py-0 px-0 max-w-none mx-0' : 'py-8 px-4 md:px-8 max-w-7xl mx-auto'}`}>
         
@@ -488,23 +527,37 @@ export default function App() {
                     No manuscripts yet. Create your first draft.
                   </button>
                 ) : authorManuscripts.map((m) => (
-                  <button
+                  <div
                     key={m.id}
-                    onClick={() => { setSelectedManuscriptId(m.id); setActiveStep('getting-started'); }}
-                    className={`text-left border rounded-xl p-3 transition ${activeManuscript?.id === m.id ? 'border-teal-600 bg-teal-50' : 'border-slate-200 bg-slate-50 hover:bg-white'}`}
+                    className={`relative group border rounded-xl p-3 transition ${activeManuscript?.id === m.id ? 'border-teal-600 bg-teal-50' : 'border-slate-200 bg-slate-50 hover:bg-white'}`}
                   >
-                    <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-slate-500">
-                      <span>{m.id}</span>
-                      <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {m.status}</span>
-                    </div>
-                    <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-2">{m.title || 'Untitled draft'}</p>
-                    <p className="mt-1 text-[11px] text-slate-500">Created {new Date(m.createdAt).toLocaleDateString()} · Updated {new Date(m.updatedAt).toLocaleDateString()}</p>
-                    {m.editorDecisionLog.length > 0 && (
-                      <p className="mt-1 text-[11px] text-amber-700 font-semibold line-clamp-1">
-                        Latest editor note: {m.editorDecisionLog[m.editorDecisionLog.length - 1].comments}
-                      </p>
+                    <button
+                      onClick={() => { setSelectedManuscriptId(m.id); setActiveStep('getting-started'); }}
+                      className="text-left w-full"
+                    >
+                      <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-slate-500">
+                        <span>{m.id}</span>
+                        <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {m.status}</span>
+                      </div>
+                      <p className="mt-2 text-sm font-bold text-slate-800 line-clamp-2">{m.title || 'Untitled draft'}</p>
+                      <p className="mt-1 text-[11px] text-slate-500">Created {new Date(m.createdAt).toLocaleDateString()} · Updated {new Date(m.updatedAt).toLocaleDateString()}</p>
+                      {m.editorDecisionLog.length > 0 && (
+                        <p className="mt-1 text-[11px] text-amber-700 font-semibold line-clamp-1">
+                          Latest editor note: {m.editorDecisionLog[m.editorDecisionLog.length - 1].comments}
+                        </p>
+                      )}
+                    </button>
+                    {/* Delete button — only for drafts or revision-requested */}
+                    {['Draft', 'Revision Requested'].includes(m.status) && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: m.id, title: m.title || 'Untitled draft' }); }}
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-lg text-red-500 hover:bg-red-50 transition"
+                        title="Delete manuscript"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     )}
-                  </button>
+                  </div>
                 ))}
               </div>
             </section>
@@ -543,10 +596,14 @@ export default function App() {
         ) : (
           
           /* INTERACTIVE MULTI-ROLE OFFICE DASHBOARDS */
-          <RoleDashboards 
+          <RoleDashboards
             currentUser={currentUser}
             manuscripts={manuscripts}
             onUpdateManuscripts={handleUpdateManuscriptsList}
+            onDeleteManuscript={(id) => {
+              const m = manuscripts.find(x => x.id === id);
+              setDeleteConfirm({ id, title: m?.title || 'Untitled' });
+            }}
             onShowNotification={triggerNotification}
           />
         )}
