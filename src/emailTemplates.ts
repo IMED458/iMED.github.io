@@ -87,10 +87,9 @@ export function paymentRequest(manuscript: Manuscript) {
 }
 
 export function reviewerInvitation(manuscript: Manuscript, reviewerName: string) {
-  const portal = typeof window !== 'undefined' ? window.location.origin : 'https://gbmnsubmit.github.io';
   return {
     subject: `GBMN — Peer Review Invitation: ${manuscript.id}`,
-    body: `Dear ${reviewerName},\n\nYou have been invited to serve as a peer reviewer for the following manuscript submitted to the Georgian Biomedical and Medical Nexus (GBMN).\n\nManuscript ID: ${manuscript.id}\nTitle: ${manuscript.title}\nSpecialty: ${manuscript.specialty}\nArticle Type: ${manuscript.articleType}\n\nPlease sign in to the reviewer portal to access the full manuscript and complete your review:\n${portal}\n\nWe kindly request that you complete your review within 14 days of receiving this invitation. If you are unable to accept this assignment, please decline through the portal at your earliest convenience.\n\nYour expert contribution is essential to maintaining the scholarly standards of GBMN.\n\nSincerely,\nEditorial Office\nGeorgian Biomedical and Medical Nexus\ngbmn@tsmu.edu`,
+    body: `Dear ${reviewerName},\n\nYou have been invited to serve as a peer reviewer for the following manuscript submitted to the Georgian Biomedical and Medical Nexus (GBMN).\n\nManuscript ID: ${manuscript.id}\nTitle: ${manuscript.title}\nSpecialty: ${manuscript.specialty}\nArticle Type: ${manuscript.articleType}\n\nPlease sign in to the reviewer portal to access the full manuscript and complete your review.\n\nWe kindly request that you complete your review within 14 days of receiving this invitation. If you are unable to accept this assignment, please decline through the portal at your earliest convenience.\n\nYour expert contribution is essential to maintaining the scholarly standards of GBMN.\n\nSincerely,\nEditorial Office\nGeorgian Biomedical and Medical Nexus\ngbmn@tsmu.edu`,
   };
 }
 
