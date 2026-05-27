@@ -171,7 +171,22 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           <title>${stripHtml(manuscript.title || 'GBMN Manuscript')}</title>
           ${styles}
           <style>
-            @page { size: A4 portrait; margin: 19mm 13mm 28mm 13mm; }
+            /* Page 1: original margins, no running header */
+            @page :first {
+              size: A4 portrait;
+              margin: 19mm 13mm 28mm 13mm;
+              @top-left   { content: none; border: none; }
+              @top-center { content: none; border: none; }
+              @top-right  { content: none; border: none; }
+            }
+            /* Pages 2+: taller top margin to hold running header */
+            @page {
+              size: A4 portrait;
+              margin: 26mm 13mm 28mm 13mm;
+              @top-left   { content: ""; border-top: 2pt solid #0E8B8B; border-bottom: 2pt solid #0E8B8B; padding: 3pt 0; }
+              @top-center { content: "GEORGIAN BIOMEDICAL NEWS"; font-family: Arial,sans-serif; font-size: 8pt; font-weight: bold; color: #0A3C3C; letter-spacing: 0.12em; border-top: 2pt solid #0E8B8B; border-bottom: 2pt solid #0E8B8B; padding: 3pt 14pt; white-space: nowrap; }
+              @top-right  { content: ""; border-top: 2pt solid #0E8B8B; border-bottom: 2pt solid #0E8B8B; padding: 3pt 0; }
+            }
             html, body {
               margin: 0 !important;
               padding: 0 !important;
@@ -601,8 +616,8 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           align-items: center;
           gap: 16px;
         }
-        .gbmn-header-rules { flex: 1; display: flex; flex-direction: column; gap: 3px; }
-        .gbmn-rule-line { height: 3px; background: var(--gbmn-teal); }
+        .gbmn-header-rules { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+        .gbmn-rule-line { height: 2.5px; background: var(--gbmn-teal); }
         .gbmn-volume-label {
           font-family: Arial, sans-serif;
           font-size: 11pt;

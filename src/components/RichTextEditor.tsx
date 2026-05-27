@@ -33,6 +33,7 @@ export default function RichTextEditor({
   const draggedMediaRef = useRef<HTMLElement | null>(null);
   const insertionMarkerIdRef = useRef<string | null>(null);
   const historyRef = useRef<string[]>([]);
+  const [currentBlockStyle, setCurrentBlockStyle] = useState<'normal' | 'subheading'>('normal');
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
   const [showTablePaste, setShowTablePaste] = useState(false);
   const [showDiagramPaste, setShowDiagramPaste] = useState(false);
@@ -70,10 +71,34 @@ export default function RichTextEditor({
     handleInput();
   };
 
+  const detectBlockStyle = () => {
+    if (!editorRef.current) return;
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) { setCurrentBlockStyle('normal'); return; }
+    let node: Node | null = sel.getRangeAt(0).commonAncestorContainer;
+    while (node && node !== editorRef.current) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tag = (node as HTMLElement).tagName?.toUpperCase();
+        if (tag === 'H3' || tag === 'H2' || tag === 'H4' || tag === 'H5') {
+          setCurrentBlockStyle('subheading');
+          return;
+        }
+        if (tag === 'P' || tag === 'DIV' || tag === 'LI' || tag === 'BLOCKQUOTE') {
+          setCurrentBlockStyle('normal');
+          return;
+        }
+      }
+      node = node.parentNode;
+    }
+    setCurrentBlockStyle('normal');
+  };
+
   const applyBlockStyle = (style: 'normal' | 'subheading') => {
     editorRef.current?.focus();
     document.execCommand('formatBlock', false, style === 'subheading' ? 'h3' : 'p');
     handleInput();
+    // Sync dropdown after command settles
+    setTimeout(detectBlockStyle, 0);
   };
 
   const pushHistory = () => {
@@ -460,6 +485,7 @@ export default function RichTextEditor({
     if (!media) {
       setSelectedMediaId(null);
       saveSelectionFromPoint(event.clientX, event.clientY);
+      setTimeout(detectBlockStyle, 0);
       return;
     }
     event.preventDefault();
@@ -634,8 +660,8 @@ export default function RichTextEditor({
       {/* Toolbar */}
       <div className="flex flex-wrap gap-1 bg-slate-100 border border-b-0 border-slate-300 rounded-t-lg p-1.5">
         <select
+          value={currentBlockStyle}
           onChange={(event) => applyBlockStyle(event.target.value as 'normal' | 'subheading')}
-          defaultValue="normal"
           className="h-8 border border-slate-300 bg-white px-2 text-xs font-semibold"
           title="Block style"
         >
@@ -870,9 +896,9 @@ export default function RichTextEditor({
         onDragOver={(event) => event.preventDefault()}
         onDrop={handleDrop}
         onMouseDown={(event) => saveSelectionFromPoint(event.clientX, event.clientY)}
-        onMouseUp={() => setTimeout(saveSelection, 0)}
-        onKeyUp={saveSelection}
-        onFocus={saveSelection}
+        onMouseUp={() => setTimeout(() => { saveSelection(); detectBlockStyle(); }, 0)}
+        onKeyUp={() => { saveSelection(); detectBlockStyle(); }}
+        onFocus={() => { saveSelection(); detectBlockStyle(); }}
         onClick={handleEditorClick}
         data-placeholder={placeholder}
         className="w-full bg-white border border-slate-300 rounded-b-lg p-3 font-serif text-[14px] leading-relaxed focus:ring-1 focus:ring-teal-600 focus:outline-none text-slate-800 rich-editor-area"
