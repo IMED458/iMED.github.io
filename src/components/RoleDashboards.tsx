@@ -49,6 +49,113 @@ interface RoleDashboardsProps {
   onShowNotification: (msg: string, type: 'success' | 'info' | 'error') => void;
 }
 
+function printReviewAsPdf(params: {
+  manuscript: Manuscript;
+  reviewerName: string;
+  ethical: string;
+  methodScore: number;
+  origScore: number;
+  meritScore: number;
+  comments: string;
+  confidential: string;
+  recommendation: string;
+  highlights: { id: string; text: string; note?: string }[];
+  onNotify: (msg: string, type: 'success' | 'info' | 'error') => void;
+}) {
+  const { manuscript, reviewerName, ethical, methodScore, origScore, meritScore, comments, confidential, recommendation, highlights, onNotify } = params;
+  const recLabel: Record<string, string> = {
+    'accept': 'Accept Manuscript Unedited',
+    'minor-revision': 'Accept with Minor Revisions',
+    'major-revision': 'Re-evaluate after Major Revisions',
+    'reject': 'Decline / Reject Submission',
+  };
+  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  const scoreBar = (score: number) =>
+    `<span style="letter-spacing:3px;font-size:13pt;color:#0f766e">${'●'.repeat(score)}${'○'.repeat(5 - score)}</span> <strong>${score}/5</strong>`;
+
+  const printWindow = window.open('', '_blank', 'width=900,height=1200');
+  if (!printWindow) { onNotify('Popup blocked — please allow popups for this site.', 'error'); return; }
+
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Peer Review Report — ${manuscript.id}</title>
+  <style>
+    @page { size: A4 portrait; margin: 20mm 15mm 25mm 15mm; }
+    *{box-sizing:border-box}
+    body{font-family:'Times New Roman',Times,serif;font-size:11pt;line-height:1.5;color:#1a1a1a;background:#fff;margin:0;padding:0}
+    .gbmn-header{border-bottom:3px solid #0f766e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-end}
+    .journal-name{font-size:17pt;font-weight:900;color:#0f766e;letter-spacing:1px;text-transform:uppercase}
+    .journal-sub{font-size:8.5pt;color:#555;font-style:italic;margin-top:2px}
+    .report-title{font-size:13pt;font-weight:bold;text-align:center;color:#1e293b;margin:10px 0 14px;text-transform:uppercase;letter-spacing:.5px}
+    .meta-box{border:1.5px solid #cbd5e1;border-radius:6px;padding:10px 14px;background:#f8fafc;font-size:9.5pt;margin-bottom:14px}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+    .meta-item{margin:2px 0}
+    .meta-label{font-weight:bold;color:#475569}
+    h2{font-size:9.5pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;color:#0f766e;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin:14px 0 6px}
+    .score-row{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;margin-bottom:5px;font-size:10pt}
+    .score-label{font-weight:bold;color:#334155}
+    .content-box{border:1px solid #e2e8f0;border-radius:4px;padding:10px 12px;background:#fff;font-size:10.5pt;min-height:40px}
+    .rec-box{border:2.5px solid #0f766e;border-radius:6px;padding:10px 14px;background:#f0fdf4;font-size:12pt;font-weight:bold;color:#065f46;text-align:center;margin-top:10px}
+    .hl-item{font-size:9.5pt;padding:5px 8px;background:#fef9c3;border:1px solid #fde68a;border-radius:4px;margin-bottom:4px}
+    .gbmn-footer{border-top:1px solid #cbd5e1;padding-top:7px;margin-top:22px;font-size:8.5pt;color:#64748b;display:flex;justify-content:space-between}
+    .sig-block{display:flex;justify-content:flex-end;margin-top:28px}
+    .sig-line{border-top:1px solid #334155;width:220px;padding-top:4px;font-size:9pt;color:#334155}
+  </style>
+</head>
+<body>
+  <div class="gbmn-header">
+    <div>
+      <div class="journal-name">GBMN</div>
+      <div class="journal-sub">Georgian Biomedical and Medical Nexus</div>
+    </div>
+    <div style="text-align:right;font-size:9pt;color:#555">Confidential Peer Review Document<br/>Date: ${today}</div>
+  </div>
+  <div class="report-title">Peer Review Report</div>
+  <div class="meta-box">
+    <div class="meta-grid">
+      <p class="meta-item"><span class="meta-label">Manuscript ID:</span> ${manuscript.id}</p>
+      <p class="meta-item"><span class="meta-label">Article Type:</span> ${manuscript.articleType}</p>
+      <p class="meta-item" style="grid-column:1/-1"><span class="meta-label">Title:</span> ${manuscript.title}</p>
+      <p class="meta-item"><span class="meta-label">First Author:</span> ${(manuscript.authors[0]?.firstName || '')} ${(manuscript.authors[0]?.lastName || '')}</p>
+      <p class="meta-item"><span class="meta-label">Specialty:</span> ${manuscript.specialty}</p>
+      <p class="meta-item"><span class="meta-label">Reviewer:</span> ${reviewerName}</p>
+      <p class="meta-item"><span class="meta-label">Review Date:</span> ${today}</p>
+    </div>
+  </div>
+  <h2>1. Ethical Concerns</h2>
+  <div class="content-box">${ethical || '<em>None identified</em>'}</div>
+  <h2>2. Scientific Assessment</h2>
+  <div class="score-row"><span class="score-label">Methodology</span><span>${scoreBar(methodScore)}</span></div>
+  <div class="score-row"><span class="score-label">Originality</span><span>${scoreBar(origScore)}</span></div>
+  <div class="score-row"><span class="score-label">Scientific Merit</span><span>${scoreBar(meritScore)}</span></div>
+  <h2>3. Constructive Comments to Authors</h2>
+  <div class="content-box">${comments || '<em>No comments provided.</em>'}</div>
+  <h2>4. Confidential Comments to Editor</h2>
+  <div class="content-box">${confidential || '<em>None.</em>'}</div>
+  ${highlights.length > 0 ? `<h2>Text Highlights (${highlights.length})</h2>
+  ${highlights.map((h, i) => `<div class="hl-item"><strong>[${i + 1}]</strong> &ldquo;${h.text}&rdquo;${h.note ? ` &mdash; <em>${h.note}</em>` : ''}</div>`).join('')}` : ''}
+  <h2>5. Recommendation</h2>
+  <div class="rec-box">${recLabel[recommendation] || recommendation}</div>
+  <div class="sig-block">
+    <div>
+      <div class="sig-line">${reviewerName}</div>
+      <div style="font-size:8.5pt;color:#64748b;margin-top:3px">Reviewer Signature</div>
+    </div>
+  </div>
+  <div class="gbmn-footer">
+    <span>GBMN &mdash; Georgian Biomedical and Medical Nexus &middot; gbmn@tsmu.edu</span>
+    <span>Confidential &mdash; For Editorial Use Only</span>
+  </div>
+</body>
+</html>`);
+  printWindow.document.close();
+  setTimeout(() => { printWindow.focus(); printWindow.print(); }, 300);
+  onNotify('Opening review PDF preview.', 'success');
+}
+
 function sortNewest(list: Manuscript[]): Manuscript[] {
   return [...list].sort(
     (a, b) =>
@@ -284,108 +391,19 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
   const handlePrintReview = () => {
     if (!selectedManuscript) return;
-    const recLabel: Record<string, string> = {
-      'accept': 'Accept Manuscript Unedited',
-      'minor-revision': 'Accept with Minor Revisions',
-      'major-revision': 'Re-evaluate after Major Revisions',
-      'reject': 'Decline / Reject Submission',
-    };
-    const reviewerFullName = `${currentUser.firstName} ${currentUser.lastName}`;
-    const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-    const scoreBar = (score: number) =>
-      `<span style="letter-spacing:3px;font-size:13pt;color:#0f766e">${'●'.repeat(score)}${'○'.repeat(5 - score)}</span> <strong>${score}/5</strong>`;
-
-    const printWindow = window.open('', '_blank', 'width=900,height=1200');
-    if (!printWindow) { onShowNotification('Popup blocked — please allow popups for this site.', 'error'); return; }
-
-    printWindow.document.open();
-    printWindow.document.write(`<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>Peer Review Report — ${selectedManuscript.id}</title>
-  <style>
-    @page { size: A4 portrait; margin: 20mm 15mm 25mm 15mm; }
-    *{box-sizing:border-box}
-    body{font-family:'Times New Roman',Times,serif;font-size:11pt;line-height:1.5;color:#1a1a1a;background:#fff;margin:0;padding:0}
-    .gbmn-header{border-bottom:3px solid #0f766e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-end}
-    .journal-name{font-size:17pt;font-weight:900;color:#0f766e;letter-spacing:1px;text-transform:uppercase}
-    .journal-sub{font-size:8.5pt;color:#555;font-style:italic;margin-top:2px}
-    .report-title{font-size:13pt;font-weight:bold;text-align:center;color:#1e293b;margin:10px 0 14px;text-transform:uppercase;letter-spacing:.5px}
-    .meta-box{border:1.5px solid #cbd5e1;border-radius:6px;padding:10px 14px;background:#f8fafc;font-size:9.5pt;margin-bottom:14px}
-    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
-    .meta-item{margin:2px 0}
-    .meta-label{font-weight:bold;color:#475569}
-    h2{font-size:9.5pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;color:#0f766e;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin:14px 0 6px}
-    .score-row{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;margin-bottom:5px;font-size:10pt}
-    .score-label{font-weight:bold;color:#334155}
-    .content-box{border:1px solid #e2e8f0;border-radius:4px;padding:10px 12px;background:#fff;font-size:10.5pt;min-height:40px}
-    .rec-box{border:2.5px solid #0f766e;border-radius:6px;padding:10px 14px;background:#f0fdf4;font-size:12pt;font-weight:bold;color:#065f46;text-align:center;margin-top:10px}
-    .hl-item{font-size:9.5pt;padding:5px 8px;background:#fef9c3;border:1px solid #fde68a;border-radius:4px;margin-bottom:4px}
-    .gbmn-footer{border-top:1px solid #cbd5e1;padding-top:7px;margin-top:22px;font-size:8.5pt;color:#64748b;display:flex;justify-content:space-between}
-    .sig-block{display:flex;justify-content:flex-end;margin-top:28px}
-    .sig-line{border-top:1px solid #334155;width:220px;padding-top:4px;font-size:9pt;color:#334155}
-  </style>
-</head>
-<body>
-  <div class="gbmn-header">
-    <div>
-      <div class="journal-name">GBMN</div>
-      <div class="journal-sub">Georgian Biomedical and Medical Nexus</div>
-    </div>
-    <div style="text-align:right;font-size:9pt;color:#555">Confidential Peer Review Document<br/>Date: ${today}</div>
-  </div>
-
-  <div class="report-title">Peer Review Report</div>
-
-  <div class="meta-box">
-    <div class="meta-grid">
-      <p class="meta-item"><span class="meta-label">Manuscript ID:</span> ${selectedManuscript.id}</p>
-      <p class="meta-item"><span class="meta-label">Article Type:</span> ${selectedManuscript.articleType}</p>
-      <p class="meta-item" style="grid-column:1/-1"><span class="meta-label">Title:</span> ${selectedManuscript.title}</p>
-      <p class="meta-item"><span class="meta-label">First Author:</span> ${(selectedManuscript.authors[0]?.firstName || '')} ${(selectedManuscript.authors[0]?.lastName || '')}</p>
-      <p class="meta-item"><span class="meta-label">Specialty:</span> ${selectedManuscript.specialty}</p>
-      <p class="meta-item"><span class="meta-label">Reviewer:</span> ${reviewerFullName}</p>
-      <p class="meta-item"><span class="meta-label">Review Date:</span> ${today}</p>
-    </div>
-  </div>
-
-  <h2>1. Ethical Concerns</h2>
-  <div class="content-box">${reviewScoreEthical || '<em>None identified</em>'}</div>
-
-  <h2>2. Scientific Assessment</h2>
-  <div class="score-row"><span class="score-label">Methodology</span><span>${scoreBar(reviewScoreMethod)}</span></div>
-  <div class="score-row"><span class="score-label">Originality</span><span>${scoreBar(reviewScoreOrig)}</span></div>
-  <div class="score-row"><span class="score-label">Scientific Merit</span><span>${scoreBar(reviewScoreMerit)}</span></div>
-
-  <h2>3. Constructive Comments to Authors</h2>
-  <div class="content-box">${reviewComments || '<em>No comments provided.</em>'}</div>
-
-  <h2>4. Confidential Comments to Editor</h2>
-  <div class="content-box">${reviewPrivate || '<em>None.</em>'}</div>
-
-  ${reviewHighlights.length > 0 ? `<h2>Text Highlights (${reviewHighlights.length})</h2>
-  ${reviewHighlights.map((h, i) => `<div class="hl-item"><strong>[${i + 1}]</strong> &ldquo;${h.text}&rdquo;${h.note ? ` &mdash; <em>${h.note}</em>` : ''}</div>`).join('')}` : ''}
-
-  <h2>5. Recommendation</h2>
-  <div class="rec-box">${recLabel[reviewRecommend] || reviewRecommend}</div>
-
-  <div class="sig-block">
-    <div>
-      <div class="sig-line">${reviewerFullName}</div>
-      <div style="font-size:8.5pt;color:#64748b;margin-top:3px">Reviewer Signature</div>
-    </div>
-  </div>
-
-  <div class="gbmn-footer">
-    <span>GBMN &mdash; Georgian Biomedical and Medical Nexus &middot; gbmn@tsmu.edu</span>
-    <span>Confidential &mdash; For Editorial Use Only</span>
-  </div>
-</body>
-</html>`);
-    printWindow.document.close();
-    setTimeout(() => { printWindow.focus(); printWindow.print(); }, 300);
-    onShowNotification('Opening review PDF preview.', 'success');
+    printReviewAsPdf({
+      manuscript: selectedManuscript,
+      reviewerName: `${currentUser.firstName} ${currentUser.lastName}`,
+      ethical: reviewScoreEthical,
+      methodScore: reviewScoreMethod,
+      origScore: reviewScoreOrig,
+      meritScore: reviewScoreMerit,
+      comments: reviewComments,
+      confidential: reviewPrivate,
+      recommendation: reviewRecommend,
+      highlights: reviewHighlights,
+      onNotify: onShowNotification,
+    });
   };
 
   const handleTextHighlight = () => {
@@ -559,9 +577,30 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             <p className="font-bold text-amber-900 uppercase text-[10px]">Reviewer Feedback</p>
             {manuscript.reviewerAssignments.filter(ra => ra.comments).map(ra => (
               <div key={ra.reviewerId} className="bg-white border border-amber-200 rounded-lg p-2.5 space-y-1">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="font-bold text-slate-800">{ra.reviewerName}</span>
-                  <span className="font-bold text-teal-700 uppercase text-[10px]">{ra.comments!.recommendation}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-teal-700 uppercase text-[10px]">{ra.comments!.recommendation}</span>
+                    <button
+                      type="button"
+                      onClick={() => printReviewAsPdf({
+                        manuscript,
+                        reviewerName: ra.reviewerName,
+                        ethical: ra.comments!.ethicalConcerns,
+                        methodScore: ra.comments!.methodologyScore,
+                        origScore: ra.comments!.originalityScore,
+                        meritScore: ra.comments!.scientificMeritScore,
+                        comments: ra.comments!.constructiveComments,
+                        confidential: ra.comments!.confidentialToEditor,
+                        recommendation: ra.comments!.recommendation,
+                        highlights: ra.highlights || [],
+                        onNotify: onShowNotification,
+                      })}
+                      className="flex items-center gap-1 border border-teal-300 text-teal-700 font-bold px-2 py-0.5 rounded text-[10px] hover:bg-teal-50"
+                    >
+                      <Printer className="h-3 w-3" /> Print PDF
+                    </button>
+                  </div>
                 </div>
                 <p className="text-slate-600 italic">"{ra.comments!.constructiveComments}"</p>
                 {ra.comments!.confidentialToEditor && <p className="text-slate-500 text-[10px]">Confidential: {ra.comments!.confidentialToEditor}</p>}
@@ -868,7 +907,31 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     </div>
                     {m.reviewerAssignments.filter(ra => ra.comments).map(ra => (
                       <div key={ra.reviewerId} className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs space-y-1">
-                        <div className="flex justify-between"><span className="font-bold">{ra.reviewerName}</span><span className="font-bold text-teal-800 uppercase">{ra.comments!.recommendation}</span></div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold">{ra.reviewerName}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-teal-800 uppercase">{ra.comments!.recommendation}</span>
+                            <button
+                              type="button"
+                              onClick={() => printReviewAsPdf({
+                                manuscript: m,
+                                reviewerName: ra.reviewerName,
+                                ethical: ra.comments!.ethicalConcerns,
+                                methodScore: ra.comments!.methodologyScore,
+                                origScore: ra.comments!.originalityScore,
+                                meritScore: ra.comments!.scientificMeritScore,
+                                comments: ra.comments!.constructiveComments,
+                                confidential: ra.comments!.confidentialToEditor,
+                                recommendation: ra.comments!.recommendation,
+                                highlights: ra.highlights || [],
+                                onNotify: onShowNotification,
+                              })}
+                              className="flex items-center gap-1 border border-teal-300 text-teal-700 font-bold px-2 py-0.5 rounded text-[10px] hover:bg-teal-50"
+                            >
+                              <Printer className="h-3 w-3" /> Print PDF
+                            </button>
+                          </div>
+                        </div>
                         <p className="italic text-slate-600">"{ra.comments!.constructiveComments}"</p>
                       </div>
                     ))}
