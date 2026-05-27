@@ -38,6 +38,7 @@ import {
   Menu,
   ArrowLeft,
   Trash2,
+  Printer,
 } from 'lucide-react';
 
 interface RoleDashboardsProps {
@@ -279,6 +280,112 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
       setSelectedManuscript(updated.find(m => m.id === manuscript.id) || null);
       DB.addAuditLog({ userId: currentUser.id, userEmail: currentUser.email, action: 'REVIEW_SUBMITTED', targetId: manuscript.id, details: `Recommendation: ${reviewRecommend}` });
     }
+  };
+
+  const handlePrintReview = () => {
+    if (!selectedManuscript) return;
+    const recLabel: Record<string, string> = {
+      'accept': 'Accept Manuscript Unedited',
+      'minor-revision': 'Accept with Minor Revisions',
+      'major-revision': 'Re-evaluate after Major Revisions',
+      'reject': 'Decline / Reject Submission',
+    };
+    const reviewerFullName = `${currentUser.firstName} ${currentUser.lastName}`;
+    const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    const scoreBar = (score: number) =>
+      `<span style="letter-spacing:3px;font-size:13pt;color:#0f766e">${'●'.repeat(score)}${'○'.repeat(5 - score)}</span> <strong>${score}/5</strong>`;
+
+    const printWindow = window.open('', '_blank', 'width=900,height=1200');
+    if (!printWindow) { onShowNotification('Popup blocked — please allow popups for this site.', 'error'); return; }
+
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Peer Review Report — ${selectedManuscript.id}</title>
+  <style>
+    @page { size: A4 portrait; margin: 20mm 15mm 25mm 15mm; }
+    *{box-sizing:border-box}
+    body{font-family:'Times New Roman',Times,serif;font-size:11pt;line-height:1.5;color:#1a1a1a;background:#fff;margin:0;padding:0}
+    .gbmn-header{border-bottom:3px solid #0f766e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-end}
+    .journal-name{font-size:17pt;font-weight:900;color:#0f766e;letter-spacing:1px;text-transform:uppercase}
+    .journal-sub{font-size:8.5pt;color:#555;font-style:italic;margin-top:2px}
+    .report-title{font-size:13pt;font-weight:bold;text-align:center;color:#1e293b;margin:10px 0 14px;text-transform:uppercase;letter-spacing:.5px}
+    .meta-box{border:1.5px solid #cbd5e1;border-radius:6px;padding:10px 14px;background:#f8fafc;font-size:9.5pt;margin-bottom:14px}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+    .meta-item{margin:2px 0}
+    .meta-label{font-weight:bold;color:#475569}
+    h2{font-size:9.5pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;color:#0f766e;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin:14px 0 6px}
+    .score-row{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;margin-bottom:5px;font-size:10pt}
+    .score-label{font-weight:bold;color:#334155}
+    .content-box{border:1px solid #e2e8f0;border-radius:4px;padding:10px 12px;background:#fff;font-size:10.5pt;min-height:40px}
+    .rec-box{border:2.5px solid #0f766e;border-radius:6px;padding:10px 14px;background:#f0fdf4;font-size:12pt;font-weight:bold;color:#065f46;text-align:center;margin-top:10px}
+    .hl-item{font-size:9.5pt;padding:5px 8px;background:#fef9c3;border:1px solid #fde68a;border-radius:4px;margin-bottom:4px}
+    .gbmn-footer{border-top:1px solid #cbd5e1;padding-top:7px;margin-top:22px;font-size:8.5pt;color:#64748b;display:flex;justify-content:space-between}
+    .sig-block{display:flex;justify-content:flex-end;margin-top:28px}
+    .sig-line{border-top:1px solid #334155;width:220px;padding-top:4px;font-size:9pt;color:#334155}
+  </style>
+</head>
+<body>
+  <div class="gbmn-header">
+    <div>
+      <div class="journal-name">GBMN</div>
+      <div class="journal-sub">Georgian Biomedical and Medical Nexus</div>
+    </div>
+    <div style="text-align:right;font-size:9pt;color:#555">Confidential Peer Review Document<br/>Date: ${today}</div>
+  </div>
+
+  <div class="report-title">Peer Review Report</div>
+
+  <div class="meta-box">
+    <div class="meta-grid">
+      <p class="meta-item"><span class="meta-label">Manuscript ID:</span> ${selectedManuscript.id}</p>
+      <p class="meta-item"><span class="meta-label">Article Type:</span> ${selectedManuscript.articleType}</p>
+      <p class="meta-item" style="grid-column:1/-1"><span class="meta-label">Title:</span> ${selectedManuscript.title}</p>
+      <p class="meta-item"><span class="meta-label">First Author:</span> ${(selectedManuscript.authors[0]?.firstName || '')} ${(selectedManuscript.authors[0]?.lastName || '')}</p>
+      <p class="meta-item"><span class="meta-label">Specialty:</span> ${selectedManuscript.specialty}</p>
+      <p class="meta-item"><span class="meta-label">Reviewer:</span> ${reviewerFullName}</p>
+      <p class="meta-item"><span class="meta-label">Review Date:</span> ${today}</p>
+    </div>
+  </div>
+
+  <h2>1. Ethical Concerns</h2>
+  <div class="content-box">${reviewScoreEthical || '<em>None identified</em>'}</div>
+
+  <h2>2. Scientific Assessment</h2>
+  <div class="score-row"><span class="score-label">Methodology</span><span>${scoreBar(reviewScoreMethod)}</span></div>
+  <div class="score-row"><span class="score-label">Originality</span><span>${scoreBar(reviewScoreOrig)}</span></div>
+  <div class="score-row"><span class="score-label">Scientific Merit</span><span>${scoreBar(reviewScoreMerit)}</span></div>
+
+  <h2>3. Constructive Comments to Authors</h2>
+  <div class="content-box">${reviewComments || '<em>No comments provided.</em>'}</div>
+
+  <h2>4. Confidential Comments to Editor</h2>
+  <div class="content-box">${reviewPrivate || '<em>None.</em>'}</div>
+
+  ${reviewHighlights.length > 0 ? `<h2>Text Highlights (${reviewHighlights.length})</h2>
+  ${reviewHighlights.map((h, i) => `<div class="hl-item"><strong>[${i + 1}]</strong> &ldquo;${h.text}&rdquo;${h.note ? ` &mdash; <em>${h.note}</em>` : ''}</div>`).join('')}` : ''}
+
+  <h2>5. Recommendation</h2>
+  <div class="rec-box">${recLabel[reviewRecommend] || reviewRecommend}</div>
+
+  <div class="sig-block">
+    <div>
+      <div class="sig-line">${reviewerFullName}</div>
+      <div style="font-size:8.5pt;color:#64748b;margin-top:3px">Reviewer Signature</div>
+    </div>
+  </div>
+
+  <div class="gbmn-footer">
+    <span>GBMN &mdash; Georgian Biomedical and Medical Nexus &middot; gbmn@tsmu.edu</span>
+    <span>Confidential &mdash; For Editorial Use Only</span>
+  </div>
+</body>
+</html>`);
+    printWindow.document.close();
+    setTimeout(() => { printWindow.focus(); printWindow.print(); }, 300);
+    onShowNotification('Opening review PDF preview.', 'success');
   };
 
   const handleTextHighlight = () => {
@@ -1030,6 +1137,9 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     <button type="button" onClick={() => { handleReviewerSubmit(selectedManuscript, true); setSelectedManuscript(null); }} className="border border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-slate-50">Save Draft & Close</button>
                     <button type="button" onClick={() => handleReviewerSubmit(selectedManuscript, false)} className="bg-teal-700 hover:bg-teal-800 text-white font-bold px-5 py-2 rounded-lg text-xs flex items-center gap-1.5">
                       <Send className="h-3.5 w-3.5" /> Submit Review
+                    </button>
+                    <button type="button" onClick={handlePrintReview} className="border border-teal-300 text-teal-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-teal-50 flex items-center gap-1.5">
+                      <Printer className="h-3.5 w-3.5" /> Print Review PDF
                     </button>
                     <button onClick={() => {
                       const updated = manuscripts.map(item => item.id === selectedManuscript.id ? { ...item, reviewerAssignments: item.reviewerAssignments.map(r => r.reviewerId === currentUser.id ? { ...r, status: 'declined' as const } : r) } : item);
