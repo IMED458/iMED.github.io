@@ -768,11 +768,15 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
         /* ── BODY COLUMNS ────────────────────────────── */
         .gbmn-body-columns {
+          display: block !important;
+          columns: 2 !important;
+          -webkit-columns: 2 !important;
           column-count: 2 !important;
           -webkit-column-count: 2 !important;
           column-gap: 0.6cm !important;
           -webkit-column-gap: 0.6cm !important;
-          column-fill: auto;
+          column-fill: auto !important;
+          width: 100% !important;
           font-size: 11pt;
           line-height: 1.36;
           text-align: justify;
