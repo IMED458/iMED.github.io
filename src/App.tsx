@@ -136,7 +136,8 @@ export default function App() {
       ? manuscripts.map(m => m.id === updated.id ? cloudReady : m)
       : [...manuscripts, cloudReady];
     setManuscripts(list);
-    DB.setManuscripts(list);
+    // Write only the changed document — faster and avoids rewriting the whole collection
+    DB.setManuscript(cloudReady);
     setSelectedManuscriptId(cloudReady.id);
   };
 

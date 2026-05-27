@@ -4,7 +4,7 @@
  */
 
 import { ArticleTypeConfig, Manuscript, User, SystemAuditLog, JournalSettings, AuthorDetails } from './types';
-import { firebaseEnabled, firestore } from './firebase';
+import { ensureFirebaseSession, firebaseEnabled, firestore } from './firebase';
 import { collection, doc, getDoc, getDocs, setDoc, onSnapshot } from 'firebase/firestore';
 
 let manuscriptMemory: Manuscript[] = [];
@@ -556,10 +556,27 @@ export const DB = {
     setIndexedState('gbmn_manuscripts', manuscripts).catch(console.warn);
     localStorage.removeItem('gbmn_manuscripts');
     localStorage.setItem('gbmn_manuscripts_indexed', 'true');
-    // Write each manuscript as its own Firestore document for real-time listeners
+    // Ensure a Firebase auth session (anonymous if needed) before writing so
+    // Firestore security rules that require request.auth are satisfied even for
+    // demo accounts that bypass Firebase email/password auth.
     if (firebaseEnabled && firestore) {
-      manuscripts.forEach(m => {
-        void setDoc(doc(firestore!, 'manuscripts', m.id), { payload: m, updatedAt: new Date().toISOString() })
+      ensureFirebaseSession().catch(() => {}).finally(() => {
+        manuscripts.forEach(m => {
+          void setDoc(doc(firestore!, 'manuscripts', m.id), { payload: m, updatedAt: new Date().toISOString() })
+            .catch(err => console.warn('Firestore manuscript write failed:', err));
+        });
+      });
+    }
+  },
+
+  /** Write a single manuscript document — use this when only one entry changed. */
+  setManuscript(manuscript: Manuscript) {
+    manuscriptMemory = manuscriptMemory.map(m => m.id === manuscript.id ? manuscript : m);
+    if (!manuscriptMemory.some(m => m.id === manuscript.id)) manuscriptMemory.push(manuscript);
+    setIndexedState('gbmn_manuscripts', manuscriptMemory).catch(console.warn);
+    if (firebaseEnabled && firestore) {
+      ensureFirebaseSession().catch(() => {}).finally(() => {
+        void setDoc(doc(firestore!, 'manuscripts', manuscript.id), { payload: manuscript, updatedAt: new Date().toISOString() })
           .catch(err => console.warn('Firestore manuscript write failed:', err));
       });
     }
