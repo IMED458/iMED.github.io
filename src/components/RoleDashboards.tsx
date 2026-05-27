@@ -271,7 +271,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
   useEffect(() => {
     if (!selectedManuscript) return;
-    const ra = selectedManuscript.reviewerAssignments.find(r => r.reviewerId === currentUser.id);
+    const ra = (selectedManuscript.reviewerAssignments || []).find(r => r.reviewerId === currentUser.id);
     if (ra?.highlights) setReviewHighlights(ra.highlights);
     if (ra?.draftReview) setReviewMajorComments(ra.draftReview);
     const c = ra?.comments;
@@ -373,13 +373,13 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const handleAssignReviewer = async (manuscript: Manuscript, reviewerId: string) => {
     const reviewerObj = DB.getUsers().find(u => u.id === reviewerId);
     if (!reviewerObj) return;
-    if (manuscript.reviewerAssignments.some(ra => ra.reviewerId === reviewerId || ra.reviewerEmail === reviewerObj.email)) { onShowNotification('Reviewer already assigned.', 'error'); return; }
+    if ((manuscript.reviewerAssignments || []).some(ra => ra.reviewerId === reviewerId || ra.reviewerEmail === reviewerObj.email)) { onShowNotification('Reviewer already assigned.', 'error'); return; }
     const reviewerFullName = `${reviewerObj.firstName} ${reviewerObj.lastName}`;
     updateSelectedManuscript({
       ...manuscript,
       status: 'Reviewer Assigned',
       updatedAt: new Date().toISOString(),
-      reviewerAssignments: [...manuscript.reviewerAssignments, { reviewerId, reviewerName: reviewerFullName, reviewerEmail: reviewerObj.email, status: 'assigned', assignedAt: new Date().toISOString() }],
+      reviewerAssignments: [...(manuscript.reviewerAssignments || []), { reviewerId, reviewerName: reviewerFullName, reviewerEmail: reviewerObj.email, status: 'assigned', assignedAt: new Date().toISOString() }],
     });
     onShowNotification(`Reviewer ${reviewerFullName} assigned.`, 'success');
     DB.addAuditLog({ userId: currentUser.id, userEmail: currentUser.email, action: 'REVIEWER_ASSIGNED', targetId: manuscript.id, details: `Dispatched to ${reviewerObj.email}` });
@@ -393,11 +393,11 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   };
 
   const handleRemoveReviewer = (manuscript: Manuscript, reviewerId: string) => {
-    const reviewer = manuscript.reviewerAssignments.find(ra => ra.reviewerId === reviewerId);
+    const reviewer = (manuscript.reviewerAssignments || []).find(ra => ra.reviewerId === reviewerId);
     updateSelectedManuscript({
       ...manuscript,
-      reviewerAssignments: manuscript.reviewerAssignments.filter(ra => ra.reviewerId !== reviewerId),
-      status: manuscript.reviewerAssignments.length <= 1 ? 'Submitted' : manuscript.status,
+      reviewerAssignments: (manuscript.reviewerAssignments || []).filter(ra => ra.reviewerId !== reviewerId),
+      status: (manuscript.reviewerAssignments || []).length <= 1 ? 'Submitted' : manuscript.status,
       updatedAt: new Date().toISOString(),
     });
     onShowNotification(`Reviewer removed: ${reviewer?.reviewerName || reviewerId}`, 'success');
@@ -448,7 +448,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
         status: 'submitted' as const,
       };
       let matched = false;
-      const updatedAssignments = item.reviewerAssignments.map(ra => {
+      const updatedAssignments = (item.reviewerAssignments || []).map(ra => {
         if (!reviewerMatchesCurrentUser(ra)) return ra;
         matched = true;
         return { ...ra, status: isDraft ? 'assigned' as const : 'completed' as const, draftReview: reviewMajorComments, highlights: reviewHighlights, comments: isDraft ? ra.comments : reviewComment };
@@ -549,7 +549,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
   // ── Manuscript list item ──────────────────────────────────────────────────
   const renderManuscriptListItem = (m: Manuscript, isSelected: boolean, onClick: () => void) => {
-    const isNew = m.status === 'Submitted' && m.reviewerAssignments.length === 0 && m.editorDecisionLog.length === 0;
+    const isNew = m.status === 'Submitted' && (m.reviewerAssignments || []).length === 0 && (m.editorDecisionLog || []).length === 0;
     const daysSince = Math.floor((Date.now() - new Date(m.submittedAt || m.createdAt).getTime()) / 86400000);
     const canDelete = !!onDeleteManuscript && (currentUser.role === 'Administrator' || m.status === 'Draft');
     return (
@@ -626,9 +626,9 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               </select>
               <button onClick={() => { if (assignReviewerId) { handleAssignReviewer(manuscript, assignReviewerId); setAssignReviewerId(''); } }} disabled={!assignReviewerId} className="bg-teal-700 disabled:opacity-40 text-white font-bold px-2 rounded-lg text-[11px]">Assign</button>
             </div>
-            {manuscript.reviewerAssignments.length > 0 && (
+            {(manuscript.reviewerAssignments || []).length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {manuscript.reviewerAssignments.map(ra => (
+                {(manuscript.reviewerAssignments || []).map(ra => (
                   <span key={ra.reviewerId} className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ra.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ra.status === 'declined' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
                     {ra.reviewerName} · {ra.status}
                     <button type="button" onClick={() => handleRemoveReviewer(manuscript, ra.reviewerId)} className="ml-1 text-rose-600 hover:text-rose-800" title="Remove reviewer">×</button>
@@ -656,10 +656,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
           </div>
         </div>
 
-        {manuscript.reviewerAssignments.some(ra => ra.comments) && (
+        {(manuscript.reviewerAssignments || []).some(ra => ra.comments) && (
           <div className="no-print border rounded-xl p-3 bg-amber-50 space-y-2 text-xs">
             <p className="font-bold text-amber-900 uppercase text-[10px]">Reviewer Feedback</p>
-            {manuscript.reviewerAssignments.filter(ra => ra.comments).map(ra => (
+            {(manuscript.reviewerAssignments || []).filter(ra => ra.comments).map(ra => (
               <div key={ra.reviewerId} className="bg-white border border-amber-200 rounded-lg p-2.5 space-y-1">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-slate-800">{ra.reviewerName}</span>
@@ -723,7 +723,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               <span><b>Title:</b> {(manuscript.title || '').slice(0, 40)}…</span>
               <span><b>Author:</b> {manuscript.authors[0]?.firstName} {manuscript.authors[0]?.lastName}</span>
               <span><b>Submitted:</b> {new Date(manuscript.submittedAt || manuscript.createdAt).toLocaleDateString()}</span>
-              <span><b>Reviewers:</b> {manuscript.reviewerAssignments.map(r => r.reviewerName).join(', ') || 'None'}</span>
+              <span><b>Reviewers:</b> {(manuscript.reviewerAssignments || []).map(r => r.reviewerName).join(', ') || 'None'}</span>
               <span><b>Date:</b> {new Date().toLocaleDateString()}</span>
             </div>
             <div>
@@ -991,13 +991,13 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             {activeSection === 'Reviews' && (
               <div className="p-6 overflow-y-auto flex-1 space-y-4">
                 <h2 className="font-black text-slate-900">Reviewer Feedback</h2>
-                {sortNewest(manuscripts.filter(m => m.reviewerAssignments.some(ra => ra.status === 'completed'))).map(m => (
+                {sortNewest(manuscripts.filter(m => (m.reviewerAssignments || []).some(ra => ra.status === 'completed'))).map(m => (
                   <div key={m.id} className="bg-white border rounded-xl p-4 shadow-sm space-y-3">
                     <div className="flex justify-between items-start">
                       <div><span className="font-mono text-[10px] text-teal-800 font-bold">{m.id}</span><p className="font-bold text-slate-800">{m.title}</p></div>
                       {renderStatusBadge(m.status)}
                     </div>
-                    {m.reviewerAssignments.filter(ra => ra.comments).map(ra => (
+                    {(m.reviewerAssignments || []).filter(ra => ra.comments).map(ra => (
                       <div key={ra.reviewerId} className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs space-y-1">
                         <div className="flex justify-between items-center">
                           <span className="font-bold">{ra.reviewerName}</span>
@@ -1037,7 +1037,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     ))}
                   </div>
                 ))}
-                {manuscripts.filter(m => m.reviewerAssignments.some(ra => ra.status === 'completed')).length === 0 && (
+                {manuscripts.filter(m => (m.reviewerAssignments || []).some(ra => ra.status === 'completed')).length === 0 && (
                   <div className="border-2 border-dashed rounded-xl p-10 text-center text-slate-400 text-sm">No completed reviews yet.</div>
                 )}
               </div>
@@ -1084,7 +1084,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   <div className="flex-1 overflow-y-auto p-2 space-y-2">
                     {visibleManuscripts.filter(m => {
                       if (activeTab === 'pending') return m.status === 'Submitted';
-                      if (activeTab === 'reviewed') return m.reviewerAssignments.some(ra => ra.status === 'completed');
+                      if (activeTab === 'reviewed') return (m.reviewerAssignments || []).some(ra => ra.status === 'completed');
                       return true;
                     }).map(m => renderManuscriptListItem(m, selectedManuscript?.id === m.id, () => { setSelectedManuscript(m); setOfficeEditMode(false); setShowDecisionPanel(false); }))}
                     {visibleManuscripts.length === 0 && <p className="text-xs text-slate-400 text-center py-8">No manuscripts in this view.</p>}
@@ -1146,7 +1146,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   };
 
   const renderReviewerDashboard = () => {
-    const directAssigned = manuscripts.filter(m => m.reviewerAssignments.some(reviewerMatchesCurrentUser));
+    const directAssigned = manuscripts.filter(m => (m.reviewerAssignments || []).some(reviewerMatchesCurrentUser));
     const assignedManuscripts = sortNewest(directAssigned.length ? directAssigned : manuscripts.filter(m => m.status !== 'Draft'));
     return (
       <div className="min-h-[calc(100vh-88px)] flex flex-col md:flex-row bg-slate-50">
@@ -1159,7 +1159,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             {assignedManuscripts.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-sm border-2 border-dashed rounded-xl">No assigned manuscripts.</div>
             ) : assignedManuscripts.map(m => {
-              const ra = m.reviewerAssignments.find(reviewerMatchesCurrentUser);
+              const ra = (m.reviewerAssignments || []).find(reviewerMatchesCurrentUser);
               return (
                 <div key={m.id} onClick={() => setSelectedManuscript(m)}
                   className={`p-3 border rounded-xl cursor-pointer transition-all text-xs ${selectedManuscript?.id === m.id ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-100' : ra?.status === 'completed' ? 'border-emerald-200 bg-emerald-50' : 'border-blue-200 bg-blue-50 hover:border-blue-400'}`}>
@@ -1472,7 +1472,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                       <Printer className="h-3.5 w-3.5" /> Print Review PDF
                     </button>
                     <button type="button" onClick={() => {
-                      const updated = manuscripts.map(item => item.id === selectedManuscript.id ? { ...item, reviewerAssignments: item.reviewerAssignments.map(r => r.reviewerId === currentUser.id ? { ...r, status: 'declined' as const } : r) } : item);
+                      const updated = manuscripts.map(item => item.id === selectedManuscript.id ? { ...item, reviewerAssignments: (item.reviewerAssignments || []).map(r => r.reviewerId === currentUser.id ? { ...r, status: 'declined' as const } : r) } : item);
                       onUpdateManuscripts(updated); setSelectedManuscript(null);
                       onShowNotification('Review invitation declined.', 'info');
                     }} className="border border-rose-200 text-rose-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-50 ml-auto">Decline Invitation</button>

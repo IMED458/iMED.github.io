@@ -9,6 +9,20 @@ import { collection, doc, deleteDoc, getDoc, getDocs, setDoc, onSnapshot } from 
 
 let manuscriptMemory: Manuscript[] = [];
 
+/** Ensure array fields that may be absent in legacy/migrated data are always arrays. */
+function normalizeManuscript(m: Partial<Manuscript>): Manuscript {
+  return {
+    ...m,
+    reviewerAssignments: m.reviewerAssignments ?? [],
+    editorDecisionLog:   m.editorDecisionLog   ?? [],
+    editorFiles:         m.editorFiles         ?? [],
+    authors:             m.authors             ?? [],
+    figuresAndTables:    m.figuresAndTables     ?? [],
+    references:          m.references          ?? [],
+    supplementaryFiles:  m.supplementaryFiles  ?? [],
+  } as Manuscript;
+}
+
 function openGbmnDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     if (typeof indexedDB === 'undefined') return reject(new Error('IndexedDB unavailable'));
@@ -452,7 +466,9 @@ export const DB = {
     if (firebaseEnabled && firestore) {
       try {
         const snapshot = await getDocs(collection(firestore, 'manuscripts'));
-        const rows = snapshot.docs.map(item => item.data().payload as Manuscript).filter(Boolean);
+        const rows = snapshot.docs
+          .map(item => { try { const p = item.data().payload; return normalizeManuscript(typeof p === 'string' ? JSON.parse(p) : p); } catch { return null; } })
+          .filter(Boolean) as Manuscript[];
         if (rows.length) {
           await setIndexedState('gbmn_manuscripts', rows);
           manuscriptMemory = rows;
@@ -463,10 +479,11 @@ export const DB = {
       }
     }
     try {
-      const stored = await getIndexedState<Manuscript[]>('gbmn_manuscripts');
+      const stored = await getIndexedState<Partial<Manuscript>[]>('gbmn_manuscripts');
       if (stored?.length) {
-        manuscriptMemory = stored;
-        return stored;
+        const normalized = stored.map(normalizeManuscript);
+        manuscriptMemory = normalized;
+        return normalized;
       }
     } catch {}
     manuscriptMemory = [SAMPLE_MANUSCRIPT];
@@ -547,7 +564,7 @@ export const DB = {
       manuscriptMemory = [SAMPLE_MANUSCRIPT];
       return [SAMPLE_MANUSCRIPT];
     }
-    manuscriptMemory = JSON.parse(data);
+    manuscriptMemory = (JSON.parse(data) as Partial<Manuscript>[]).map(normalizeManuscript);
     return manuscriptMemory;
   },
 
@@ -619,7 +636,8 @@ export const DB = {
         const rows = snapshot.docs.map(d => {
           const raw = d.data().payload;
           try {
-            return (typeof raw === 'string' ? JSON.parse(raw) : raw) as Manuscript;
+            const parsed = (typeof raw === 'string' ? JSON.parse(raw) : raw) as Partial<Manuscript>;
+            return normalizeManuscript(parsed);
           } catch {
             return null;
           }
