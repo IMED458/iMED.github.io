@@ -205,7 +205,21 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
                 content: url("${hSvgUrl}");
                 vertical-align: bottom;
               }
+              /* Footer repeats on every page */
+              @bottom-center {
+                content: "Georgian Biomedical News\\AISSN (Online): 2720-8796  ISSN (Print): 2720-7994\\ADownloaded from gbmn.org. For personal use only. No other uses without permission.\\ACopyright \\00A9 2022. All rights reserved.";
+                font-family: Arial, sans-serif;
+                font-size: 7pt;
+                color: #000000;
+                text-align: center;
+                white-space: pre-line;
+                border-top: 0.5pt solid #bbbbbb;
+                padding-top: 3pt;
+                vertical-align: top;
+              }
             }
+            /* Hide the in-content footer div — margin box handles it */
+            .gbmn-page-footer { display: none !important; }
             html, body {
               margin: 0 !important;
               padding: 0 !important;
@@ -567,11 +581,12 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           </div>
         </div>
 
-        {/* ── PAGE FOOTER ── */}
+        {/* ── PAGE FOOTER (screen only — print uses @bottom-center margin box) ── */}
         <div className="gbmn-page-footer">
-          <p>The Georgian Biomedical News</p>
+          <p>Georgian Biomedical News</p>
+          <p>ISSN (Online): 2720-8796&nbsp;&nbsp;ISSN (Print): 2720-7994</p>
           <p>Downloaded from gbmn.org. For personal use only. No other uses without permission.</p>
-          <p>Copyright © {new Date().getFullYear()}. All rights reserved.</p>
+          <p>Copyright &copy; 2022. All rights reserved.</p>
         </div>
 
       </div>{/* end #academic-manuscript-sheet */}
@@ -1039,6 +1054,8 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
           /* @page rules are defined above (first-page + running-header) */
           .gbmn-running-page-header { display: none !important; }
+          /* Footer is handled by @bottom-center margin box */
+          .gbmn-page-footer { display: none !important; }
 
 
           /* Column layout must work in print */
