@@ -509,7 +509,18 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         )}
 
         {/* ── TWO-COLUMN BODY ── */}
-        <div className="gbmn-body-columns">
+        <div
+          className="gbmn-body-columns"
+          style={{
+            columnCount: 2,
+            WebkitColumnCount: 2 as number,
+            columnGap: '0.6cm',
+            WebkitColumnGap: '0.6cm' as string,
+            columnFill: 'auto' as const,
+            display: 'block',
+            width: '100%',
+          }}
+        >
 
           {articleConfig?.requiredSections.filter(s => s !== 'Keywords').map((sectionName, sectionIndex) => (
             manuscript.sections[sectionName]?.replace(/<[^>]+>/g, '').trim() ? (
