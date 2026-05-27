@@ -141,11 +141,27 @@ export interface ReviewerComment {
   id: string;
   reviewerId: string;
   reviewerName: string;
-  ethicalConcerns: string;
-  methodologyScore: number; // 1-5
-  originalityScore: number; // 1-5
-  scientificMeritScore: number; // 1-5
-  constructiveComments: string; // Rich text or raw paragraphs
+  // ── New structured fields (PDF format) ─────────────────────────────────
+  summary?: string;               // Section 1
+  majorComments?: string;         // Section 2 (rich text)
+  minorComments?: string;         // Section 3 (rich text)
+  strengths?: string;             // Section 4
+  limitations?: string;           // Section 5
+  requiredEssential?: string;     // Section 7 — essential revisions
+  requiredRecommended?: string;   // Section 7 — recommended revisions
+  scoreOriginality?: number;      // Section 8 — /10
+  scoreMethodology?: number;      // Section 8 — /10
+  scoreStatistical?: number;      // Section 8 — /10
+  scoreClinical?: number;         // Section 8 — /10
+  scorePresentation?: number;     // Section 8 — /10
+  scorePublishability?: string;   // Section 8 — Accept / Conditional / Reject
+  // ── Legacy fields (backward compatibility) ─────────────────────────────
+  ethicalConcerns?: string;
+  methodologyScore?: number;
+  originalityScore?: number;
+  scientificMeritScore?: number;
+  constructiveComments?: string;
+  // ── Always present ──────────────────────────────────────────────────────
   confidentialToEditor: string;
   recommendation: 'accept' | 'minor-revision' | 'major-revision' | 'reject';
   submittedAt: string;

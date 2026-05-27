@@ -52,26 +52,43 @@ interface RoleDashboardsProps {
 function printReviewAsPdf(params: {
   manuscript: Manuscript;
   reviewerName: string;
-  ethical: string;
-  methodScore: number;
-  origScore: number;
-  meritScore: number;
-  comments: string;
-  confidential: string;
+  summary?: string;
+  majorComments?: string;
+  minorComments?: string;
+  strengths?: string;
+  limitations?: string;
+  requiredEssential?: string;
+  requiredRecommended?: string;
+  scoreOriginality?: number;
+  scoreMethodology?: number;
+  scoreStatistical?: number;
+  scoreClinical?: number;
+  scorePresentation?: number;
+  scorePublishability?: string;
+  confidential?: string;
   recommendation: string;
   highlights: { id: string; text: string; note?: string }[];
   onNotify: (msg: string, type: 'success' | 'info' | 'error') => void;
 }) {
-  const { manuscript, reviewerName, ethical, methodScore, origScore, meritScore, comments, confidential, recommendation, highlights, onNotify } = params;
+  const {
+    manuscript, reviewerName,
+    summary = '', majorComments = '', minorComments = '',
+    strengths = '', limitations = '',
+    requiredEssential = '', requiredRecommended = '',
+    scoreOriginality = 0, scoreMethodology = 0, scoreStatistical = 0,
+    scoreClinical = 0, scorePresentation = 0, scorePublishability = '',
+    confidential = '', recommendation, highlights, onNotify,
+  } = params;
+
   const recLabel: Record<string, string> = {
-    'accept': 'Accept Manuscript Unedited',
-    'minor-revision': 'Accept with Minor Revisions',
-    'major-revision': 'Re-evaluate after Major Revisions',
-    'reject': 'Decline / Reject Submission',
+    'accept': 'Accept',
+    'minor-revision': 'Minor Revision',
+    'major-revision': 'Major Revision',
+    'reject': 'Reject',
   };
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-  const scoreBar = (score: number) =>
-    `<span style="letter-spacing:3px;font-size:13pt;color:#0f766e">${'●'.repeat(score)}${'○'.repeat(5 - score)}</span> <strong>${score}/5</strong>`;
+  const scoreRow = (label: string, score: number) =>
+    `<tr><td style="padding:4px 8px;border:1px solid #e2e8f0;font-weight:bold">${label}</td><td style="padding:4px 8px;border:1px solid #e2e8f0;text-align:center">${score} / 10</td></tr>`;
 
   const printWindow = window.open('', '_blank', 'width=900,height=1200');
   if (!printWindow) { onNotify('Popup blocked — please allow popups for this site.', 'error'); return; }
@@ -83,69 +100,93 @@ function printReviewAsPdf(params: {
   <meta charset="utf-8"/>
   <title>Peer Review Report — ${manuscript.id}</title>
   <style>
-    @page { size: A4 portrait; margin: 20mm 15mm 25mm 15mm; }
+    @page { size: A4 portrait; margin: 22mm 18mm 28mm 18mm; }
     *{box-sizing:border-box}
-    body{font-family:'Times New Roman',Times,serif;font-size:11pt;line-height:1.5;color:#1a1a1a;background:#fff;margin:0;padding:0}
-    .gbmn-header{border-bottom:3px solid #0f766e;padding-bottom:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:flex-end}
-    .journal-name{font-size:17pt;font-weight:900;color:#0f766e;letter-spacing:1px;text-transform:uppercase}
-    .journal-sub{font-size:8.5pt;color:#555;font-style:italic;margin-top:2px}
-    .report-title{font-size:13pt;font-weight:bold;text-align:center;color:#1e293b;margin:10px 0 14px;text-transform:uppercase;letter-spacing:.5px}
-    .meta-box{border:1.5px solid #cbd5e1;border-radius:6px;padding:10px 14px;background:#f8fafc;font-size:9.5pt;margin-bottom:14px}
-    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
-    .meta-item{margin:2px 0}
-    .meta-label{font-weight:bold;color:#475569}
-    h2{font-size:9.5pt;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;color:#0f766e;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin:14px 0 6px}
-    .score-row{display:flex;justify-content:space-between;align-items:center;padding:5px 10px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;margin-bottom:5px;font-size:10pt}
-    .score-label{font-weight:bold;color:#334155}
-    .content-box{border:1px solid #e2e8f0;border-radius:4px;padding:10px 12px;background:#fff;font-size:10.5pt;min-height:40px}
-    .rec-box{border:2.5px solid #0f766e;border-radius:6px;padding:10px 14px;background:#f0fdf4;font-size:12pt;font-weight:bold;color:#065f46;text-align:center;margin-top:10px}
-    .hl-item{font-size:9.5pt;padding:5px 8px;background:#fef9c3;border:1px solid #fde68a;border-radius:4px;margin-bottom:4px}
-    .gbmn-footer{border-top:1px solid #cbd5e1;padding-top:7px;margin-top:22px;font-size:8.5pt;color:#64748b;display:flex;justify-content:space-between}
-    .sig-block{display:flex;justify-content:flex-end;margin-top:28px}
-    .sig-line{border-top:1px solid #334155;width:220px;padding-top:4px;font-size:9pt;color:#334155}
+    body{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;line-height:1.55;color:#111;background:#fff;margin:0;padding:0}
+    .hdr{margin-bottom:6pt}
+    .hdr-label{font-size:10pt;font-weight:bold}
+    .hdr-title{font-size:13pt;font-style:italic;font-weight:bold;margin-top:2pt}
+    .sec-head{font-size:10.5pt;font-weight:bold;margin:14pt 0 4pt}
+    .subsec{font-size:10.5pt;font-weight:bold;margin:10pt 0 3pt}
+    p{margin:0 0 6pt}
+    ul{margin:2pt 0 6pt;padding-left:20pt}
+    li{margin-bottom:2pt}
+    .rec-box{border:2px solid #0f766e;border-radius:4px;padding:7pt 12pt;background:#f0fdf4;font-size:11pt;font-weight:bold;color:#065f46;display:inline-block;margin-top:4pt}
+    .score-table{border-collapse:collapse;width:50%;margin-top:4pt}
+    .score-table td{padding:4px 10px;border:1px solid #cbd5e1;font-size:10pt}
+    .score-table .pub-row td{font-weight:bold;background:#f8fafc}
+    .conf-box{background:#fafafa;border:1px dashed #cbd5e1;border-radius:3px;padding:7pt 10pt;font-size:10pt;margin-top:4pt}
+    .hl-item{font-size:9.5pt;padding:4pt 8pt;background:#fef9c3;border:1px solid #fde68a;border-radius:3px;margin-bottom:3pt}
+    .footer{border-top:1px solid #cbd5e1;padding-top:6pt;margin-top:20pt;font-size:8.5pt;color:#64748b;display:flex;justify-content:space-between}
+    .sig-wrap{display:flex;justify-content:flex-end;margin-top:24pt}
+    .sig-line{border-top:1px solid #334155;width:200pt;padding-top:3pt;font-size:9pt;color:#334155}
+    hr{border:none;border-top:1px solid #e2e8f0;margin:10pt 0}
   </style>
 </head>
 <body>
-  <div class="gbmn-header">
-    <div>
-      <div class="journal-name">GBMN</div>
-      <div class="journal-sub">Georgian Biomedical and Medical Nexus</div>
-    </div>
-    <div style="text-align:right;font-size:9pt;color:#555">Confidential Peer Review Document<br/>Date: ${today}</div>
+  <div class="hdr">
+    <div class="hdr-label">Peer Review Report</div>
+    <div class="hdr-label">Manuscript Title:</div>
+    <div class="hdr-title">${manuscript.title}</div>
   </div>
-  <div class="report-title">Peer Review Report</div>
-  <div class="meta-box">
-    <div class="meta-grid">
-      <p class="meta-item"><span class="meta-label">Manuscript ID:</span> ${manuscript.id}</p>
-      <p class="meta-item"><span class="meta-label">Article Type:</span> ${manuscript.articleType}</p>
-      <p class="meta-item" style="grid-column:1/-1"><span class="meta-label">Title:</span> ${manuscript.title}</p>
-      <p class="meta-item"><span class="meta-label">First Author:</span> ${(manuscript.authors[0]?.firstName || '')} ${(manuscript.authors[0]?.lastName || '')}</p>
-      <p class="meta-item"><span class="meta-label">Specialty:</span> ${manuscript.specialty}</p>
-      <p class="meta-item"><span class="meta-label">Reviewer:</span> ${reviewerName}</p>
-      <p class="meta-item"><span class="meta-label">Review Date:</span> ${today}</p>
-    </div>
+  <div style="font-size:9pt;color:#555;margin-bottom:12pt">
+    Manuscript ID: <strong>${manuscript.id}</strong> &nbsp;·&nbsp;
+    Article Type: <strong>${manuscript.articleType}</strong> &nbsp;·&nbsp;
+    Specialty: <strong>${manuscript.specialty}</strong><br/>
+    Author: <strong>${(manuscript.authors[0]?.firstName || '')} ${(manuscript.authors[0]?.lastName || '')}</strong> &nbsp;·&nbsp;
+    Reviewer: <strong>${reviewerName}</strong> &nbsp;·&nbsp;
+    Date: <strong>${today}</strong>
   </div>
-  <h2>1. Ethical Concerns</h2>
-  <div class="content-box">${ethical || '<em>None identified</em>'}</div>
-  <h2>2. Scientific Assessment</h2>
-  <div class="score-row"><span class="score-label">Methodology</span><span>${scoreBar(methodScore)}</span></div>
-  <div class="score-row"><span class="score-label">Originality</span><span>${scoreBar(origScore)}</span></div>
-  <div class="score-row"><span class="score-label">Scientific Merit</span><span>${scoreBar(meritScore)}</span></div>
-  <h2>3. Constructive Comments to Authors</h2>
-  <div class="content-box">${comments || '<em>No comments provided.</em>'}</div>
-  <h2>4. Confidential Comments to Editor</h2>
-  <div class="content-box">${confidential || '<em>None.</em>'}</div>
-  ${highlights.length > 0 ? `<h2>Text Highlights (${highlights.length})</h2>
+  <hr/>
+
+  <div class="sec-head">1. Summary</div>
+  <div>${summary || '<p><em>No summary provided.</em></p>'}</div>
+
+  <div class="sec-head">2. Major Comments</div>
+  <div>${majorComments || '<p><em>No major comments.</em></p>'}</div>
+
+  <div class="sec-head">3. Minor Comments</div>
+  <div>${minorComments || '<p><em>No minor comments.</em></p>'}</div>
+
+  <div class="sec-head">4. Strengths</div>
+  <div>${strengths || '<p><em>Not specified.</em></p>'}</div>
+
+  <div class="sec-head">5. Limitations <span style="font-weight:normal;font-size:9.5pt">(to be strengthened in manuscript)</span></div>
+  <div>${limitations || '<p><em>Not specified.</em></p>'}</div>
+
+  <div class="sec-head">6. Recommendation to the Editor</div>
+  <div>Decision: <span class="rec-box">${recLabel[recommendation] || recommendation}</span></div>
+
+  <div class="sec-head">7. Required Revisions (Actionable)</div>
+  <div class="subsec">Essential (must address):</div>
+  <div>${requiredEssential || '<p><em>None listed.</em></p>'}</div>
+  <div class="subsec">Recommended (improves quality):</div>
+  <div>${requiredRecommended || '<p><em>None listed.</em></p>'}</div>
+
+  <div class="sec-head">8. Final Evaluation Scores</div>
+  <table class="score-table">
+    <tr><td style="padding:4px 10px;border:1px solid #cbd5e1;font-weight:bold;background:#f8fafc">Category</td><td style="padding:4px 10px;border:1px solid #cbd5e1;font-weight:bold;background:#f8fafc;text-align:center">Score</td></tr>
+    ${scoreRow('Originality', scoreOriginality)}
+    ${scoreRow('Methodology', scoreMethodology)}
+    ${scoreRow('Statistical Rigor', scoreStatistical)}
+    ${scoreRow('Clinical Relevance', scoreClinical)}
+    ${scoreRow('Presentation', scorePresentation)}
+    <tr class="pub-row"><td style="padding:4px 10px;border:1px solid #cbd5e1;font-weight:bold">Publishability</td><td style="padding:4px 10px;border:1px solid #cbd5e1;font-weight:bold;text-align:center">${scorePublishability || '—'}</td></tr>
+  </table>
+
+  ${highlights.length > 0 ? `<div class="sec-head">Text Highlights (${highlights.length})</div>
   ${highlights.map((h, i) => `<div class="hl-item"><strong>[${i + 1}]</strong> &ldquo;${h.text}&rdquo;${h.note ? ` &mdash; <em>${h.note}</em>` : ''}</div>`).join('')}` : ''}
-  <h2>5. Recommendation</h2>
-  <div class="rec-box">${recLabel[recommendation] || recommendation}</div>
-  <div class="sig-block">
+
+  ${confidential ? `<div class="sec-head">Confidential Comments to Editor</div><div class="conf-box">${confidential}</div>` : ''}
+
+  <div class="sig-wrap">
     <div>
       <div class="sig-line">${reviewerName}</div>
-      <div style="font-size:8.5pt;color:#64748b;margin-top:3px">Reviewer Signature</div>
+      <div style="font-size:8.5pt;color:#64748b;margin-top:3pt">Reviewer Signature &nbsp;·&nbsp; ${today}</div>
     </div>
   </div>
-  <div class="gbmn-footer">
+
+  <div class="footer">
     <span>GBMN &mdash; Georgian Biomedical and Medical Nexus &middot; gbmn@tsmu.edu</span>
     <span>Confidential &mdash; For Editorial Use Only</span>
   </div>
@@ -177,15 +218,27 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [assignEditorId, setAssignEditorId] = useState('');
   const [assignReviewerId, setAssignReviewerId] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [reviewScoreEthical, setReviewScoreEthical] = useState('None identified');
-  const [reviewScoreMethod, setReviewScoreMethod] = useState(5);
-  const [reviewScoreOrig, setReviewScoreOrig] = useState(5);
-  const [reviewScoreMerit, setReviewScoreMerit] = useState(5);
-  const [reviewComments, setReviewComments] = useState('');
+  // ── Reviewer form state ──────────────────────────────────────────────────
+  const [reviewSummary, setReviewSummary] = useState('');
+  const [reviewMajorComments, setReviewMajorComments] = useState('');
+  const [reviewMinorComments, setReviewMinorComments] = useState('');
+  const [reviewStrengths, setReviewStrengths] = useState('');
+  const [reviewLimitations, setReviewLimitations] = useState('');
+  const [reviewRequiredEssential, setReviewRequiredEssential] = useState('');
+  const [reviewRequiredRecommended, setReviewRequiredRecommended] = useState('');
+  const [scoreOriginality, setScoreOriginality] = useState(8);
+  const [scoreMethodology, setScoreMethodology] = useState(7);
+  const [scoreStatistical, setScoreStatistical] = useState(7);
+  const [scoreClinical, setScoreClinical] = useState(8);
+  const [scorePresentation, setScorePresentation] = useState(7);
+  const [scorePublishability, setScorePublishability] = useState('Conditional (after major revision)');
   const [reviewPrivate, setReviewPrivate] = useState('');
-  const [reviewRecommend, setReviewRecommend] = useState<'accept' | 'minor-revision' | 'major-revision' | 'reject'>('accept');
+  const [reviewRecommend, setReviewRecommend] = useState<'accept' | 'minor-revision' | 'major-revision' | 'reject'>('major-revision');
   const [reviewDraftSaved, setReviewDraftSaved] = useState(false);
   const [reviewHighlights, setReviewHighlights] = useState<ReviewHighlight[]>([]);
+  // legacy aliases used in a few spots
+  const reviewComments = reviewMajorComments;
+  const setReviewComments = setReviewMajorComments;
   const [showHighlightNote, setShowHighlightNote] = useState(false);
   const [pendingHighlightText, setPendingHighlightText] = useState('');
   const [highlightNote, setHighlightNote] = useState('');
@@ -218,9 +271,27 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
   useEffect(() => {
     if (!selectedManuscript) return;
-    const myAssignment = selectedManuscript.reviewerAssignments.find(ra => ra.reviewerId === currentUser.id);
-    if (myAssignment?.highlights) setReviewHighlights(myAssignment.highlights);
-    if (myAssignment?.draftReview) setReviewComments(myAssignment.draftReview);
+    const ra = selectedManuscript.reviewerAssignments.find(r => r.reviewerId === currentUser.id);
+    if (ra?.highlights) setReviewHighlights(ra.highlights);
+    if (ra?.draftReview) setReviewMajorComments(ra.draftReview);
+    const c = ra?.comments;
+    if (c) {
+      if (c.summary)              setReviewSummary(c.summary);
+      if (c.majorComments)        setReviewMajorComments(c.majorComments);
+      if (c.minorComments)        setReviewMinorComments(c.minorComments);
+      if (c.strengths)            setReviewStrengths(c.strengths);
+      if (c.limitations)          setReviewLimitations(c.limitations);
+      if (c.requiredEssential)    setReviewRequiredEssential(c.requiredEssential);
+      if (c.requiredRecommended)  setReviewRequiredRecommended(c.requiredRecommended);
+      if (c.scoreOriginality)     setScoreOriginality(c.scoreOriginality);
+      if (c.scoreMethodology)     setScoreMethodology(c.scoreMethodology);
+      if (c.scoreStatistical)     setScoreStatistical(c.scoreStatistical);
+      if (c.scoreClinical)        setScoreClinical(c.scoreClinical);
+      if (c.scorePresentation)    setScorePresentation(c.scorePresentation);
+      if (c.scorePublishability)  setScorePublishability(c.scorePublishability);
+      if (c.confidentialToEditor) setReviewPrivate(c.confidentialToEditor);
+      setReviewRecommend(c.recommendation);
+    }
   }, [selectedManuscript?.id]);
 
   const updateSelectedManuscript = (updated: Manuscript) => {
@@ -356,11 +427,20 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
         id: `rev-${Date.now()}`,
         reviewerId: currentUser.id,
         reviewerName: `${currentUser.firstName} ${currentUser.lastName}`,
-        ethicalConcerns: reviewScoreEthical,
-        methodologyScore: reviewScoreMethod,
-        originalityScore: reviewScoreOrig,
-        scientificMeritScore: reviewScoreMerit,
-        constructiveComments: reviewComments || '<p>See attached evaluation.</p>',
+        summary: reviewSummary,
+        majorComments: reviewMajorComments,
+        minorComments: reviewMinorComments,
+        strengths: reviewStrengths,
+        limitations: reviewLimitations,
+        requiredEssential: reviewRequiredEssential,
+        requiredRecommended: reviewRequiredRecommended,
+        scoreOriginality,
+        scoreMethodology,
+        scoreStatistical,
+        scoreClinical,
+        scorePresentation,
+        scorePublishability,
+        constructiveComments: reviewMajorComments || '<p>See attached evaluation.</p>',
         confidentialToEditor: reviewPrivate,
         recommendation: reviewRecommend,
         submittedAt: new Date().toISOString(),
@@ -371,10 +451,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
       const updatedAssignments = item.reviewerAssignments.map(ra => {
         if (!reviewerMatchesCurrentUser(ra)) return ra;
         matched = true;
-        return { ...ra, status: isDraft ? 'assigned' as const : 'completed' as const, draftReview: reviewComments, highlights: reviewHighlights, comments: isDraft ? ra.comments : reviewComment };
+        return { ...ra, status: isDraft ? 'assigned' as const : 'completed' as const, draftReview: reviewMajorComments, highlights: reviewHighlights, comments: isDraft ? ra.comments : reviewComment };
       });
       if (!matched) {
-        updatedAssignments.push({ reviewerId: currentUser.id, reviewerName: `${currentUser.firstName} ${currentUser.lastName}`, reviewerEmail: currentUser.email, status: isDraft ? 'assigned' as const : 'completed' as const, assignedAt: new Date().toISOString(), draftReview: reviewComments, highlights: reviewHighlights, comments: isDraft ? undefined : reviewComment });
+        updatedAssignments.push({ reviewerId: currentUser.id, reviewerName: `${currentUser.firstName} ${currentUser.lastName}`, reviewerEmail: currentUser.email, status: isDraft ? 'assigned' as const : 'completed' as const, assignedAt: new Date().toISOString(), draftReview: reviewMajorComments, highlights: reviewHighlights, comments: isDraft ? undefined : reviewComment });
       }
       return { ...item, status: isDraft ? item.status : ('Under Review' as ManuscriptStatus), updatedAt: new Date().toISOString(), reviewerAssignments: updatedAssignments };
     });
@@ -394,11 +474,15 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     printReviewAsPdf({
       manuscript: selectedManuscript,
       reviewerName: `${currentUser.firstName} ${currentUser.lastName}`,
-      ethical: reviewScoreEthical,
-      methodScore: reviewScoreMethod,
-      origScore: reviewScoreOrig,
-      meritScore: reviewScoreMerit,
-      comments: reviewComments,
+      summary: reviewSummary,
+      majorComments: reviewMajorComments,
+      minorComments: reviewMinorComments,
+      strengths: reviewStrengths,
+      limitations: reviewLimitations,
+      requiredEssential: reviewRequiredEssential,
+      requiredRecommended: reviewRequiredRecommended,
+      scoreOriginality, scoreMethodology, scoreStatistical,
+      scoreClinical, scorePresentation, scorePublishability,
       confidential: reviewPrivate,
       recommendation: reviewRecommend,
       highlights: reviewHighlights,
@@ -586,11 +670,19 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                       onClick={() => printReviewAsPdf({
                         manuscript,
                         reviewerName: ra.reviewerName,
-                        ethical: ra.comments!.ethicalConcerns,
-                        methodScore: ra.comments!.methodologyScore,
-                        origScore: ra.comments!.originalityScore,
-                        meritScore: ra.comments!.scientificMeritScore,
-                        comments: ra.comments!.constructiveComments,
+                        summary: ra.comments!.summary,
+                        majorComments: ra.comments!.majorComments || ra.comments!.constructiveComments,
+                        minorComments: ra.comments!.minorComments,
+                        strengths: ra.comments!.strengths,
+                        limitations: ra.comments!.limitations,
+                        requiredEssential: ra.comments!.requiredEssential,
+                        requiredRecommended: ra.comments!.requiredRecommended,
+                        scoreOriginality: ra.comments!.scoreOriginality,
+                        scoreMethodology: ra.comments!.scoreMethodology,
+                        scoreStatistical: ra.comments!.scoreStatistical,
+                        scoreClinical: ra.comments!.scoreClinical,
+                        scorePresentation: ra.comments!.scorePresentation,
+                        scorePublishability: ra.comments!.scorePublishability,
                         confidential: ra.comments!.confidentialToEditor,
                         recommendation: ra.comments!.recommendation,
                         highlights: ra.highlights || [],
@@ -916,11 +1008,19 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                               onClick={() => printReviewAsPdf({
                                 manuscript: m,
                                 reviewerName: ra.reviewerName,
-                                ethical: ra.comments!.ethicalConcerns,
-                                methodScore: ra.comments!.methodologyScore,
-                                origScore: ra.comments!.originalityScore,
-                                meritScore: ra.comments!.scientificMeritScore,
-                                comments: ra.comments!.constructiveComments,
+                                summary: ra.comments!.summary,
+                                majorComments: ra.comments!.majorComments || ra.comments!.constructiveComments,
+                                minorComments: ra.comments!.minorComments,
+                                strengths: ra.comments!.strengths,
+                                limitations: ra.comments!.limitations,
+                                requiredEssential: ra.comments!.requiredEssential,
+                                requiredRecommended: ra.comments!.requiredRecommended,
+                                scoreOriginality: ra.comments!.scoreOriginality,
+                                scoreMethodology: ra.comments!.scoreMethodology,
+                                scoreStatistical: ra.comments!.scoreStatistical,
+                                scoreClinical: ra.comments!.scoreClinical,
+                                scorePresentation: ra.comments!.scorePresentation,
+                                scorePublishability: ra.comments!.scorePublishability,
                                 confidential: ra.comments!.confidentialToEditor,
                                 recommendation: ra.comments!.recommendation,
                                 highlights: ra.highlights || [],
@@ -1140,47 +1240,119 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                   <div><b className="text-slate-500">Specialty:</b> <span className="text-slate-700">{selectedManuscript.specialty}</span></div>
                 </div>
                 <div className="space-y-4 text-xs">
+
+                  {/* 1. Summary */}
                   <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">1. Ethical Concerns</h5>
-                    <textarea value={reviewScoreEthical} onChange={e => setReviewScoreEthical(e.target.value)} rows={2} placeholder="Describe any ethical concerns or write 'None identified'…" className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-none" />
+                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">1. Summary</h5>
+                    <p className="text-[10px] text-slate-500">Brief overview of the manuscript and its key findings.</p>
+                    <textarea value={reviewSummary} onChange={e => { setReviewSummary(e.target.value); setReviewDraftSaved(false); }} rows={4}
+                      placeholder="Summarise the study design, objectives, main findings, and overall assessment…"
+                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
                   </div>
+
+                  {/* 2. Major Comments */}
+                  <div className="border rounded-xl p-4 space-y-2">
+                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">2. Major Comments</h5>
+                    <p className="text-[10px] text-slate-500">Scientific novelty, methodology, statistical analysis, results, clinical applicability, follow-up etc.</p>
+                    <RichTextEditor value={reviewMajorComments} onChange={v => { setReviewMajorComments(v); setReviewDraftSaved(false); }}
+                      placeholder="2.1 Scientific Novelty and Significance&#10;2.2 Study Design and Methodology&#10;2.3 Statistical Analysis&#10;2.4 Results Interpretation&#10;2.5 Clinical Applicability&#10;2.6 Follow-up and Outcomes"
+                      minHeight="240px" />
+                  </div>
+
+                  {/* 3. Minor Comments */}
+                  <div className="border rounded-xl p-4 space-y-2">
+                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">3. Minor Comments</h5>
+                    <p className="text-[10px] text-slate-500">Writing clarity, tables/figures, references, ethical/reporting standards.</p>
+                    <RichTextEditor value={reviewMinorComments} onChange={v => { setReviewMinorComments(v); setReviewDraftSaved(false); }}
+                      placeholder="3.1 Writing and Clarity&#10;3.2 Tables and Figures&#10;3.3 References&#10;3.4 Ethical and Reporting Standards"
+                      minHeight="160px" />
+                  </div>
+
+                  {/* 4. Strengths */}
+                  <div className="border rounded-xl p-4 space-y-2">
+                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">4. Strengths</h5>
+                    <textarea value={reviewStrengths} onChange={e => { setReviewStrengths(e.target.value); setReviewDraftSaved(false); }} rows={3}
+                      placeholder="• Clinically relevant research question&#10;• Large sample size&#10;• Robust statistical analysis…"
+                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                  </div>
+
+                  {/* 5. Limitations */}
+                  <div className="border rounded-xl p-4 space-y-2">
+                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">5. Limitations <span className="font-normal text-slate-500 normal-case">(to be strengthened in manuscript)</span></h5>
+                    <textarea value={reviewLimitations} onChange={e => { setReviewLimitations(e.target.value); setReviewDraftSaved(false); }} rows={3}
+                      placeholder="• Retrospective design&#10;• No multivariate analysis&#10;• Short follow-up duration…"
+                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                  </div>
+
+                  {/* 6. Recommendation */}
+                  <div className="border rounded-xl p-4 space-y-2">
+                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">6. Recommendation to the Editor *</h5>
+                    <select value={reviewRecommend} onChange={e => setReviewRecommend(e.target.value as any)} className="w-full bg-teal-50 border border-teal-300 rounded-lg p-2.5 font-bold text-teal-800">
+                      <option value="accept">Accept</option>
+                      <option value="minor-revision">Minor Revision</option>
+                      <option value="major-revision">Major Revision</option>
+                      <option value="reject">Reject</option>
+                    </select>
+                  </div>
+
+                  {/* 7. Required Revisions */}
                   <div className="border rounded-xl p-4 space-y-3">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">2. Scientific Assessment</h5>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {[
-                        { label: 'Methodology (1-5)', value: reviewScoreMethod, setter: setReviewScoreMethod, options: [['5','5 — Pristine & Robust'],['4','4 — Good design'],['3','3 — Satisfactory'],['2','2 — Needs controls'],['1','1 — Fatally flawed']] },
-                        { label: 'Originality (1-5)', value: reviewScoreOrig, setter: setReviewScoreOrig, options: [['5','5 — Novel breakthrough'],['4','4 — Significant update'],['3','3 — Confirms paradigms'],['2','2 — Incremental'],['1','1 — Repetitive']] },
-                        { label: 'Scientific Merit (1-5)', value: reviewScoreMerit, setter: setReviewScoreMerit, options: [['5','5 — Decisive impact'],['4','4 — High value'],['3','3 — Average relevance'],['2','2 — Minor worth'],['1','1 — Deficient']] },
-                      ].map(({ label, value, setter, options }) => (
+                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">7. Required Revisions (Actionable)</h5>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase">Essential (must address):</label>
+                      <textarea value={reviewRequiredEssential} onChange={e => { setReviewRequiredEssential(e.target.value); setReviewDraftSaved(false); }} rows={3}
+                        placeholder="1. Add multivariate analysis…&#10;2. Include interobserver agreement…"
+                        className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase">Recommended (improves quality):</label>
+                      <textarea value={reviewRequiredRecommended} onChange={e => { setReviewRequiredRecommended(e.target.value); setReviewDraftSaved(false); }} rows={2}
+                        placeholder="1. Add a clinical decision framework…&#10;2. Include ROC/AUC analysis…"
+                        className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                    </div>
+                  </div>
+
+                  {/* 8. Final Scores */}
+                  <div className="border rounded-xl p-4 space-y-3">
+                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">8. Final Evaluation Scores</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {([
+                        ['Originality', scoreOriginality, setScoreOriginality],
+                        ['Methodology', scoreMethodology, setScoreMethodology],
+                        ['Statistical Rigor', scoreStatistical, setScoreStatistical],
+                        ['Clinical Relevance', scoreClinical, setScoreClinical],
+                        ['Presentation', scorePresentation, setScorePresentation],
+                      ] as [string, number, (n: number) => void][]).map(([label, val, setter]) => (
                         <div key={label}>
-                          <label className="block font-semibold text-slate-700 mb-1">{label}</label>
-                          <select value={value} onChange={e => setter(Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50">
-                            {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                          <label className="block font-semibold text-slate-700 mb-1 text-[11px]">{label} <span className="text-slate-400">/ 10</span></label>
+                          <select value={val} onChange={e => setter(Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50 text-xs">
+                            {[10,9.5,9,8.5,8,7.5,7,6.5,6,5.5,5,4.5,4,3.5,3,2.5,2,1.5,1,0.5,0].map(n => (
+                              <option key={n} value={n}>{n} / 10</option>
+                            ))}
                           </select>
                         </div>
                       ))}
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Publishability</label>
+                        <select value={scorePublishability} onChange={e => setScorePublishability(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50 text-xs">
+                          <option>Accept</option>
+                          <option>Conditional (after minor revision)</option>
+                          <option>Conditional (after major revision)</option>
+                          <option>Reject</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Confidential */}
                   <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">3. Constructive Comments to Authors *</h5>
-                    <RichTextEditor value={reviewComments} onChange={value => { setReviewComments(value); setReviewDraftSaved(false); }}
-                      placeholder="Provide detailed commentary on methodology, results, statistical analysis, writing clarity, and required revisions…" minHeight="220px" />
-                  </div>
-                  <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">4. Confidential Comments to Editor</h5>
-                    <textarea rows={3} value={reviewPrivate} onChange={e => setReviewPrivate(e.target.value)}
+                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">Confidential Comments to Editor</h5>
+                    <textarea rows={2} value={reviewPrivate} onChange={e => setReviewPrivate(e.target.value)}
                       placeholder="Private insights for the editorial office only…"
                       className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
                   </div>
-                  <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">5. Recommendation *</h5>
-                    <select value={reviewRecommend} onChange={e => setReviewRecommend(e.target.value as any)} className="w-full bg-teal-50 border border-teal-300 rounded-lg p-2.5 font-bold text-teal-800">
-                      <option value="accept">Accept Manuscript Unedited</option>
-                      <option value="minor-revision">Accept with Minor Revisions</option>
-                      <option value="major-revision">Re-evaluate after Major Revisions</option>
-                      <option value="reject">Decline / Reject Submission</option>
-                    </select>
-                  </div>
+
+                  {/* Highlights */}
                   {reviewHighlights.length > 0 && (
                     <div className="border rounded-xl p-4 bg-yellow-50">
                       <h5 className="font-bold text-yellow-800 uppercase text-[10px] tracking-wide mb-2">Text Highlights ({reviewHighlights.length})</h5>
@@ -1193,6 +1365,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                       ))}
                     </div>
                   )}
+
+                  {/* Actions */}
                   <div className="flex flex-wrap gap-2 pt-3 border-t">
                     <button type="button" onClick={() => handleReviewerSubmit(selectedManuscript, true)} className="border border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-slate-50 flex items-center gap-1.5">
                       <Save className="h-3.5 w-3.5" /> Save Draft
