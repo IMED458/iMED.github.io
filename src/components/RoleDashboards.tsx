@@ -1228,163 +1228,256 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                 </div>
               )}
 
-              <div className="bg-white p-5 space-y-4 flex-1 overflow-y-auto">
-                <div className="border-b pb-3">
-                  <h4 className="font-black text-teal-900 text-sm">Peer Review Form</h4>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Manuscript ID: {selectedManuscript.id} · {selectedManuscript.title?.slice(0, 60)}</p>
+              <div className="bg-white flex-1 overflow-y-auto">
+                {/* ── Header bar ── */}
+                <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm">
+                  <div>
+                    <h4 className="font-black text-teal-800 text-sm flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-teal-600" /> Peer Review Form
+                    </h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{selectedManuscript.id} · {selectedManuscript.title?.slice(0, 55)}{selectedManuscript.title?.length > 55 ? '…' : ''}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => handleReviewerSubmit(selectedManuscript, true)} className="border border-slate-300 text-slate-600 font-bold px-3 py-1.5 rounded-lg text-[11px] hover:bg-slate-50 flex items-center gap-1">
+                      <Save className="h-3 w-3" /> Save Draft
+                    </button>
+                    <button type="button" onClick={() => handleReviewerSubmit(selectedManuscript, false)} className="bg-teal-700 hover:bg-teal-800 text-white font-bold px-3 py-1.5 rounded-lg text-[11px] flex items-center gap-1">
+                      <Send className="h-3 w-3" /> Submit
+                    </button>
+                  </div>
                 </div>
-                <div className="bg-slate-50 rounded-xl p-3 grid grid-cols-2 gap-2 text-[11px] border">
-                  <div><b className="text-slate-500">Title:</b> <span className="text-slate-700">{selectedManuscript.title}</span></div>
-                  <div><b className="text-slate-500">Type:</b> <span className="text-slate-700">{selectedManuscript.articleType}</span></div>
-                  <div><b className="text-slate-500">Author:</b> <span className="text-slate-700">{selectedManuscript.authors[0]?.firstName} {selectedManuscript.authors[0]?.lastName}</span></div>
-                  <div><b className="text-slate-500">Specialty:</b> <span className="text-slate-700">{selectedManuscript.specialty}</span></div>
-                </div>
-                <div className="space-y-4 text-xs">
 
+                {/* ── Manuscript meta strip ── */}
+                <div className="mx-5 mt-4 mb-1 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px]">
+                  <div><span className="font-bold text-teal-700">Title:</span> <span className="text-slate-700">{selectedManuscript.title}</span></div>
+                  <div><span className="font-bold text-teal-700">Type:</span> <span className="text-slate-700">{selectedManuscript.articleType}</span></div>
+                  <div><span className="font-bold text-teal-700">Author:</span> <span className="text-slate-700">{selectedManuscript.authors[0]?.firstName} {selectedManuscript.authors[0]?.lastName}</span></div>
+                  <div><span className="font-bold text-teal-700">Specialty:</span> <span className="text-slate-700">{selectedManuscript.specialty}</span></div>
+                </div>
+
+                <div className="p-5 space-y-5">
+
+                  {/* helper: section card with teal numbered heading */}
                   {/* 1. Summary */}
-                  <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">1. Summary</h5>
-                    <p className="text-[10px] text-slate-500">Brief overview of the manuscript and its key findings.</p>
-                    <textarea value={reviewSummary} onChange={e => { setReviewSummary(e.target.value); setReviewDraftSaved(false); }} rows={4}
-                      placeholder="Summarise the study design, objectives, main findings, and overall assessment…"
-                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-teal-700 to-teal-600 px-4 py-2.5">
+                      <span className="w-6 h-6 rounded-full bg-white text-teal-700 text-[11px] font-black flex items-center justify-center shrink-0">1</span>
+                      <div>
+                        <p className="text-white font-bold text-xs tracking-wide">Summary</p>
+                        <p className="text-teal-100 text-[10px]">Brief overview of the manuscript and key findings</p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white">
+                      <RichTextEditor value={reviewSummary} onChange={v => { setReviewSummary(v); setReviewDraftSaved(false); }}
+                        placeholder="Summarise the study design, objectives, main findings, and overall assessment…"
+                        minHeight="140px" />
+                    </div>
                   </div>
 
                   {/* 2. Major Comments */}
-                  <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">2. Major Comments</h5>
-                    <p className="text-[10px] text-slate-500">Scientific novelty, methodology, statistical analysis, results, clinical applicability, follow-up etc.</p>
-                    <RichTextEditor value={reviewMajorComments} onChange={v => { setReviewMajorComments(v); setReviewDraftSaved(false); }}
-                      placeholder="2.1 Scientific Novelty and Significance&#10;2.2 Study Design and Methodology&#10;2.3 Statistical Analysis&#10;2.4 Results Interpretation&#10;2.5 Clinical Applicability&#10;2.6 Follow-up and Outcomes"
-                      minHeight="240px" />
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-teal-700 to-teal-600 px-4 py-2.5">
+                      <span className="w-6 h-6 rounded-full bg-white text-teal-700 text-[11px] font-black flex items-center justify-center shrink-0">2</span>
+                      <div>
+                        <p className="text-white font-bold text-xs tracking-wide">Major Comments</p>
+                        <p className="text-teal-100 text-[10px]">2.1 Scientific Novelty · 2.2 Methodology · 2.3 Statistics · 2.4 Results · 2.5 Clinical · 2.6 Follow-up</p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white">
+                      <RichTextEditor value={reviewMajorComments} onChange={v => { setReviewMajorComments(v); setReviewDraftSaved(false); }}
+                        placeholder="2.1 Scientific Novelty and Significance&#10;2.2 Study Design and Methodology&#10;2.3 Statistical Analysis&#10;2.4 Results Interpretation&#10;2.5 Clinical Applicability&#10;2.6 Follow-up and Outcomes"
+                        minHeight="240px" />
+                    </div>
                   </div>
 
                   {/* 3. Minor Comments */}
-                  <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">3. Minor Comments</h5>
-                    <p className="text-[10px] text-slate-500">Writing clarity, tables/figures, references, ethical/reporting standards.</p>
-                    <RichTextEditor value={reviewMinorComments} onChange={v => { setReviewMinorComments(v); setReviewDraftSaved(false); }}
-                      placeholder="3.1 Writing and Clarity&#10;3.2 Tables and Figures&#10;3.3 References&#10;3.4 Ethical and Reporting Standards"
-                      minHeight="160px" />
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-teal-700 to-teal-600 px-4 py-2.5">
+                      <span className="w-6 h-6 rounded-full bg-white text-teal-700 text-[11px] font-black flex items-center justify-center shrink-0">3</span>
+                      <div>
+                        <p className="text-white font-bold text-xs tracking-wide">Minor Comments</p>
+                        <p className="text-teal-100 text-[10px]">3.1 Writing · 3.2 Tables/Figures · 3.3 References · 3.4 Ethical Standards</p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white">
+                      <RichTextEditor value={reviewMinorComments} onChange={v => { setReviewMinorComments(v); setReviewDraftSaved(false); }}
+                        placeholder="3.1 Writing and Clarity&#10;3.2 Tables and Figures&#10;3.3 References&#10;3.4 Ethical and Reporting Standards"
+                        minHeight="160px" />
+                    </div>
                   </div>
 
                   {/* 4. Strengths */}
-                  <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">4. Strengths</h5>
-                    <textarea value={reviewStrengths} onChange={e => { setReviewStrengths(e.target.value); setReviewDraftSaved(false); }} rows={3}
-                      placeholder="• Clinically relevant research question&#10;• Large sample size&#10;• Robust statistical analysis…"
-                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-teal-700 to-teal-600 px-4 py-2.5">
+                      <span className="w-6 h-6 rounded-full bg-white text-teal-700 text-[11px] font-black flex items-center justify-center shrink-0">4</span>
+                      <div>
+                        <p className="text-white font-bold text-xs tracking-wide">Strengths</p>
+                        <p className="text-teal-100 text-[10px]">List the manuscript's strengths as bullet points</p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white">
+                      <RichTextEditor value={reviewStrengths} onChange={v => { setReviewStrengths(v); setReviewDraftSaved(false); }}
+                        placeholder="• Clinically relevant research question&#10;• Large cohort size&#10;• Robust statistical analysis…"
+                        minHeight="120px" />
+                    </div>
                   </div>
 
                   {/* 5. Limitations */}
-                  <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">5. Limitations <span className="font-normal text-slate-500 normal-case">(to be strengthened in manuscript)</span></h5>
-                    <textarea value={reviewLimitations} onChange={e => { setReviewLimitations(e.target.value); setReviewDraftSaved(false); }} rows={3}
-                      placeholder="• Retrospective design&#10;• No multivariate analysis&#10;• Short follow-up duration…"
-                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-teal-700 to-teal-600 px-4 py-2.5">
+                      <span className="w-6 h-6 rounded-full bg-white text-teal-700 text-[11px] font-black flex items-center justify-center shrink-0">5</span>
+                      <div>
+                        <p className="text-white font-bold text-xs tracking-wide">Limitations</p>
+                        <p className="text-teal-100 text-[10px]">To be strengthened in the manuscript</p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white">
+                      <RichTextEditor value={reviewLimitations} onChange={v => { setReviewLimitations(v); setReviewDraftSaved(false); }}
+                        placeholder="• Retrospective design&#10;• No multivariate analysis&#10;• Short follow-up duration…"
+                        minHeight="120px" />
+                    </div>
                   </div>
 
                   {/* 6. Recommendation */}
-                  <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">6. Recommendation to the Editor *</h5>
-                    <select value={reviewRecommend} onChange={e => setReviewRecommend(e.target.value as any)} className="w-full bg-teal-50 border border-teal-300 rounded-lg p-2.5 font-bold text-teal-800">
-                      <option value="accept">Accept</option>
-                      <option value="minor-revision">Minor Revision</option>
-                      <option value="major-revision">Major Revision</option>
-                      <option value="reject">Reject</option>
-                    </select>
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-teal-700 to-teal-600 px-4 py-2.5">
+                      <span className="w-6 h-6 rounded-full bg-white text-teal-700 text-[11px] font-black flex items-center justify-center shrink-0">6</span>
+                      <div>
+                        <p className="text-white font-bold text-xs tracking-wide">Recommendation to the Editor *</p>
+                      </div>
+                    </div>
+                    <div className="p-4 bg-white">
+                      <select value={reviewRecommend} onChange={e => setReviewRecommend(e.target.value as any)}
+                        className="w-full bg-teal-50 border-2 border-teal-300 rounded-xl p-3 font-black text-teal-800 text-sm">
+                        <option value="accept">Accept</option>
+                        <option value="minor-revision">Minor Revision</option>
+                        <option value="major-revision">Major Revision</option>
+                        <option value="reject">Reject</option>
+                      </select>
+                    </div>
                   </div>
 
                   {/* 7. Required Revisions */}
-                  <div className="border rounded-xl p-4 space-y-3">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">7. Required Revisions (Actionable)</h5>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase">Essential (must address):</label>
-                      <textarea value={reviewRequiredEssential} onChange={e => { setReviewRequiredEssential(e.target.value); setReviewDraftSaved(false); }} rows={3}
-                        placeholder="1. Add multivariate analysis…&#10;2. Include interobserver agreement…"
-                        className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-teal-700 to-teal-600 px-4 py-2.5">
+                      <span className="w-6 h-6 rounded-full bg-white text-teal-700 text-[11px] font-black flex items-center justify-center shrink-0">7</span>
+                      <div>
+                        <p className="text-white font-bold text-xs tracking-wide">Required Revisions (Actionable)</p>
+                        <p className="text-teal-100 text-[10px]">Essential + Recommended</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase">Recommended (improves quality):</label>
-                      <textarea value={reviewRequiredRecommended} onChange={e => { setReviewRequiredRecommended(e.target.value); setReviewDraftSaved(false); }} rows={2}
-                        placeholder="1. Add a clinical decision framework…&#10;2. Include ROC/AUC analysis…"
-                        className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                    <div className="p-3 bg-white space-y-3">
+                      <div>
+                        <p className="text-[10px] font-black text-teal-700 uppercase tracking-wide mb-1.5">Essential (must address):</p>
+                        <RichTextEditor value={reviewRequiredEssential} onChange={v => { setReviewRequiredEssential(v); setReviewDraftSaved(false); }}
+                          placeholder="1. Add multivariate analysis…&#10;2. Include interobserver agreement…"
+                          minHeight="120px" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-teal-700 uppercase tracking-wide mb-1.5">Recommended (improves quality):</p>
+                        <RichTextEditor value={reviewRequiredRecommended} onChange={v => { setReviewRequiredRecommended(v); setReviewDraftSaved(false); }}
+                          placeholder="1. Add a clinical decision framework…&#10;2. Include ROC/AUC analysis…"
+                          minHeight="100px" />
+                      </div>
                     </div>
                   </div>
 
                   {/* 8. Final Scores */}
-                  <div className="border rounded-xl p-4 space-y-3">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">8. Final Evaluation Scores</h5>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {([
-                        ['Originality', scoreOriginality, setScoreOriginality],
-                        ['Methodology', scoreMethodology, setScoreMethodology],
-                        ['Statistical Rigor', scoreStatistical, setScoreStatistical],
-                        ['Clinical Relevance', scoreClinical, setScoreClinical],
-                        ['Presentation', scorePresentation, setScorePresentation],
-                      ] as [string, number, (n: number) => void][]).map(([label, val, setter]) => (
-                        <div key={label}>
-                          <label className="block font-semibold text-slate-700 mb-1 text-[11px]">{label} <span className="text-slate-400">/ 10</span></label>
-                          <select value={val} onChange={e => setter(Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50 text-xs">
-                            {[10,9.5,9,8.5,8,7.5,7,6.5,6,5.5,5,4.5,4,3.5,3,2.5,2,1.5,1,0.5,0].map(n => (
-                              <option key={n} value={n}>{n} / 10</option>
-                            ))}
+                  <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-teal-700 to-teal-600 px-4 py-2.5">
+                      <span className="w-6 h-6 rounded-full bg-white text-teal-700 text-[11px] font-black flex items-center justify-center shrink-0">8</span>
+                      <div>
+                        <p className="text-white font-bold text-xs tracking-wide">Final Evaluation Scores</p>
+                        <p className="text-teal-100 text-[10px]">Rate each category out of 10</p>
+                      </div>
+                    </div>
+                    <div className="p-4 bg-white">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {([
+                          ['Originality', scoreOriginality, setScoreOriginality],
+                          ['Methodology', scoreMethodology, setScoreMethodology],
+                          ['Statistical Rigor', scoreStatistical, setScoreStatistical],
+                          ['Clinical Relevance', scoreClinical, setScoreClinical],
+                          ['Presentation', scorePresentation, setScorePresentation],
+                        ] as [string, number, (n: number) => void][]).map(([label, val, setter]) => (
+                          <div key={label} className="bg-teal-50 border border-teal-200 rounded-xl p-3">
+                            <p className="text-[10px] font-bold text-teal-700 mb-1.5 uppercase">{label}</p>
+                            <div className="flex items-center gap-2">
+                              <select value={val} onChange={e => setter(Number(e.target.value))}
+                                className="flex-1 border border-teal-300 rounded-lg p-1.5 text-xs font-bold text-teal-800 bg-white">
+                                {[10,9.5,9,8.5,8,7.5,7,6.5,6,5.5,5,4.5,4,3.5,3,2.5,2,1.5,1,0.5,0].map(n => (
+                                  <option key={n} value={n}>{n}</option>
+                                ))}
+                              </select>
+                              <span className="text-[10px] text-teal-600 font-bold">/ 10</span>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="bg-teal-50 border border-teal-200 rounded-xl p-3">
+                          <p className="text-[10px] font-bold text-teal-700 mb-1.5 uppercase">Publishability</p>
+                          <select value={scorePublishability} onChange={e => setScorePublishability(e.target.value)}
+                            className="w-full border border-teal-300 rounded-lg p-1.5 text-xs font-bold text-teal-800 bg-white">
+                            <option>Accept</option>
+                            <option>Conditional (after minor revision)</option>
+                            <option>Conditional (after major revision)</option>
+                            <option>Reject</option>
                           </select>
                         </div>
-                      ))}
-                      <div>
-                        <label className="block font-semibold text-slate-700 mb-1 text-[11px]">Publishability</label>
-                        <select value={scorePublishability} onChange={e => setScorePublishability(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-slate-50 text-xs">
-                          <option>Accept</option>
-                          <option>Conditional (after minor revision)</option>
-                          <option>Conditional (after major revision)</option>
-                          <option>Reject</option>
-                        </select>
                       </div>
                     </div>
                   </div>
 
                   {/* Confidential */}
-                  <div className="border rounded-xl p-4 space-y-2">
-                    <h5 className="font-bold text-slate-800 uppercase text-[10px] tracking-wide">Confidential Comments to Editor</h5>
-                    <textarea rows={2} value={reviewPrivate} onChange={e => setReviewPrivate(e.target.value)}
-                      placeholder="Private insights for the editorial office only…"
-                      className="w-full border border-slate-300 rounded-lg p-2.5 bg-slate-50 resize-y font-sans" />
+                  <div className="rounded-2xl border border-amber-200 overflow-hidden shadow-xs">
+                    <div className="flex items-center gap-3 bg-gradient-to-r from-amber-600 to-amber-500 px-4 py-2.5">
+                      <div>
+                        <p className="text-white font-bold text-xs tracking-wide">Confidential Comments to Editor</p>
+                        <p className="text-amber-100 text-[10px]">Not visible to the author</p>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white">
+                      <RichTextEditor value={reviewPrivate} onChange={v => setReviewPrivate(v)}
+                        placeholder="Private insights for the editorial office only…"
+                        minHeight="100px" />
+                    </div>
                   </div>
 
                   {/* Highlights */}
                   {reviewHighlights.length > 0 && (
-                    <div className="border rounded-xl p-4 bg-yellow-50">
-                      <h5 className="font-bold text-yellow-800 uppercase text-[10px] tracking-wide mb-2">Text Highlights ({reviewHighlights.length})</h5>
-                      {reviewHighlights.map((h, i) => (
-                        <div key={h.id} className="text-[11px] bg-white border border-yellow-200 rounded-lg px-3 py-1.5 mb-1">
-                          <span className="text-slate-500 font-bold">[{i + 1}]</span>{' '}
-                          <span className="font-semibold">"{h.text}"</span>
-                          {h.note && <span className="text-slate-500 ml-2">— {h.note}</span>}
-                        </div>
-                      ))}
+                    <div className="rounded-2xl border border-yellow-200 overflow-hidden shadow-xs">
+                      <div className="flex items-center gap-3 bg-gradient-to-r from-yellow-500 to-yellow-400 px-4 py-2.5">
+                        <p className="text-white font-bold text-xs tracking-wide">Text Highlights ({reviewHighlights.length})</p>
+                      </div>
+                      <div className="p-3 bg-white space-y-1">
+                        {reviewHighlights.map((h, i) => (
+                          <div key={h.id} className="text-[11px] bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 flex items-start justify-between gap-2">
+                            <span><span className="text-slate-500 font-bold">[{i + 1}]</span> <span className="font-semibold">"{h.text}"</span>{h.note && <span className="text-slate-500 ml-1">— {h.note}</span>}</span>
+                            <button onClick={() => setReviewHighlights(prev => prev.filter(x => x.id !== h.id))} className="text-red-400 hover:text-red-600 shrink-0"><X className="h-3 w-3" /></button>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
-                  {/* Actions */}
-                  <div className="flex flex-wrap gap-2 pt-3 border-t">
+                  {/* Action bar */}
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
                     <button type="button" onClick={() => handleReviewerSubmit(selectedManuscript, true)} className="border border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-slate-50 flex items-center gap-1.5">
                       <Save className="h-3.5 w-3.5" /> Save Draft
                     </button>
-                    <button type="button" onClick={() => { handleReviewerSubmit(selectedManuscript, true); setSelectedManuscript(null); }} className="border border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-slate-50">Save Draft & Close</button>
+                    <button type="button" onClick={() => { handleReviewerSubmit(selectedManuscript, true); setSelectedManuscript(null); }} className="border border-slate-300 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-slate-50">Save & Close</button>
                     <button type="button" onClick={() => handleReviewerSubmit(selectedManuscript, false)} className="bg-teal-700 hover:bg-teal-800 text-white font-bold px-5 py-2 rounded-lg text-xs flex items-center gap-1.5">
                       <Send className="h-3.5 w-3.5" /> Submit Review
                     </button>
                     <button type="button" onClick={handlePrintReview} className="border border-teal-300 text-teal-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-teal-50 flex items-center gap-1.5">
                       <Printer className="h-3.5 w-3.5" /> Print Review PDF
                     </button>
-                    <button onClick={() => {
+                    <button type="button" onClick={() => {
                       const updated = manuscripts.map(item => item.id === selectedManuscript.id ? { ...item, reviewerAssignments: item.reviewerAssignments.map(r => r.reviewerId === currentUser.id ? { ...r, status: 'declined' as const } : r) } : item);
                       onUpdateManuscripts(updated); setSelectedManuscript(null);
                       onShowNotification('Review invitation declined.', 'info');
-                    }} className="border border-rose-200 text-rose-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-50">Decline Invitation</button>
+                    }} className="border border-rose-200 text-rose-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-50 ml-auto">Decline Invitation</button>
                   </div>
-                  {reviewDraftSaved && <p className="text-[11px] text-teal-700 font-semibold">✓ Draft saved</p>}
+                  {reviewDraftSaved && <p className="text-[11px] text-teal-700 font-semibold flex items-center gap-1">✓ Draft saved</p>}
                 </div>
               </div>
             </div>
