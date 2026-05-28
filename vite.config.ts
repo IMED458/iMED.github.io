@@ -3,9 +3,10 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
   return {
-    base: '/gbmnsubmit.github.io/',
+    // Dev: serve from root; GitHub Pages build: /gbmnsubmit.github.io/
+    base: command === 'build' ? '/gbmnsubmit.github.io/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
