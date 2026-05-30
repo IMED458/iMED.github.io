@@ -299,14 +299,19 @@ export default function App() {
 
   const handleUpdateManuscript = async (updated: Manuscript) => {
     const cloudReady = await uploadEmbeddedImages(updated);
-    const exists = manuscripts.some(m => m.id === updated.id);
+    // Auto-transition: Revision Requested → Under Revision when author starts editing
+    const autoStatused: Manuscript =
+      cloudReady.status === 'Revision Requested' && currentUser?.role === 'Author'
+        ? { ...cloudReady, status: 'Under Revision' as const }
+        : cloudReady;
+    const exists = manuscripts.some(m => m.id === autoStatused.id);
     const list = exists
-      ? manuscripts.map(m => m.id === updated.id ? cloudReady : m)
-      : [...manuscripts, cloudReady];
+      ? manuscripts.map(m => m.id === autoStatused.id ? autoStatused : m)
+      : [...manuscripts, autoStatused];
     setManuscripts(list);
     // Write only the changed document — faster and avoids rewriting the whole collection
-    DB.setManuscript(cloudReady);
-    setSelectedManuscriptId(cloudReady.id);
+    DB.setManuscript(autoStatused);
+    setSelectedManuscriptId(autoStatused.id);
   };
 
   const handleUpdateManuscriptsList = (newList: Manuscript[]) => {
@@ -462,7 +467,7 @@ export default function App() {
   const activeManuscript = currentUser?.role === 'Author'
     ? authorManuscripts.find(m => m.id === selectedManuscriptId) || authorManuscripts[0] || null
     : null;
-  const authorCanEditActive = !activeManuscript || ['Draft', 'Revision Requested'].includes(activeManuscript.status);
+  const authorCanEditActive = !activeManuscript || ['Draft', 'Revision Requested', 'Under Revision'].includes(activeManuscript.status);
 
   const createAuthorDraft = () => {
     if (!currentUser) return;
@@ -709,7 +714,7 @@ export default function App() {
                       </button>
                     ))}
                     {/* Delete button — only for drafts or revision-requested */}
-                    {['Draft', 'Revision Requested'].includes(m.status) && (
+                    {['Draft', 'Revision Requested', 'Under Revision'].includes(m.status) && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setDeleteConfirm({ id: m.id, title: m.title || 'Untitled draft' }); }}
                         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-lg text-red-500 hover:bg-red-50 transition"
@@ -754,12 +759,13 @@ export default function App() {
                   }}
                 />
                 <div className="flex-1">
-                  <SubmissionWorkflow 
+                  <SubmissionWorkflow
                     manuscript={activeManuscript}
                     onUpdateManuscript={handleUpdateManuscript}
                     activeStep={activeStep}
                     onStepChange={setActiveStep}
                     onShowNotification={triggerNotification}
+                    currentUser={currentUser}
                   />
                 </div>
               </div>

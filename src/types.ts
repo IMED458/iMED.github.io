@@ -177,6 +177,7 @@ export type ManuscriptStatus =
   | 'Under Review'
   | 'In Review'
   | 'Revision Requested'
+  | 'Under Revision'
   | 'Editorial Decision'
   | 'Accepted'
   | 'In Production'

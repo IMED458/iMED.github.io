@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Manuscript, AuthorDetails, ReferenceItem, FigureTableItem, SupplementaryFile } from '../types';
+import { Manuscript, AuthorDetails, ReferenceItem, FigureTableItem, SupplementaryFile, User } from '../types';
 import { ARTICLE_TYPES, createManuscriptId, formatAMAReference, SAMPLE_MANUSCRIPT } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
 import RichTextEditor from './RichTextEditor';
@@ -34,6 +34,7 @@ interface SubmissionWorkflowProps {
   activeStep: string;
   onStepChange: (stepId: string) => void;
   onShowNotification: (msg: string, type: 'success' | 'info' | 'error') => void;
+  currentUser?: User | null;
 }
 
 export default function SubmissionWorkflow({
@@ -41,7 +42,8 @@ export default function SubmissionWorkflow({
   onUpdateManuscript,
   activeStep,
   onStepChange,
-  onShowNotification
+  onShowNotification,
+  currentUser,
 }: SubmissionWorkflowProps) {
 
   // Auto-Save interval simulation
@@ -102,6 +104,8 @@ export default function SubmissionWorkflow({
   const [authorIsCorr, setAuthorIsCorr] = useState(false);
   const [editingAuthorId, setEditingAuthorId] = useState<string | null>(null);
   const [isAuthorOrcidLookup, setIsAuthorOrcidLookup] = useState(false);
+  // Self-contribution: track if the current user's own contribution has been saved this session
+  const [selfContribSaved, setSelfContribSaved] = useState(false);
 
   // 3. Figures/Table temporary state
   const [mediaType, setMediaType] = useState<'figure' | 'table' | 'diagram'>('figure');
@@ -717,7 +721,103 @@ export default function SubmissionWorkflow({
         )}
 
         {/* 5. AUTHORS - ROSTER */}
-        {activeStep === 'authors' && (
+        {activeStep === 'authors' && (() => {
+          // Find logged-in user's existing author entry
+          const selfAuthor = currentUser
+            ? manuscript.authors.find(a =>
+                a.email?.toLowerCase() === currentUser.email?.toLowerCase() ||
+                (a.firstName === currentUser.firstName && a.lastName === currentUser.lastName)
+              )
+            : null;
+          const selfNeedsContrib = selfAuthor &&
+            (!selfAuthor.contributionTags || selfAuthor.contributionTags.length === 0) &&
+            !selfContribSaved;
+
+          const handleSaveSelfContrib = (e: React.FormEvent) => {
+            e.preventDefault();
+            const hasCoreContribution = authorContributionTags.some(tag => [
+              'Substantial contributions to concept or design',
+              'Acquisition, analysis, or interpretation of data',
+            ].includes(tag));
+            const hasWritingContribution = authorContributionTags.some(tag => [
+              'Drafting of the manuscript',
+              'Critical review of the manuscript for important intellectual content',
+            ].includes(tag));
+            const hasRequiredContribution = [
+              'Agreed to be accountable for all aspects of the work',
+              'Will review the final version to be published',
+            ].every(tag => authorContributionTags.includes(tag));
+            if (!hasCoreContribution || !hasWritingContribution || !hasRequiredContribution) {
+              onShowNotification('Please check at least one concept/data item, one writing/review item, and both required items.', 'error');
+              return;
+            }
+            const updatedAuthors = manuscript.authors.map(a =>
+              a.id === selfAuthor?.id
+                ? { ...a, contributionRole: authorContrib || authorContributionTags.join('; '), contributionTags: authorContributionTags }
+                : a
+            );
+            onUpdateManuscript({ ...manuscript, authors: updatedAuthors, updatedAt: new Date().toISOString() });
+            setSelfContribSaved(true);
+            setAuthorContributionTags([]);
+            setAuthorContrib('Draft Writing & Methodology');
+            onShowNotification(`Your contributions saved! Now add your co-authors.`, 'success');
+          };
+
+          if (selfNeedsContrib) {
+            return (
+              <div className="space-y-6 text-xs animate-fade-in">
+                <div className="bg-teal-50 border border-teal-300 rounded-xl p-5 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-teal-200 pb-3">
+                    <Users className="h-5 w-5 text-teal-700" />
+                    <div>
+                      <h4 className="font-black text-teal-900 text-sm">Step 1 — Your Contributions</h4>
+                      <p className="text-[11px] text-teal-700 mt-0.5">
+                        Before adding co-authors, please describe <strong>your own contribution</strong> to this manuscript.
+                        All four ICMJE criteria must be met.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg p-3 border border-teal-200 text-teal-900 text-[11px] font-semibold">
+                    ✍️ {selfAuthor?.firstName} {selfAuthor?.lastName} · {selfAuthor?.institution}
+                  </div>
+                  <form onSubmit={handleSaveSelfContrib} className="space-y-4">
+                    <div>
+                      <h5 className="font-bold text-slate-800 mb-2">Contributions. How did each listed author contribute?</h5>
+                      <p className="text-[10px] text-slate-500 mb-3">Check all that apply. You must check at least one concept/data item, one writing/review item, and both required items.</p>
+                      <div className="grid grid-cols-1 gap-2">
+                        {contributionOptions.map(opt => (
+                          <label key={opt} className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition ${authorContributionTags.includes(opt) ? 'bg-teal-50 border-teal-400 text-teal-900' : 'bg-white border-slate-200 text-slate-700 hover:border-teal-300'}`}>
+                            <input
+                              type="checkbox"
+                              checked={authorContributionTags.includes(opt)}
+                              onChange={e => setAuthorContributionTags(prev => e.target.checked ? [...prev, opt] : prev.filter(t => t !== opt))}
+                              className="accent-teal-700"
+                            />
+                            <span className="text-[11px] font-medium">{opt}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1">Specific scientific contributions (free text)</label>
+                      <input
+                        type="text"
+                        value={authorContrib}
+                        onChange={e => setAuthorContrib(e.target.value)}
+                        placeholder="e.g., Study design, statistical analysis, manuscript writing"
+                        className="w-full bg-slate-50 border p-2 rounded focus:outline-hidden focus:ring-1 focus:ring-teal-600"
+                      />
+                    </div>
+                    <button type="submit" className="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold py-2.5 px-4 rounded-xl text-sm">
+                      Save My Contributions &amp; Continue to Add Co-Authors →
+                    </button>
+                  </form>
+                </div>
+              </div>
+            );
+          }
+
+          return (
           <div className="space-y-6 text-xs animate-fade-in">
             {/* Added Authors display in priority indexing */}
             <div className="space-y-2 border p-4 bg-slate-50 rounded-xl">
@@ -956,7 +1056,8 @@ export default function SubmissionWorkflow({
               </button>
             </form>
           </div>
-        )}
+          );
+        })()}
 
         {/* 6. ARTICLE TYPE */}
         {activeStep === 'article-type' && (

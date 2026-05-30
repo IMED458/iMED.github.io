@@ -375,7 +375,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const acceptedCount = manuscripts.filter(m => ['Accepted', 'Published'].includes(m.status)).length;
   const manuscriptStatuses: ManuscriptStatus[] = [
     'Draft', 'Submitted', 'Reviewer Assigned', 'Under Review', 'In Review',
-    'Revision Requested', 'Editorial Decision', 'Accepted', 'In Production',
+    'Revision Requested', 'Under Revision', 'Editorial Decision', 'Accepted', 'In Production',
     'Completed', 'Rejected', 'Published',
   ];
 
@@ -426,6 +426,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
       'Under Review': 'bg-yellow-50 text-yellow-800 border-yellow-200',
       'In Review': 'bg-orange-50 text-orange-800 border-orange-200',
       'Revision Requested': 'bg-amber-50 text-amber-800 border-amber-200',
+      'Under Revision': 'bg-orange-50 text-orange-800 border-orange-300',
       'Editorial Decision': 'bg-purple-50 text-purple-800 border-purple-200',
       'Accepted': 'bg-emerald-50 text-emerald-800 border-emerald-200',
       'In Production': 'bg-lime-50 text-lime-800 border-lime-200',
@@ -962,7 +963,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                 </div>
               </div>
               <div className="flex-1 min-w-0">
-                <SubmissionWorkflow manuscript={manuscript} onUpdateManuscript={updateSelectedManuscript} activeStep={officeEditStep} onStepChange={setOfficeEditStep} onShowNotification={onShowNotification} />
+                <SubmissionWorkflow manuscript={manuscript} onUpdateManuscript={updateSelectedManuscript} activeStep={officeEditStep} onStepChange={setOfficeEditStep} onShowNotification={onShowNotification} currentUser={currentUser} />
               </div>
             </div>
           ) : (
@@ -1015,7 +1016,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
         if (!ok) return false;
         if (activeSection === 'Awaiting Action') return m.status === 'Submitted';
         if (activeSection === 'Under Review') return ['Under Review', 'Reviewer Assigned', 'In Review'].includes(m.status);
-        if (activeSection === 'Revisions') return m.status === 'Revision Requested';
+        if (activeSection === 'Revisions') return ['Revision Requested', 'Under Revision'].includes(m.status);
         if (activeSection === 'Accepted') return m.status === 'Accepted';
         if (activeSection === 'Published') return m.status === 'Published';
         if (activeSection === 'Rejected') return m.status === 'Rejected';
@@ -1162,7 +1163,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                         </button>
                       </div>
                     );
-                    return <SubmissionWorkflow manuscript={myDraft} onUpdateManuscript={m => onUpdateManuscripts(manuscripts.map(x => x.id === m.id ? m : x))} activeStep={editorMyMsStep} onStepChange={setEditorMyMsStep} onShowNotification={onShowNotification} />;
+                    return <SubmissionWorkflow manuscript={myDraft} onUpdateManuscript={m => onUpdateManuscripts(manuscripts.map(x => x.id === m.id ? m : x))} activeStep={editorMyMsStep} onStepChange={setEditorMyMsStep} onShowNotification={onShowNotification} currentUser={currentUser} />;
                   })()}
                 </div>
               </div>
