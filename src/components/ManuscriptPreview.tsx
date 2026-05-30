@@ -508,14 +508,10 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           </div>
         )}
 
-        {/* ── TWO-COLUMN BODY ── */}
+        {/* ── BODY (single column on screen, two columns in print) ── */}
         <div
           className="gbmn-body-columns"
           style={{
-            columnCount: 2,
-            WebkitColumnCount: 2 as number,
-            columnGap: '0.6cm',
-            columnFill: 'auto' as const,
             display: 'block',
             width: '100%',
           }}
@@ -593,12 +589,10 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
         {/* ── PAGE FOOTER (screen only — print uses @bottom-center margin box) ── */}
         <div className="gbmn-page-footer">
-          <svg viewBox="0 0 900 120" xmlns="http://www.w3.org/2000/svg" style={{width:'100%',display:'block',background:'#fff'}}>
-            <text x="450" y="40" fontFamily="Arial, Helvetica, sans-serif" fontSize="11" fontWeight="700" textAnchor="middle" fill="#000">Georgian Biomedical News</text>
-            <text x="450" y="58" fontFamily="Arial, Helvetica, sans-serif" fontSize="11" fontWeight="700" textAnchor="middle" fill="#000">ISSN (Online): 2720-8796 ISSN (Print): 2720-7994</text>
-            <text x="450" y="76" fontFamily="Arial, Helvetica, sans-serif" fontSize="11" fontWeight="700" textAnchor="middle" fill="#000">Downloaded from gbmn.org. For personal use only. No other uses without permission.</text>
-            <text x="450" y="94" fontFamily="Arial, Helvetica, sans-serif" fontSize="11" fontWeight="700" textAnchor="middle" fill="#000">Copyright © 2022. All rights reserved.</text>
-          </svg>
+          <p>Georgian Biomedical News</p>
+          <p>ISSN (Online): 2720-8796&nbsp;&nbsp;ISSN (Print): 2720-7994</p>
+          <p>Downloaded from gbmn.org. For personal use only. No other uses without permission.</p>
+          <p>Copyright &copy; 2022. All rights reserved.</p>
         </div>
 
       </div>{/* end #academic-manuscript-sheet */}
@@ -797,16 +791,13 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         }
 
         /* ── BODY COLUMNS ────────────────────────────── */
+        /* Screen: single column. Print: 2 columns (see @media print below) */
         .gbmn-body-columns {
-          display: block !important;
-          columns: 2 !important;
-          -webkit-columns: 2 !important;
-          column-count: 2 !important;
-          -webkit-column-count: 2 !important;
-          column-gap: 0.6cm !important;
-          -webkit-column-gap: 0.6cm !important;
-          column-fill: auto !important;
-          width: 100% !important;
+          display: block;
+          column-count: 1;
+          column-gap: 0.6cm;
+          column-fill: auto;
+          width: 100%;
           font-size: 11pt;
           line-height: 1.36;
           text-align: justify;
@@ -855,14 +846,13 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         .preview-rich-dropcap > p:first-of-type::first-letter,
         .preview-rich-dropcap p:first-child::first-letter {
           float: left !important;
-          font-size: 3em !important;
+          font-size: 3.2em !important;
           line-height: 0.78 !important;
           font-weight: 700 !important;
-          margin: 4px 6px -2px 0 !important;
+          margin: 3px 6px 0 0 !important;
           padding: 0 !important;
           color: #111111 !important;
           font-family: "Times New Roman", Georgia, serif !important;
-          display: block !important;
         }
 
         /* ── INLINE CITATION LINKS ───────────────────── */
@@ -1030,13 +1020,17 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
         /* ── PAGE FOOTER ─────────────────────────────── */
         .gbmn-page-footer {
           border-top: 1px solid #cbd5e1;
-          padding-top: 10px;
+          padding-top: 8px;
           margin-top: 14px;
           text-align: center;
           font-family: Arial, sans-serif;
           font-size: 8pt;
+          font-weight: 700;
           color: #000000;
-          line-height: 1.25;
+          line-height: 1.75;
+        }
+        .gbmn-page-footer p {
+          margin: 0;
         }
         .gbmn-placeholder { color: #94a3b8; font-style: italic; font-size: 10pt; }
 
