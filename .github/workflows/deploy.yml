@@ -39,6 +39,10 @@ jobs:
             <head>
               <meta charset="UTF-8" />
               <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <link rel="icon" type="image/png" sizes="512x512" href="/gbmnsubmit.github.io/favicon.png" />
+              <link rel="icon" type="image/png" sizes="32x32" href="/gbmnsubmit.github.io/favicon-32.png" />
+              <link rel="shortcut icon" href="/gbmnsubmit.github.io/favicon.png" />
+              <link rel="apple-touch-icon" href="/gbmnsubmit.github.io/favicon.png" />
               <title>GBMN Manuscript Submission</title>
             </head>
             <body>
