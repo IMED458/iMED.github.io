@@ -1233,8 +1233,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const directAssigned = manuscripts.filter(m => (m.reviewerAssignments || []).some(reviewerMatchesCurrentUser));
     const assignedManuscripts = sortNewest(directAssigned.length ? directAssigned : manuscripts.filter(m => m.status !== 'Draft'));
     return (
-      <div className="min-h-[calc(100vh-88px)] flex flex-col md:flex-row bg-slate-50">
-        <div className={`${selectedManuscript ? 'hidden md:flex md:flex-col' : 'flex flex-col'} w-full md:w-80 shrink-0 bg-white border-r border-slate-200`}>
+      <div className="h-[calc(100vh-88px)] flex flex-col md:flex-row bg-slate-50 overflow-hidden">
+        <div className={`${selectedManuscript ? 'hidden md:flex md:flex-col' : 'flex flex-col'} w-full md:w-80 shrink-0 bg-white border-r border-slate-200 overflow-hidden`}>
           <div className="p-4 border-b bg-white">
             <div className="flex items-center gap-2 mb-1"><ShieldCheck className="h-5 w-5 text-teal-700" /><h3 className="font-bold text-sm text-slate-800">Reviewer Queue</h3></div>
             <p className="text-[11px] text-slate-500">Welcome, {currentUser.firstName}.</p>
@@ -1268,53 +1268,62 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
               <BookOpen className="h-12 w-12 opacity-40" /><p>Select a manuscript to review</p>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto flex flex-col gap-0">
-              <div className="border-b border-slate-200">
-                <div className="bg-white px-4 py-2 flex items-center justify-between border-b">
+            /* ── SPLIT VIEW: left = manuscript preview, right = review form ── */
+            <div className="flex-1 flex flex-row min-h-0 overflow-hidden">
+
+              {/* ── LEFT PANE: Manuscript Preview ── */}
+              <div className="flex flex-col w-1/2 min-h-0 border-r border-slate-200 overflow-hidden">
+                {/* Left header bar */}
+                <div className="shrink-0 bg-white px-4 py-2 flex items-center justify-between border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <button onClick={() => setSelectedManuscript(null)} className="md:hidden p-1 rounded hover:bg-slate-100 text-slate-500 mr-1"><ArrowLeft className="h-4 w-4" /></button>
-                    <Eye className="h-4 w-4 text-teal-700" /><span className="text-xs font-bold text-slate-800">Manuscript Preview — {selectedManuscript.id}</span>
+                    <Eye className="h-4 w-4 text-teal-700" /><span className="text-xs font-bold text-slate-800">Manuscript — {selectedManuscript.id}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={handleTextHighlight} className="text-[11px] flex items-center gap-1 bg-yellow-100 border border-yellow-300 text-yellow-800 font-bold px-3 py-1 rounded-lg hover:bg-yellow-200">
-                      <Highlighter className="h-3.5 w-3.5" /> Highlight selected text
+                    <button onClick={handleTextHighlight} className="text-[11px] flex items-center gap-1 bg-yellow-100 border border-yellow-300 text-yellow-800 font-bold px-2 py-1 rounded-lg hover:bg-yellow-200">
+                      <Highlighter className="h-3.5 w-3.5" /> Highlight
                     </button>
                     <button onClick={() => setSelectedManuscript(null)} className="hidden md:block text-xs text-slate-400 hover:text-slate-600 font-bold">Close ×</button>
                   </div>
                 </div>
-                <div className="max-h-[45vh] overflow-y-auto bg-slate-50 p-4">
+
+                {/* Highlight note bar */}
+                {showHighlightNote && (
+                  <div className="shrink-0 bg-yellow-50 border-b border-yellow-300 px-4 py-3 flex items-center gap-3 text-xs">
+                    <Highlighter className="h-4 w-4 text-yellow-700 shrink-0" />
+                    <p className="font-semibold text-yellow-800 shrink-0">"{pendingHighlightText.slice(0, 40)}…"</p>
+                    <input value={highlightNote} onChange={e => setHighlightNote(e.target.value)} placeholder="Add note (optional)" className="flex-1 border border-yellow-300 rounded px-2 py-1 bg-white" />
+                    <button onClick={confirmHighlight} className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold px-3 py-1 rounded-lg">Save</button>
+                    <button onClick={() => { setShowHighlightNote(false); setPendingHighlightText(''); }}><X className="h-4 w-4 text-slate-400" /></button>
+                  </div>
+                )}
+
+                {/* Highlights strip */}
+                {reviewHighlights.length > 0 && (
+                  <div className="shrink-0 bg-yellow-50 border-b border-yellow-200 px-4 py-2">
+                    <p className="text-[10px] font-bold text-yellow-800 uppercase mb-1.5">Highlights ({reviewHighlights.length})</p>
+                    <div className="flex flex-wrap gap-2">
+                      {reviewHighlights.map(h => (
+                        <div key={h.id} className="bg-yellow-100 border border-yellow-300 rounded-lg px-2 py-1 text-[10px] flex items-start gap-1.5 max-w-xs">
+                          <span className="font-semibold">"{h.text.slice(0, 60)}{h.text.length > 60 ? '…' : ''}"</span>
+                          {h.note && <span className="text-yellow-700">— {h.note}</span>}
+                          <button onClick={() => setReviewHighlights(prev => prev.filter(x => x.id !== h.id))} className="text-red-400 hover:text-red-600 ml-1"><X className="h-3 w-3" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Scrollable preview area */}
+                <div className="flex-1 overflow-y-auto bg-slate-50 p-4">
                   <ManuscriptPreview manuscript={selectedManuscript} onShowNotification={onShowNotification} />
                 </div>
               </div>
 
-              {reviewHighlights.length > 0 && (
-                <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2">
-                  <p className="text-[10px] font-bold text-yellow-800 uppercase mb-1.5">Highlights ({reviewHighlights.length})</p>
-                  <div className="flex flex-wrap gap-2">
-                    {reviewHighlights.map(h => (
-                      <div key={h.id} className="bg-yellow-100 border border-yellow-300 rounded-lg px-2 py-1 text-[10px] flex items-start gap-1.5 max-w-xs">
-                        <span className="font-semibold">"{h.text.slice(0, 60)}{h.text.length > 60 ? '…' : ''}"</span>
-                        {h.note && <span className="text-yellow-700">— {h.note}</span>}
-                        <button onClick={() => setReviewHighlights(prev => prev.filter(x => x.id !== h.id))} className="text-red-400 hover:text-red-600 ml-1"><X className="h-3 w-3" /></button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {showHighlightNote && (
-                <div className="bg-yellow-50 border-b border-yellow-300 px-4 py-3 flex items-center gap-3 text-xs">
-                  <Highlighter className="h-4 w-4 text-yellow-700 shrink-0" />
-                  <p className="font-semibold text-yellow-800 shrink-0">"{pendingHighlightText.slice(0, 40)}…"</p>
-                  <input value={highlightNote} onChange={e => setHighlightNote(e.target.value)} placeholder="Add note (optional)" className="flex-1 border border-yellow-300 rounded px-2 py-1 bg-white" />
-                  <button onClick={confirmHighlight} className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold px-3 py-1 rounded-lg">Save</button>
-                  <button onClick={() => { setShowHighlightNote(false); setPendingHighlightText(''); }}><X className="h-4 w-4 text-slate-400" /></button>
-                </div>
-              )}
-
-              <div className="bg-white flex-1 overflow-y-auto">
-                {/* ── Header bar ── */}
-                <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm">
+              {/* ── RIGHT PANE: Peer Review Form ── */}
+              <div className="flex flex-col w-1/2 min-h-0 bg-white overflow-hidden">
+                {/* Right header bar — sticky inside right pane */}
+                <div className="shrink-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm">
                   <div>
                     <h4 className="font-black text-teal-800 text-sm flex items-center gap-2">
                       <ShieldCheck className="h-4 w-4 text-teal-600" /> Peer Review Form
@@ -1330,6 +1339,9 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     </button>
                   </div>
                 </div>
+
+                {/* Scrollable form area */}
+                <div className="flex-1 overflow-y-auto">
 
                 {/* ── Manuscript meta strip ── */}
                 <div className="mx-5 mt-4 mb-1 bg-teal-50 border border-teal-200 rounded-xl px-4 py-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[11px]">
@@ -1562,6 +1574,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     }} className="border border-rose-200 text-rose-700 font-bold px-4 py-2 rounded-lg text-xs hover:bg-rose-50 ml-auto">Decline Invitation</button>
                   </div>
                   {reviewDraftSaved && <p className="text-[11px] text-teal-700 font-semibold flex items-center gap-1">✓ Draft saved</p>}
+                </div>
                 </div>
               </div>
             </div>

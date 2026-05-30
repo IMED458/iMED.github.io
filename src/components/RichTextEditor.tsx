@@ -424,19 +424,59 @@ export default function RichTextEditor({
   const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
     const html = event.clipboardData.getData('text/html');
     const text = event.clipboardData.getData('text/plain');
+
+    // Check both clipboardData.files AND clipboardData.items for image data
+    // (PowerPoint copies images as items, not files)
     const imageFile = Array.from(event.clipboardData.files).find(file => file.type.startsWith('image/'));
-    if (imageFile) {
+    const imageItem = !imageFile
+      ? Array.from(event.clipboardData.items).find(item => item.kind === 'file' && item.type.startsWith('image/'))
+      : null;
+    const resolvedImageFile = imageFile || (imageItem ? imageItem.getAsFile() : null);
+
+    if (resolvedImageFile) {
       event.preventDefault();
       saveSelection();
       createInsertionMarker();
       setShowImageUpload(true);
-      setImageUploadFile(imageFile);
-      setInsertTitle(imageFile.name);
+      setImageUploadFile(resolvedImageFile);
+      setInsertTitle(resolvedImageFile.name || 'Pasted image');
       const reader = new FileReader();
       reader.onload = () => setImageUploadPreview(String(reader.result || ''));
-      reader.readAsDataURL(imageFile);
+      reader.readAsDataURL(resolvedImageFile);
       return;
     }
+
+    // If HTML contains embedded base64 images (e.g. pasted from PowerPoint as HTML),
+    // extract the first image and open the figure insert dialog with it pre-loaded.
+    if (html) {
+      const template = document.createElement('template');
+      template.innerHTML = html;
+      const embeddedImg = template.content.querySelector('img[src^="data:image"]') as HTMLImageElement | null;
+      if (embeddedImg) {
+        event.preventDefault();
+        saveSelection();
+        createInsertionMarker();
+        // Convert data URL back to File for the upload dialog
+        const dataUrl = embeddedImg.src;
+        const mimeMatch = dataUrl.match(/^data:(image\/[^;]+);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+        fetch(dataUrl)
+          .then(r => r.blob())
+          .then(blob => {
+            const file = new File([blob], 'pasted-figure.png', { type: mime });
+            setShowImageUpload(true);
+            setImageUploadFile(file);
+            setInsertTitle('Figure');
+            setImageUploadPreview(dataUrl);
+          })
+          .catch(() => {
+            // Fallback: insert as inline img with data URL
+            insertImageDataUrl(dataUrl, 'Figure', '');
+          });
+        return;
+      }
+    }
+
     if (html.includes('<table')) {
       event.preventDefault();
       insertHtml(`<figure class="gbmn-inline-media gbmn-inline-media-table gbmn-media-two-column" data-layout="two-column" contenteditable="false" draggable="true" data-media-id="${crypto.randomUUID()}">${mediaActionsHtml()}<figcaption><strong>Table.</strong> Add title and legend...</figcaption>${sanitizeRichPaste(html)}</figure><p><br></p>`);
@@ -779,7 +819,11 @@ export default function RichTextEditor({
                   if (file) handleImageUpload({ target: { files: [file], value: '' } } as any);
                 }}
                 onPaste={(event) => {
-                  const file = Array.from(event.clipboardData.files).find(item => item.type.startsWith('image/'));
+                  const fileFromFiles = Array.from(event.clipboardData.files).find(item => item.type.startsWith('image/'));
+                  const fileFromItems = !fileFromFiles
+                    ? (() => { const it = Array.from(event.clipboardData.items).find(i => i.kind === 'file' && i.type.startsWith('image/')); return it ? it.getAsFile() : null; })()
+                    : null;
+                  const file = fileFromFiles || fileFromItems;
                   if (file) {
                     event.preventDefault();
                     handleImageUpload({ target: { files: [file], value: '' } } as any);

@@ -418,16 +418,14 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
       <div id="academic-manuscript-sheet">
         {/* ── JOURNAL HEADER ── */}
         <div className="gbmn-journal-header">
-          <div className="gbmn-logo-row">
-            <img className="gbmn-logo-image" src={logoSrc} alt="Georgian Biomedical News" />
-          </div>
-          <div className="gbmn-header-rule-row">
-            <div className="gbmn-header-rules">
-              <div className="gbmn-rule-line" />
-              <div className="gbmn-rule-line" />
-            </div>
-            <div className="gbmn-volume-label">{issueLabel(manuscript)}</div>
-          </div>
+          <svg viewBox="0 0 900 70" xmlns="http://www.w3.org/2000/svg" style={{width:'100%',display:'block',background:'#fff'}}>
+            <line x1="30" y1="34" x2="75" y2="34" stroke="#0e7a7a" strokeWidth="4"/>
+            <line x1="30" y1="42" x2="75" y2="42" stroke="#0e7a7a" strokeWidth="1.5"/>
+            <text x="88" y="44" fontFamily="Arial, Helvetica, sans-serif" fontSize="18" fontWeight="700" letterSpacing="2.5" fill="#0d1f3c">GEORGIAN BIOMEDICAL NEWS</text>
+            <line x1="490" y1="34" x2="620" y2="34" stroke="#0e7a7a" strokeWidth="4"/>
+            <line x1="490" y1="42" x2="620" y2="42" stroke="#0e7a7a" strokeWidth="1.5"/>
+            <text x="755" y="41" fontFamily="Arial, Helvetica, sans-serif" fontSize="10" fontWeight="400" letterSpacing="1" textAnchor="middle" fill="#0d1f3c">VOLUME X. ISSUE X. JANUARY-MARCH 2026</text>
+          </svg>
         </div>
 
         {/* ── TITLE BLOCK (single column) ── */}
@@ -446,12 +444,14 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
                   {a.isCorresponding && (
                     <a className="gbmn-corresponding-mark" title="Email corresponding author" href={`mailto:${a.email}`}>✉</a>
                   )}
-                  {orcidUrl(a.orcidId) ? (
-                    <a href={orcidUrl(a.orcidId)} target="_blank" rel="noreferrer" className="gbmn-author-num">
-                      {i + 1}
+                  <sup className="gbmn-author-num">{i + 1}</sup>
+                  {orcidUrl(a.orcidId) && (
+                    <a href={orcidUrl(a.orcidId)} target="_blank" rel="noreferrer" title={`ORCID: ${a.orcidId}`} className="gbmn-orcid-link">
+                      <svg className="gbmn-orcid-logo" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="128" cy="128" r="128" fill="#A6CE39"/>
+                        <path d="M86.3 186.2H70.9V79.1h15.4v107.1zM108.9 79.1h41.6c39.6 0 57 28.3 57 53.6 0 27.5-21.5 53.6-56.8 53.6h-41.8V79.1zm15.4 93.3h24.5c34.9 0 42.9-26.5 42.9-39.7C191.7 111.2 178 93 148 93h-23.7v79.4zM88.7 56.8c0 5.5-4.5 10.1-10.1 10.1-5.6 0-10.1-4.6-10.1-10.1 0-5.6 4.5-10.1 10.1-10.1 5.6 0 10.1 4.5 10.1 10.1z" fill="#fff"/>
+                      </svg>
                     </a>
-                  ) : (
-                    <sup className="gbmn-author-num">{i + 1}</sup>
                   )}
                   {i < manuscript.authors.length - 1 && ', '}
                 </span>
@@ -515,7 +515,6 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
             columnCount: 2,
             WebkitColumnCount: 2 as number,
             columnGap: '0.6cm',
-            WebkitColumnGap: '0.6cm' as string,
             columnFill: 'auto' as const,
             display: 'block',
             width: '100%',
@@ -594,10 +593,12 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
         {/* ── PAGE FOOTER (screen only — print uses @bottom-center margin box) ── */}
         <div className="gbmn-page-footer">
-          <p>Georgian Biomedical News</p>
-          <p>ISSN (Online): 2720-8796&nbsp;&nbsp;ISSN (Print): 2720-7994</p>
-          <p>Downloaded from gbmn.org. For personal use only. No other uses without permission.</p>
-          <p>Copyright &copy; 2022. All rights reserved.</p>
+          <svg viewBox="0 0 900 120" xmlns="http://www.w3.org/2000/svg" style={{width:'100%',display:'block',background:'#fff'}}>
+            <text x="450" y="40" fontFamily="Arial, Helvetica, sans-serif" fontSize="11" fontWeight="700" textAnchor="middle" fill="#000">Georgian Biomedical News</text>
+            <text x="450" y="58" fontFamily="Arial, Helvetica, sans-serif" fontSize="11" fontWeight="700" textAnchor="middle" fill="#000">ISSN (Online): 2720-8796 ISSN (Print): 2720-7994</text>
+            <text x="450" y="76" fontFamily="Arial, Helvetica, sans-serif" fontSize="11" fontWeight="700" textAnchor="middle" fill="#000">Downloaded from gbmn.org. For personal use only. No other uses without permission.</text>
+            <text x="450" y="94" fontFamily="Arial, Helvetica, sans-serif" fontSize="11" fontWeight="700" textAnchor="middle" fill="#000">Copyright © 2022. All rights reserved.</text>
+          </svg>
         </div>
 
       </div>{/* end #academic-manuscript-sheet */}
@@ -706,6 +707,24 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           text-decoration: none;
         }
         a.gbmn-author-num:hover { text-decoration: underline; }
+
+        .gbmn-orcid-link {
+          display: inline-block;
+          vertical-align: super;
+          margin-left: 2px;
+          line-height: 0;
+          text-decoration: none;
+        }
+        .gbmn-orcid-logo {
+          display: inline-block;
+          width: 12px;
+          height: 12px;
+          vertical-align: middle;
+          border-radius: 50%;
+        }
+        .gbmn-orcid-link:hover .gbmn-orcid-logo {
+          opacity: 0.8;
+        }
 
         .gbmn-affiliations {
           font-family: "Times New Roman", Georgia, serif;
@@ -833,14 +852,17 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
 
         /* DROP CAP for first section first letter */
         .preview-rich-dropcap > p:first-child::first-letter,
-        .preview-rich-dropcap > p:first-of-type::first-letter {
+        .preview-rich-dropcap > p:first-of-type::first-letter,
+        .preview-rich-dropcap p:first-child::first-letter {
           float: left !important;
-          font-size: 48pt !important;
-          line-height: 36pt !important;
+          font-size: 3em !important;
+          line-height: 0.78 !important;
           font-weight: 700 !important;
-          margin: 2px 8px 0 0 !important;
+          margin: 4px 6px -2px 0 !important;
+          padding: 0 !important;
           color: #111111 !important;
           font-family: "Times New Roman", Georgia, serif !important;
+          display: block !important;
         }
 
         /* ── INLINE CITATION LINKS ───────────────────── */
