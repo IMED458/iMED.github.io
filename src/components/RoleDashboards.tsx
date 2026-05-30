@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState, FormEvent } from 'react';
+import React, { useEffect, useState, useRef, useCallback, FormEvent } from 'react';
 import { User, UserRole, Manuscript, ManuscriptStatus, JournalSettings, ReviewHighlight } from '../types';
 import { DB, ARTICLE_TYPES } from '../utils';
 import ManuscriptPreview from './ManuscriptPreview';
@@ -39,6 +39,8 @@ import {
   ArrowLeft,
   Trash2,
   Printer,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 interface RoleDashboardsProps {
@@ -326,6 +328,36 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
   const [showHighlightNote, setShowHighlightNote] = useState(false);
   const [pendingHighlightText, setPendingHighlightText] = useState('');
   const [highlightNote, setHighlightNote] = useState('');
+
+  // ── Reviewer layout: collapsible queue + resizable split pane ────────────
+  const [reviewerQueueCollapsed, setReviewerQueueCollapsed] = useState(false);
+  const [splitPercent, setSplitPercent] = useState(50);
+  const [isDragging, setIsDragging] = useState(false);
+  const splitRef = useRef<HTMLDivElement>(null);
+
+  const handleSplitDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const container = splitRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const pct = Math.min(80, Math.max(20, ((e.clientX - rect.left) / rect.width) * 100));
+      setSplitPercent(pct);
+    };
+    const onUp = () => setIsDragging(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [isDragging]);
+
   const [adminMode, setAdminMode] = useState<'editorial' | 'finance' | 'users'>('editorial');
   const [editorialSection, setEditorialSection] = useState('Dashboard');
   const [emailDraft, setEmailDraft] = useState<{ open: boolean; manuscript: Manuscript | null; subject: string; body: string }>({ open: false, manuscript: null, subject: '', body: '' });
@@ -1234,32 +1266,62 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     const assignedManuscripts = sortNewest(directAssigned.length ? directAssigned : manuscripts.filter(m => m.status !== 'Draft'));
     return (
       <div className="h-[calc(100vh-88px)] flex flex-col md:flex-row bg-slate-50 overflow-hidden">
-        <div className={`${selectedManuscript ? 'hidden md:flex md:flex-col' : 'flex flex-col'} w-full md:w-80 shrink-0 bg-white border-r border-slate-200 overflow-hidden`}>
-          <div className="p-4 border-b bg-white">
-            <div className="flex items-center gap-2 mb-1"><ShieldCheck className="h-5 w-5 text-teal-700" /><h3 className="font-bold text-sm text-slate-800">Reviewer Queue</h3></div>
-            <p className="text-[11px] text-slate-500">Welcome, {currentUser.firstName}.</p>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {assignedManuscripts.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-sm border-2 border-dashed rounded-xl">No assigned manuscripts.</div>
-            ) : assignedManuscripts.map(m => {
-              const ra = (m.reviewerAssignments || []).find(reviewerMatchesCurrentUser);
-              return (
-                <div key={m.id} onClick={() => setSelectedManuscript(m)}
-                  className={`p-3 border rounded-xl cursor-pointer transition-all text-xs ${selectedManuscript?.id === m.id ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-100' : ra?.status === 'completed' ? 'border-emerald-200 bg-emerald-50' : 'border-blue-200 bg-blue-50 hover:border-blue-400'}`}>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="font-mono font-bold text-teal-800 text-[10px]">{m.id}</span>
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${ra?.status === 'completed' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : ra?.status === 'declined' ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-blue-100 text-blue-800 border-blue-300'}`}>
-                      {ra?.status === 'completed' ? 'Completed' : ra?.status === 'declined' ? 'Declined' : 'Pending'}
-                    </span>
-                  </div>
-                  <p className="font-bold text-slate-800 line-clamp-2 leading-snug">{m.title}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">{m.specialty} · Assigned {ra?.assignedAt ? new Date(ra.assignedAt).toLocaleDateString() : 'N/A'}</p>
-                  {ra?.comments && <p className="mt-1 text-[10px] text-emerald-700 font-semibold">Recommendation: {ra.comments.recommendation.toUpperCase()}</p>}
+        {/* ── REVIEWER QUEUE SIDEBAR (collapsible) ── */}
+        <div className={`${selectedManuscript ? 'hidden md:flex md:flex-col' : 'flex flex-col'} shrink-0 bg-white border-r border-slate-200 overflow-hidden transition-all duration-200 ${reviewerQueueCollapsed ? 'w-10' : 'w-full md:w-80'}`}>
+          {reviewerQueueCollapsed ? (
+            /* Collapsed: narrow strip with expand button */
+            <div className="flex flex-col items-center pt-3 h-full gap-3">
+              <button
+                onClick={() => setReviewerQueueCollapsed(false)}
+                className="p-1.5 rounded-lg hover:bg-teal-50 text-teal-700 transition-colors"
+                title="Expand Reviewer Queue"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest select-none"
+                style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+                Queue
+              </span>
+            </div>
+          ) : (
+            /* Expanded sidebar */
+            <>
+              <div className="p-4 border-b bg-white flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2 mb-1"><ShieldCheck className="h-5 w-5 text-teal-700" /><h3 className="font-bold text-sm text-slate-800">Reviewer Queue</h3></div>
+                  <p className="text-[11px] text-slate-500">Welcome, {currentUser.firstName}.</p>
                 </div>
-              );
-            })}
-          </div>
+                <button
+                  onClick={() => setReviewerQueueCollapsed(true)}
+                  className="shrink-0 p-1 rounded-lg hover:bg-slate-100 text-slate-400 mt-0.5 transition-colors"
+                  title="Collapse Queue"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {assignedManuscripts.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-sm border-2 border-dashed rounded-xl">No assigned manuscripts.</div>
+                ) : assignedManuscripts.map(m => {
+                  const ra = (m.reviewerAssignments || []).find(reviewerMatchesCurrentUser);
+                  return (
+                    <div key={m.id} onClick={() => setSelectedManuscript(m)}
+                      className={`p-3 border rounded-xl cursor-pointer transition-all text-xs ${selectedManuscript?.id === m.id ? 'border-teal-500 bg-teal-50 ring-2 ring-teal-100' : ra?.status === 'completed' ? 'border-emerald-200 bg-emerald-50' : 'border-blue-200 bg-blue-50 hover:border-blue-400'}`}>
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-mono font-bold text-teal-800 text-[10px]">{m.id}</span>
+                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${ra?.status === 'completed' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : ra?.status === 'declined' ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-blue-100 text-blue-800 border-blue-300'}`}>
+                          {ra?.status === 'completed' ? 'Completed' : ra?.status === 'declined' ? 'Declined' : 'Pending'}
+                        </span>
+                      </div>
+                      <p className="font-bold text-slate-800 line-clamp-2 leading-snug">{m.title}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">{m.specialty} · Assigned {ra?.assignedAt ? new Date(ra.assignedAt).toLocaleDateString() : 'N/A'}</p>
+                      {ra?.comments && <p className="mt-1 text-[10px] text-emerald-700 font-semibold">Recommendation: {ra.comments.recommendation.toUpperCase()}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         <div className={`${selectedManuscript ? 'flex flex-col' : 'hidden md:flex md:flex-col'} flex-1 overflow-hidden`}>
@@ -1269,10 +1331,10 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
             </div>
           ) : (
             /* ── SPLIT VIEW: left = manuscript preview, right = review form ── */
-            <div className="flex-1 flex flex-row min-h-0 overflow-hidden">
+            <div ref={splitRef} className={`flex-1 flex flex-row min-h-0 overflow-hidden${isDragging ? ' select-none' : ''}`}>
 
               {/* ── LEFT PANE: Manuscript Preview ── */}
-              <div className="flex flex-col w-1/2 min-h-0 border-r border-slate-200 overflow-hidden">
+              <div style={{ flex: `0 0 calc(${splitPercent}% - 3px)`, minWidth: 0 }} className="flex flex-col min-h-0 overflow-hidden">
                 {/* Left header bar */}
                 <div className="shrink-0 bg-white px-4 py-2 flex items-center justify-between border-b border-slate-200">
                   <div className="flex items-center gap-2">
@@ -1320,8 +1382,21 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                 </div>
               </div>
 
+              {/* ── DRAGGABLE DIVIDER ── */}
+              <div
+                onMouseDown={handleSplitDragStart}
+                title="Drag to resize"
+                className={`flex-none w-1.5 cursor-col-resize relative flex items-center justify-center transition-colors group ${isDragging ? 'bg-teal-400' : 'bg-slate-200 hover:bg-teal-300'}`}
+              >
+                <div className="pointer-events-none flex flex-col gap-[3px]">
+                  {[0,1,2,3,4].map(i => (
+                    <div key={i} className={`w-[3px] h-[3px] rounded-full transition-colors ${isDragging ? 'bg-teal-700' : 'bg-slate-400 group-hover:bg-teal-600'}`} />
+                  ))}
+                </div>
+              </div>
+
               {/* ── RIGHT PANE: Peer Review Form ── */}
-              <div className="flex flex-col w-1/2 min-h-0 bg-white overflow-hidden">
+              <div style={{ flex: '1 1 0', minWidth: 0 }} className="flex flex-col min-h-0 bg-white overflow-hidden">
                 {/* Right header bar — sticky inside right pane */}
                 <div className="shrink-0 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shadow-sm">
                   <div>
