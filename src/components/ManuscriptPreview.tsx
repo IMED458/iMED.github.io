@@ -5,7 +5,8 @@
 
 import { Manuscript, ReviewHighlight } from '../types';
 import { ARTICLE_TYPES, formatAMAReference } from '../utils';
-import { Printer, Download, BookOpen, Award } from 'lucide-react';
+import { Printer, Download, BookOpen, Award, Globe } from 'lucide-react';
+import { generateJatsPackage } from '../jatsExporter';
 import { downloadManuscriptDocx } from '../docxExport';
 
 interface ManuscriptPreviewProps {
@@ -345,6 +346,27 @@ export default function ManuscriptPreview({ manuscript, onShowNotification, high
     }
   };
 
+  const handleExportJats = async () => {
+    try {
+      if (onShowNotification) onShowNotification('Generating JATS XML package…', 'info');
+      const { zipBlob, zipFilename, xml } = await generateJatsPackage(manuscript);
+      // Download the ZIP
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = zipFilename;
+      a.click();
+      URL.revokeObjectURL(url);
+      // Also log the XML to console for quick inspection
+      console.log('[GBMN JATS] Generated XML (first 80 lines):\n',
+        xml.split('\n').slice(0, 80).join('\n'));
+      if (onShowNotification) onShowNotification(`JATS XML PMC package exported: ${zipFilename}`, 'success');
+    } catch (error) {
+      console.error('[GBMN JATS] Export failed:', error);
+      if (onShowNotification) onShowNotification('JATS XML export failed. Check console for details.', 'error');
+    }
+  };
+
   const abstractEntries = Object.entries(manuscript.abstractContents)
     .filter(([, value]) => stripHtml(value || ''));
   const abstractHtml = manuscript.abstractContents['text']
@@ -410,6 +432,14 @@ export default function ManuscriptPreview({ manuscript, onShowNotification, high
           >
             <Download className="h-4 w-4" />
             Export JSON
+          </button>
+          <button
+            onClick={handleExportJats}
+            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer shadow-xs"
+            title="Export JATS XML 1.3 ZIP package ready for PubMed Central (PMC) FTP submission"
+          >
+            <Globe className="h-4 w-4" />
+            Export JATS XML (PMC)
           </button>
         </div>
       </div>

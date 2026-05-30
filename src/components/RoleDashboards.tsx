@@ -453,12 +453,20 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     if (!ra.comments) { onShowNotification('Review is incomplete — nothing to send.', 'error'); return; }
 
     // 1. Mark this reviewer assignment as shared with author
+    //    Auto-set status to 'Revision Requested' for minor/major revision recommendations
+    const recommendation = ra.comments?.recommendation;
+    const needsRevision = recommendation === 'minor-revision' || recommendation === 'major-revision';
     const updatedAssignments = (manuscript.reviewerAssignments || []).map(r =>
       r.reviewerId === ra.reviewerId
         ? { ...r, sharedWithAuthor: true as const, sharedWithAuthorAt: new Date().toISOString() }
         : r
     );
-    const updated = { ...manuscript, reviewerAssignments: updatedAssignments, updatedAt: new Date().toISOString() };
+    const updated: Manuscript = {
+      ...manuscript,
+      reviewerAssignments: updatedAssignments,
+      status: needsRevision ? ('Revision Requested' as ManuscriptStatus) : manuscript.status,
+      updatedAt: new Date().toISOString(),
+    };
     updateSelectedManuscript(updated);
 
     // 2. Email the author

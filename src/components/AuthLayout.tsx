@@ -219,6 +219,10 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
         onShowNotification('Please fill in all required profile fields.', 'error');
         return;
       }
+      if (!orcidId.trim()) {
+        onShowNotification('ORCID iD is required for all GBMN submissions. Please enter your 16-digit ORCID (0000-0000-0000-0000).', 'error');
+        return;
+      }
       if (!pendingProviderUid && password.length < 6) {
         onShowNotification('Password must be at least 6 characters.', 'error');
         return;
@@ -498,7 +502,8 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
 
                 <div>
                   <label htmlFor="reg-orcid" className="block text-xs font-semibold text-slate-600 mb-1">
-                    ORCID iD (optional)
+                    ORCID iD <span className="text-rose-600">*</span>
+                    <span className="ml-1 text-[10px] font-normal text-slate-400">(required for all GBMN submissions)</span>
                   </label>
                   <input
                     id="reg-orcid"
@@ -507,7 +512,8 @@ export default function AuthLayout({ currentUser, onUserChanged, onShowNotificat
                     onChange={(e) => setOrcidId(e.target.value)}
                     onBlur={autofillFromOrcid}
                     placeholder="0000-xxxx-xxxx-xxxx"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg py-2 px-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-teal-600 font-mono"
+                    required
+                    className={`w-full bg-slate-50 border rounded-lg py-2 px-3 text-sm focus:outline-hidden focus:ring-1 focus:ring-teal-600 font-mono ${!orcidId.trim() ? 'border-rose-300 bg-rose-50' : 'border-slate-300'}`}
                   />
                   <button
                     type="button"
