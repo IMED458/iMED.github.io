@@ -182,6 +182,19 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
     ].join('');
     const hSvgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(hSvg)}`;
 
+    // ── Footer SVG (all pages) ────────────────────────────────────────
+    const fSvg = [
+      '<svg viewBox="0 0 672 46" width="672" height="46" xmlns="http://www.w3.org/2000/svg">',
+      '<rect width="672" height="46" fill="white"/>',
+      '<line x1="0" y1="1" x2="672" y2="1" stroke="#bbbbbb" stroke-width="0.5"/>',
+      '<text x="336" y="13" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="700" text-anchor="middle" fill="#000000">Georgian Biomedical News</text>',
+      '<text x="336" y="22" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="700" text-anchor="middle" fill="#000000">ISSN (Online): 2720-8796  ISSN (Print): 2720-7994</text>',
+      '<text x="336" y="31" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="700" text-anchor="middle" fill="#000000">Downloaded from gbmn.org. For personal use only. No other uses without permission.</text>',
+      '<text x="336" y="40" font-family="Arial,Helvetica,sans-serif" font-size="7" font-weight="700" text-anchor="middle" fill="#000000">Copyright © 2022. All rights reserved.</text>',
+      '</svg>',
+    ].join('');
+    const fSvgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(fSvg)}`;
+
     printWindow.document.open();
     printWindow.document.write(`<!doctype html>
       <html>
@@ -191,13 +204,17 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           <title>${stripHtml(manuscript.title || 'GBMN Manuscript')}</title>
           ${styles}
           <style>
-            /* Page 1: original top margin, NO running header */
+            /* Page 1: original top margin, NO running header, footer SVG */
             @page :first {
               size: A4 portrait;
               margin: 19mm 13mm 28mm 13mm;
               @top-left { content: none; }
+              @bottom-center {
+                content: url("${fSvgUrl}");
+                vertical-align: top;
+              }
             }
-            /* Pages 2+: extra top margin + SVG running header */
+            /* Pages 2+: extra top margin + SVG running header + footer SVG */
             @page {
               size: A4 portrait;
               margin: 22mm 13mm 28mm 13mm;
@@ -205,16 +222,8 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
                 content: url("${hSvgUrl}");
                 vertical-align: bottom;
               }
-              /* Footer repeats on every page */
               @bottom-center {
-                content: "Georgian Biomedical News\\AISSN (Online): 2720-8796  ISSN (Print): 2720-7994\\ADownloaded from gbmn.org. For personal use only. No other uses without permission.\\ACopyright \\00A9 2022. All rights reserved.";
-                font-family: Arial, sans-serif;
-                font-size: 7pt;
-                color: #000000;
-                text-align: center;
-                white-space: pre-line;
-                border-top: 0.5pt solid #bbbbbb;
-                padding-top: 3pt;
+                content: url("${fSvgUrl}");
                 vertical-align: top;
               }
             }
@@ -416,16 +425,18 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
       {/* overflow-x: auto ensures the 794px sheet is always fully visible */}
       <div style={{ overflowX: 'auto' }}>
       <div id="academic-manuscript-sheet">
-        {/* ── JOURNAL HEADER ── */}
+        {/* ── JOURNAL HEADER (page 1 logo layout; pages 2+ get running SVG header via @top-left in print) ── */}
         <div className="gbmn-journal-header">
-          <svg viewBox="0 0 900 70" xmlns="http://www.w3.org/2000/svg" style={{width:'100%',display:'block',background:'#fff'}}>
-            <line x1="30" y1="34" x2="75" y2="34" stroke="#0e7a7a" strokeWidth="4"/>
-            <line x1="30" y1="42" x2="75" y2="42" stroke="#0e7a7a" strokeWidth="1.5"/>
-            <text x="88" y="44" fontFamily="Arial, Helvetica, sans-serif" fontSize="18" fontWeight="700" letterSpacing="2.5" fill="#0d1f3c">GEORGIAN BIOMEDICAL NEWS</text>
-            <line x1="490" y1="34" x2="620" y2="34" stroke="#0e7a7a" strokeWidth="4"/>
-            <line x1="490" y1="42" x2="620" y2="42" stroke="#0e7a7a" strokeWidth="1.5"/>
-            <text x="755" y="41" fontFamily="Arial, Helvetica, sans-serif" fontSize="10" fontWeight="400" letterSpacing="1" textAnchor="middle" fill="#0d1f3c">VOLUME X. ISSUE X. JANUARY-MARCH 2026</text>
-          </svg>
+          <div className="gbmn-logo-row">
+            <img className="gbmn-logo-image" src={logoSrc} alt="GBMN" />
+          </div>
+          <div className="gbmn-header-rule-row">
+            <div className="gbmn-header-rules">
+              <div className="gbmn-rule-line" />
+              <div className="gbmn-rule-line" />
+            </div>
+            <span className="gbmn-volume-label">{issueLabel(manuscript)}</span>
+          </div>
         </div>
 
         {/* ── TITLE BLOCK (single column) ── */}
