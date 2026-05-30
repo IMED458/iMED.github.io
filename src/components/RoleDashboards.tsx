@@ -661,6 +661,14 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
   const resetUserForm = () => { setEditingUserId(null); setUserForm({ firstName: '', lastName: '', email: '', institution: '', role: 'Author', orcidId: '', isVerified: true, tempPassword: '' }); };
   const handleEditUser = (user: User) => { setEditingUserId(user.id); setUserForm({ firstName: user.firstName, lastName: user.lastName, email: user.email, institution: user.institution, role: user.role, orcidId: user.orcidId || '', isVerified: user.isVerified, tempPassword: '' }); };
+  // Keep adminUsers in sync with live Firestore data
+  useEffect(() => {
+    const unsub = DB.subscribeToUsers(liveUsers => {
+      setAdminUsers(liveUsers);
+    });
+    return unsub;
+  }, []);
+
   const handleUpdateUserRole = (userId: string, newRole: UserRole) => {
     const updated = adminUsers.map(u => u.id === userId ? { ...u, role: newRole } : u);
     setAdminUsers(updated); DB.setUsers(updated);
@@ -674,7 +682,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     if (editingUserId) {
       const updated = adminUsers.map(u => u.id === editingUserId ? { ...u, ...formFields, orcidId: formFields.orcidId || undefined } : u);
       setAdminUsers(updated); DB.setUsers(updated); resetUserForm();
-      onShowNotification('User updated.', 'success');
+      onShowNotification('User updated — saving to Firebase…', 'success');
     } else {
       const newUser = {
         id: `user-${Date.now()}`,
@@ -685,8 +693,8 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
       };
       const updated = [...adminUsers, newUser];
       setAdminUsers(updated); DB.setUsers(updated); resetUserForm();
-      const pwMsg = tempPassword ? ` Temp password: ${tempPassword}` : ' No password set — user must register.';
-      onShowNotification(`User created.${pwMsg}`, 'success');
+      const pwMsg = tempPassword ? ` Temp password: ${tempPassword}` : ' No password set — user must register via sign-up.';
+      onShowNotification(`User created and saving to Firebase…${pwMsg}`, 'success');
     }
   };
   const handleDeleteUser = (user: User) => {

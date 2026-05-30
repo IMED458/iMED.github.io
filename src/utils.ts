@@ -531,7 +531,16 @@ export const DB = {
   setUsers(users: User[]) {
     const normalized = withRequiredSystemUsers(users);
     localStorage.setItem('gbmn_users', JSON.stringify(normalized));
-    mirrorArrayToFirestore('users', normalized);
+    if (firebaseEnabled && firestore) {
+      const fs = firestore;
+      ensureFirebaseSession().catch(() => null).finally(() => {
+        normalized.forEach(u => {
+          setDoc(doc(fs, 'users', u.id), { payload: u, updatedAt: new Date().toISOString() })
+            .then(() => console.log('[GBMN] ✓ User write ok:', u.id))
+            .catch((err: unknown) => console.error('[GBMN] ✗ User write failed:', u.id, err));
+        });
+      });
+    }
   },
 
   /** Sync users FROM Firestore into local cache (call on app mount on every device). */
@@ -540,7 +549,9 @@ export const DB = {
     try {
       const snapshot = await getDocs(collection(firestore, 'users'));
       const rows: User[] = snapshot.docs.map(d => (d.data().payload || d.data()) as User).filter(Boolean);
-      localStorage.setItem('gbmn_users', JSON.stringify(withRequiredSystemUsers(rows)));
+      if (rows.length) {
+        localStorage.setItem('gbmn_users', JSON.stringify(withRequiredSystemUsers(rows)));
+      }
     } catch (e) {
       console.warn('Firestore user sync failed', e);
     }
@@ -551,8 +562,15 @@ export const DB = {
     const next = users.some(item => item.id === user.id)
       ? users.map(item => item.id === user.id ? user : item)
       : [...users, user];
-    this.setUsers(next);
-    mirrorToFirestore('users', user.id, user);
+    localStorage.setItem('gbmn_users', JSON.stringify(withRequiredSystemUsers(next)));
+    if (firebaseEnabled && firestore) {
+      const fs = firestore;
+      ensureFirebaseSession().catch(() => null).finally(() => {
+        setDoc(doc(fs, 'users', user.id), { payload: user, updatedAt: new Date().toISOString() })
+          .then(() => console.log('[GBMN] ✓ User write ok:', user.id))
+          .catch((err: unknown) => console.error('[GBMN] ✗ User write failed:', user.id, err));
+      });
+    }
   },
 
   getManuscripts(): Manuscript[] {

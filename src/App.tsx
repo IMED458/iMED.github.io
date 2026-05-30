@@ -185,18 +185,36 @@ export default function App() {
     { id: 'n2', text: 'Shota Rustaveli national grant funding integration loaded.', time: '2 hours ago', read: true },
   ]);
 
-  // Ref holds the active manuscript unsubscribe fn so we can replace it on auth change
+  // Ref holds the active manuscript/users unsubscribe fns so we can replace them on auth change
   const manuscriptSubRef = useRef<(() => void) | null>(null);
+  const userSubRef = useRef<(() => void) | null>(null);
 
   // Load persistent cloud state on mount and sync visible role users across devices.
   useEffect(() => {
-    // Initial subscription — may be anonymous; will be replaced when auth settles
+    // Initial subscriptions — may be anonymous; will be replaced when auth settles
     manuscriptSubRef.current = DB.subscribeToManuscripts(setManuscripts);
+    // Live user subscription keeps adminUsers in sync across all devices
+    userSubRef.current = DB.subscribeToUsers((_users) => {
+      // Update currentUser if their profile changed in Firestore
+      setCurrentUser(prev => {
+        if (!prev) return prev;
+        const fresh = _users.find(u => u.id === prev.id);
+        return fresh || prev;
+      });
+    });
 
     const unsubAuth = subscribeFirebaseAuth(async firebaseUser => {
       // Re-subscribe now that Firebase auth state is known (rules may require auth)
       manuscriptSubRef.current?.();
       manuscriptSubRef.current = DB.subscribeToManuscripts(setManuscripts);
+      userSubRef.current?.();
+      userSubRef.current = DB.subscribeToUsers((_users) => {
+        setCurrentUser(prev => {
+          if (!prev) return prev;
+          const fresh = _users.find(u => u.id === prev.id);
+          return fresh || prev;
+        });
+      });
 
       await DB.syncUsersFromFirestore().catch(() => {});
       if (!firebaseUser) {
@@ -210,6 +228,7 @@ export default function App() {
     return () => {
       unsubAuth();
       manuscriptSubRef.current?.();
+      userSubRef.current?.();
     };
   }, []);
 
