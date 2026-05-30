@@ -445,6 +445,41 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
     setEmailDraft({ open: true, manuscript, subject: email.subject, body: email.body });
   };
 
+  // Send a specific reviewer's completed review to the author (dashboard flag + email)
+  const handleSendReviewToAuthor = async (
+    manuscript: Manuscript,
+    ra: { reviewerId: string; reviewerName: string; reviewerEmail?: string; comments?: Manuscript['reviewerAssignments'][number]['comments']; highlights?: Manuscript['reviewerAssignments'][number]['highlights'] }
+  ) => {
+    if (!ra.comments) { onShowNotification('Review is incomplete — nothing to send.', 'error'); return; }
+
+    // 1. Mark this reviewer assignment as shared with author
+    const updatedAssignments = (manuscript.reviewerAssignments || []).map(r =>
+      r.reviewerId === ra.reviewerId
+        ? { ...r, sharedWithAuthor: true as const, sharedWithAuthorAt: new Date().toISOString() }
+        : r
+    );
+    const updated = { ...manuscript, reviewerAssignments: updatedAssignments, updatedAt: new Date().toISOString() };
+    updateSelectedManuscript(updated);
+
+    // 2. Email the author
+    const authorEmail = manuscript.authors[0]?.email || '';
+    const authorName = manuscript.authors[0]
+      ? `${manuscript.authors[0].firstName} ${manuscript.authors[0].lastName}`.trim()
+      : 'Author';
+    const subject = `Peer Review Report Available — Manuscript ${manuscript.id}`;
+    const body = `Dear ${authorName},\n\nThe peer review report for your manuscript:\n\n"${manuscript.title}"\n(ID: ${manuscript.id})\n\nhas been submitted and is now available in your GBMN author dashboard. Please log in and click the "View Review" button to read the full report.\n\nIf revisions are required, please address the reviewer's comments and resubmit through the platform.\n\nBest regards,\nGBMN Editorial Office`;
+    if (authorEmail) {
+      try {
+        await sendEmailToAddress(authorEmail, authorName, subject, body);
+        onShowNotification(`Review sent — author dashboard updated and email dispatched to ${authorEmail}.`, 'success');
+      } catch {
+        onShowNotification('Review shared with author dashboard. Email delivery failed — check EmailJS settings.', 'info');
+      }
+    } else {
+      onShowNotification('Review shared with author dashboard (no author email found).', 'info');
+    }
+  };
+
   const handleSendToAuthor = async (manuscript: Manuscript) => {
     if (!editorCommentHtml.trim()) { onShowNotification('Please add a comment before sending.', 'error'); return; }
     const plainText = editorCommentHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -808,6 +843,19 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     >
                       <Printer className="h-3 w-3" /> Print PDF
                     </button>
+                    {ra.sharedWithAuthor ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                        ✓ Sent to Author
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSendReviewToAuthor(manuscript, ra)}
+                        className="flex items-center gap-1 border border-indigo-300 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px] hover:bg-indigo-50 bg-indigo-50"
+                      >
+                        <Send className="h-3 w-3" /> Send Review to Author
+                      </button>
+                    )}
                   </div>
                 </div>
                 <p className="text-slate-600 italic">"{ra.comments!.constructiveComments}"</p>

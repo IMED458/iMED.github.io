@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { User, Manuscript } from './types';
+import { User, Manuscript, ReviewHighlight } from './types';
 import { createManuscriptId, DB } from './utils';
 import { uploadImageDataUrlToCloudinary } from './cloudinary';
 import AuthLayout from './components/AuthLayout';
@@ -26,6 +26,138 @@ import {
   Clock,
   Trash2
 } from 'lucide-react';
+
+/** Opens the peer review report in a new popup — identical to the editor's print preview
+ *  but WITHOUT the confidential section (not visible to the author). */
+function openReviewForAuthor(
+  manuscript: Manuscript,
+  ra: { reviewerName: string; comments: NonNullable<Manuscript['reviewerAssignments'][number]['comments']>; highlights?: ReviewHighlight[] }
+) {
+  const c = ra.comments;
+  const recLabel: Record<string, string> = {
+    accept: 'Accept Manuscript Unedited',
+    'minor-revision': 'Minor Revision Required',
+    'major-revision': 'Major Revision Required',
+    reject: 'Reject',
+  };
+  const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+  const firstAuthor = manuscript.authors[0];
+  const firstAuthorName = firstAuthor ? `${firstAuthor.firstName} ${firstAuthor.lastName}`.trim() : '—';
+  const highlights: ReviewHighlight[] = ra.highlights || [];
+
+  const scoreRow = (label: string, score: number, even: boolean) =>
+    `<tr style="background:${even ? '#f9fafb' : '#fff'}">
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:10pt;color:#1e293b;font-weight:600">${label}</td>
+      <td style="padding:6px 12px;border-bottom:1px solid #e5e7eb;font-size:10pt;text-align:right;font-weight:700">${score}&thinsp;/&thinsp;10</td>
+    </tr>`;
+
+  const section = (num: number, title: string, body: string, sub?: string) => `
+    <div style="margin-top:16pt">
+      <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">${num}. ${title}${sub ? `<span style="font-weight:400;font-size:9.5pt;text-transform:none;color:#475569"> ${sub}</span>` : ''}</div>
+      <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+      <div style="border:1px solid #d1d5db;border-radius:4px;padding:10pt 12pt;font-size:10.5pt;line-height:1.6;color:#1e293b;background:#fff">${body || '<em style="color:#6b7280">Not provided.</em>'}</div>
+    </div>`;
+
+  const w = window.open('', '_blank', 'width=900,height=1200');
+  if (!w) return;
+  w.document.open();
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"/>
+    <title>Peer Review — ${manuscript.id}</title>
+    <style>
+      @page{size:A4 portrait;margin:20mm 18mm 24mm 18mm}
+      *{box-sizing:border-box}
+      body{font-family:Arial,Helvetica,sans-serif;font-size:10.5pt;line-height:1.55;color:#1e293b;background:#fff;margin:0;padding:0}
+      p{margin:0 0 5pt}
+    </style>
+  </head><body>
+    <table style="width:100%;border-bottom:2px solid #0f766e;padding-bottom:8pt;margin-bottom:0">
+      <tr>
+        <td style="vertical-align:bottom">
+          <div style="font-size:22pt;font-weight:900;color:#0f766e;letter-spacing:-0.5px;line-height:1">GBMN</div>
+          <div style="font-size:9pt;font-style:italic;color:#475569;margin-top:1pt">Georgian Biomedical and Medical Nexus</div>
+        </td>
+        <td style="vertical-align:bottom;text-align:right">
+          <div style="font-size:8.5pt;color:#64748b">Peer Review Report</div>
+          <div style="font-size:8.5pt;color:#64748b">Date: ${today}</div>
+        </td>
+      </tr>
+    </table>
+    <div style="text-align:center;font-size:14pt;font-weight:900;letter-spacing:0.06em;margin:14pt 0 12pt;color:#0f172a">PEER REVIEW REPORT</div>
+    <table style="width:100%;border:1px solid #d1d5db;border-radius:6px;border-collapse:separate;margin-bottom:4pt">
+      <tr>
+        <td style="width:50%;padding:7pt 12pt 3pt 12pt"><span style="font-weight:700">Manuscript ID:</span> ${manuscript.id}</td>
+        <td style="width:50%;padding:7pt 12pt 3pt 12pt"><span style="font-weight:700">Article Type:</span> ${manuscript.articleType}</td>
+      </tr>
+      <tr><td colspan="2" style="padding:2pt 12pt 3pt 12pt"><span style="font-weight:700">Title:</span> ${manuscript.title}</td></tr>
+      <tr>
+        <td style="padding:2pt 12pt 3pt 12pt"><span style="font-weight:700">First Author:</span> ${firstAuthorName}</td>
+        <td style="padding:2pt 12pt 3pt 12pt"><span style="font-weight:700">Specialty:</span> ${manuscript.specialty}</td>
+      </tr>
+      <tr>
+        <td style="padding:2pt 12pt 8pt 12pt"><span style="font-weight:700">Reviewer:</span> ${ra.reviewerName}</td>
+        <td style="padding:2pt 12pt 8pt 12pt"><span style="font-weight:700">Review Date:</span> ${today}</td>
+      </tr>
+    </table>
+    ${section(1, 'Summary', c.summary || '')}
+    ${section(2, 'Major Comments', c.majorComments || c.constructiveComments || '')}
+    ${section(3, 'Minor Comments', c.minorComments || '')}
+    ${section(4, 'Strengths', c.strengths || '')}
+    ${section(5, 'Limitations', c.limitations || '', '(to be strengthened in manuscript)')}
+    <div style="margin-top:16pt">
+      <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">6. Recommendation</div>
+      <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+      <div style="border:1px solid #d1d5db;border-radius:4px;padding:10pt 12pt;text-align:center">
+        <div style="font-size:12pt;font-weight:900;color:#0f172a;border:2px solid #0f766e;border-radius:5px;padding:8pt 20pt;display:inline-block">
+          ${recLabel[c.recommendation] || c.recommendation}
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:16pt">
+      <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">7. Required Revisions <span style="font-weight:400;font-size:9.5pt;text-transform:none;color:#475569">(Actionable)</span></div>
+      <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+      <div style="border:1px solid #d1d5db;border-radius:4px;padding:10pt 12pt;font-size:10.5pt;line-height:1.6;color:#1e293b;background:#fff">
+        <div style="font-weight:700;margin-bottom:4pt">Essential <span style="font-weight:400;font-size:9.5pt">(must address):</span></div>
+        <div style="margin-bottom:10pt">${c.requiredEssential || '<em style="color:#6b7280">None listed.</em>'}</div>
+        <div style="font-weight:700;margin-bottom:4pt">Recommended <span style="font-weight:400;font-size:9.5pt">(improves quality):</span></div>
+        <div>${c.requiredRecommended || '<em style="color:#6b7280">None listed.</em>'}</div>
+      </div>
+    </div>
+    <div style="margin-top:16pt">
+      <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">8. Final Evaluation Scores</div>
+      <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+      <table style="width:100%;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;border-collapse:separate;border-spacing:0">
+        <thead><tr style="background:#f1faf8">
+          <th style="padding:7px 12px;text-align:left;font-size:10pt;color:#0f766e;border-bottom:1px solid #d1d5db;font-weight:700">Category</th>
+          <th style="padding:7px 12px;text-align:right;font-size:10pt;color:#0f766e;border-bottom:1px solid #d1d5db;font-weight:700">Score</th>
+        </tr></thead>
+        <tbody>
+          ${scoreRow('Originality', c.scoreOriginality || 0, false)}
+          ${scoreRow('Methodology', c.scoreMethodology || 0, true)}
+          ${scoreRow('Statistical Rigor', c.scoreStatistical || 0, false)}
+          ${scoreRow('Clinical Relevance', c.scoreClinical || 0, true)}
+          ${scoreRow('Presentation', c.scorePresentation || 0, false)}
+          <tr style="background:#f1faf8">
+            <td style="padding:7px 12px;font-size:10pt;font-weight:700;border-top:1px solid #d1d5db">Publishability</td>
+            <td style="padding:7px 12px;font-size:10pt;font-weight:700;text-align:right;border-top:1px solid #d1d5db">${c.scorePublishability || '—'}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    ${highlights.length > 0 ? `
+    <div style="margin-top:16pt">
+      <div style="color:#0f766e;font-weight:700;font-size:10.5pt;letter-spacing:0.04em;text-transform:uppercase">Text Highlights (${highlights.length})</div>
+      <div style="border-top:1px solid #99d0cb;margin:4pt 0 6pt"></div>
+      <div style="border:1px solid #d1d5db;border-radius:4px;padding:8pt 12pt">
+        ${highlights.map((h, i) => `<div style="font-size:9.5pt;padding:4pt 8pt;background:#fef9c3;border:1px solid #fde68a;border-radius:3px;margin-bottom:4pt"><strong>[${i+1}]</strong> &ldquo;${h.text}&rdquo;${h.note ? ` &mdash; <em>${h.note}</em>` : ''}</div>`).join('')}
+      </div>
+    </div>` : ''}
+    <div style="border-top:1px solid #d1d5db;margin-top:24pt;padding-top:6pt;display:flex;justify-content:space-between;font-size:8pt;color:#64748b">
+      <span>GBMN &mdash; Georgian Biomedical and Medical Nexus</span>
+      <span>Peer Review Report &mdash; ${manuscript.id}</span>
+    </div>
+  </body></html>`);
+  w.document.close();
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -547,6 +679,16 @@ export default function App() {
                         </p>
                       )}
                     </button>
+                    {/* View Review buttons — shown when editor has shared a completed review */}
+                    {(m.reviewerAssignments || []).filter(ra => ra.sharedWithAuthor && ra.comments).map((ra, idx) => (
+                      <button
+                        key={ra.reviewerId}
+                        onClick={(e) => { e.stopPropagation(); openReviewForAuthor(m, { reviewerName: ra.reviewerName, comments: ra.comments!, highlights: ra.highlights }); }}
+                        className="mt-2 w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <span>📄</span> View Review {(m.reviewerAssignments || []).filter(ra2 => ra2.sharedWithAuthor && ra2.comments).length > 1 ? `#${idx + 1}` : ''}
+                      </button>
+                    ))}
                     {/* Delete button — only for drafts or revision-requested */}
                     {['Draft', 'Revision Requested'].includes(m.status) && (
                       <button
@@ -561,6 +703,25 @@ export default function App() {
                 ))}
               </div>
             </section>
+
+            {/* Review-available banner for the active manuscript */}
+            {activeManuscript && (activeManuscript.reviewerAssignments || []).some(ra => ra.sharedWithAuthor && ra.comments) && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-bold text-indigo-900">📋 Peer Review Available</p>
+                <p className="text-xs text-indigo-700">The editorial office has shared the peer review report for this manuscript.</p>
+                <div className="flex flex-wrap gap-2">
+                  {(activeManuscript.reviewerAssignments || []).filter(ra => ra.sharedWithAuthor && ra.comments).map((ra, idx) => (
+                    <button
+                      key={ra.reviewerId}
+                      onClick={() => openReviewForAuthor(activeManuscript, { reviewerName: ra.reviewerName, comments: ra.comments!, highlights: ra.highlights })}
+                      className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                    >
+                      📄 View Review {(activeManuscript.reviewerAssignments || []).filter(ra2 => ra2.sharedWithAuthor && ra2.comments).length > 1 ? `#${idx + 1}` : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {activeManuscript && (
               authorCanEditActive ? (

@@ -249,6 +249,8 @@ export interface Manuscript {
     comments?: ReviewerComment;
     highlights?: ReviewHighlight[];
     draftReview?: string;
+    sharedWithAuthor?: boolean;
+    sharedWithAuthorAt?: string;
   }[];
   editorDecisionLog: {
     editorId: string;
