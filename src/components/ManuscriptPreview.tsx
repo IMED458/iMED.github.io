@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Manuscript } from '../types';
+import { Manuscript, ReviewHighlight } from '../types';
 import { ARTICLE_TYPES, formatAMAReference } from '../utils';
 import { Printer, Download, BookOpen, Award } from 'lucide-react';
 import { downloadManuscriptDocx } from '../docxExport';
@@ -11,10 +11,28 @@ import { downloadManuscriptDocx } from '../docxExport';
 interface ManuscriptPreviewProps {
   manuscript: Manuscript;
   onShowNotification?: (msg: string, type: 'success' | 'info' | 'error') => void;
+  highlights?: ReviewHighlight[];
 }
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Wrap each highlighted text occurrence with a <mark> element */
+function applyHighlights(html: string, highlights: ReviewHighlight[]): string {
+  let result = html;
+  highlights.forEach((hl) => {
+    if (!hl.text?.trim()) return;
+    const mark = `<mark id="gbmn-hl-${hl.id}" class="gbmn-highlight">${hl.text}</mark>`;
+    try {
+      const escaped = hl.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      result = result.replace(new RegExp(escaped), mark);
+    } catch {
+      const idx = result.indexOf(hl.text);
+      if (idx !== -1) result = result.slice(0, idx) + mark + result.slice(idx + hl.text.length);
+    }
+  });
+  return result;
 }
 
 function referenceUrl(ref: Manuscript['references'][number]) {
@@ -33,12 +51,14 @@ function linkReferenceCitations(html: string, references: Manuscript['references
   });
 }
 
-function RichContent({ html, references, dropCap = false }: { html: string; references: Manuscript['references']; dropCap?: boolean }) {
+function RichContent({ html, references, dropCap = false, highlights = [] }: { html: string; references: Manuscript['references']; dropCap?: boolean; highlights?: ReviewHighlight[] }) {
   if (!html) return null;
+  let processed = linkReferenceCitations(html, references);
+  if (highlights.length) processed = applyHighlights(processed, highlights);
   return (
     <div
       className={`text-slate-850 preview-rich ${dropCap ? 'preview-rich-dropcap' : ''}`}
-      dangerouslySetInnerHTML={{ __html: linkReferenceCitations(html, references) }}
+      dangerouslySetInnerHTML={{ __html: processed }}
     />
   );
 }
@@ -140,7 +160,7 @@ function authorAffiliations(author: Manuscript['authors'][number]) {
   return author.affiliations?.length ? author.affiliations : [author.affiliation].filter(Boolean);
 }
 
-export default function ManuscriptPreview({ manuscript, onShowNotification }: ManuscriptPreviewProps) {
+export default function ManuscriptPreview({ manuscript, onShowNotification, highlights = [] }: ManuscriptPreviewProps) {
   const articleConfig = ARTICLE_TYPES[manuscript.articleType];
   const logoSrc = `${import.meta.env.BASE_URL}gbmn-logo.png`;
 
@@ -163,11 +183,9 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
       .join('\n');
 
     // ── Running page header SVG (pages 2+ only) ──────────────────────────
-    // Parse volume/issue into two lines: e.g. "VOLUME 4 ISSUE 2. APR-JUN 2026"
+    // Matches the exact SVG style the editor specified (single centered volume line)
     const rawVi = manuscript.publicationInfo?.volumeIssue?.trim() || '';
-    const viMatch = rawVi.match(/^(.*?)\.\s*(.+)$/) || [];
-    const viLine1 = (viMatch[1] || rawVi || 'VOLUME X ISSUE X').toUpperCase();
-    const viLine2 = (viMatch[2] || String(new Date().getFullYear())).toUpperCase();
+    const viText = (rawVi || 'VOLUME X. ISSUE X. JANUARY-MARCH 2026').toUpperCase();
     const hSvg = [
       '<svg viewBox="0 0 900 70" width="696" height="54" xmlns="http://www.w3.org/2000/svg">',
       '<rect width="900" height="70" fill="white"/>',
@@ -176,8 +194,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
       '<text x="88" y="44" font-family="Arial,Helvetica,sans-serif" font-size="18" font-weight="700" letter-spacing="2.5" fill="#0d1f3c">GEORGIAN BIOMEDICAL NEWS</text>',
       '<line x1="490" y1="34" x2="620" y2="34" stroke="#0e7a7a" stroke-width="4"/>',
       '<line x1="490" y1="42" x2="620" y2="42" stroke="#0e7a7a" stroke-width="1.5"/>',
-      `<text x="634" y="36" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="400" letter-spacing="1" fill="#0d1f3c">${viLine1}</text>`,
-      `<text x="634" y="50" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="400" letter-spacing="1" fill="#0d1f3c">${viLine2}</text>`,
+      `<text x="755" y="41" font-family="Arial,Helvetica,sans-serif" font-size="10" font-weight="400" letter-spacing="1" text-anchor="middle" fill="#0d1f3c">${viText}</text>`,
       '</svg>',
     ].join('');
     const hSvgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(hSvg)}`;
@@ -503,7 +520,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
               )}
             </div>
             {abstractHtml ? (
-              <RichContent html={abstractHtml} references={manuscript.references} />
+              <RichContent html={abstractHtml} references={manuscript.references} highlights={highlights} />
             ) : (
               <p className="gbmn-placeholder">[Abstract not yet entered. Fill in Step 7.]</p>
             )}
@@ -536,6 +553,7 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
                   html={manuscript.sections[sectionName]}
                   references={manuscript.references}
                   dropCap={sectionIndex === 0}
+                  highlights={highlights}
                 />
               </div>
             ) : null
@@ -1044,6 +1062,18 @@ export default function ManuscriptPreview({ manuscript, onShowNotification }: Ma
           margin: 0;
         }
         .gbmn-placeholder { color: #94a3b8; font-style: italic; font-size: 10pt; }
+
+        /* ── TEXT HIGHLIGHTS (reviewer) ────────────────── */
+        .gbmn-highlight {
+          background: #fef08a;
+          border-radius: 2px;
+          padding: 0 2px;
+          box-shadow: 0 0 0 1px #fbbf2466;
+          cursor: pointer;
+        }
+        .gbmn-highlight:hover {
+          background: #fde047;
+        }
 
         /* ═══════════════════════════════════════════════
            PRINT / PDF RULES

@@ -1366,10 +1366,15 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                     <p className="text-[10px] font-bold text-yellow-800 uppercase mb-1.5">Highlights ({reviewHighlights.length})</p>
                     <div className="flex flex-wrap gap-2">
                       {reviewHighlights.map(h => (
-                        <div key={h.id} className="bg-yellow-100 border border-yellow-300 rounded-lg px-2 py-1 text-[10px] flex items-start gap-1.5 max-w-xs">
+                        <div
+                          key={h.id}
+                          onClick={() => document.getElementById(`gbmn-hl-${h.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                          className="bg-yellow-100 border border-yellow-300 rounded-lg px-2 py-1 text-[10px] flex items-start gap-1.5 max-w-xs cursor-pointer hover:bg-yellow-200 transition-colors"
+                          title="Click to jump to highlight in text"
+                        >
                           <span className="font-semibold">"{h.text.slice(0, 60)}{h.text.length > 60 ? '…' : ''}"</span>
                           {h.note && <span className="text-yellow-700">— {h.note}</span>}
-                          <button onClick={() => setReviewHighlights(prev => prev.filter(x => x.id !== h.id))} className="text-red-400 hover:text-red-600 ml-1"><X className="h-3 w-3" /></button>
+                          <button onClick={(e) => { e.stopPropagation(); setReviewHighlights(prev => prev.filter(x => x.id !== h.id)); }} className="text-red-400 hover:text-red-600 ml-1"><X className="h-3 w-3" /></button>
                         </div>
                       ))}
                     </div>
@@ -1378,7 +1383,7 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
 
                 {/* Scrollable preview area */}
                 <div className="flex-1 overflow-y-auto bg-slate-50 p-4">
-                  <ManuscriptPreview manuscript={selectedManuscript} onShowNotification={onShowNotification} />
+                  <ManuscriptPreview manuscript={selectedManuscript} onShowNotification={onShowNotification} highlights={reviewHighlights} />
                 </div>
               </div>
 
@@ -1621,9 +1626,14 @@ export default function RoleDashboards({ currentUser, manuscripts, onUpdateManus
                       </div>
                       <div className="p-3 bg-white space-y-1">
                         {reviewHighlights.map((h, i) => (
-                          <div key={h.id} className="text-[11px] bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 flex items-start justify-between gap-2">
+                          <div
+                            key={h.id}
+                            onClick={() => document.getElementById(`gbmn-hl-${h.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                            className="text-[11px] bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-1.5 flex items-start justify-between gap-2 cursor-pointer hover:bg-yellow-100 transition-colors"
+                            title="Click to jump to highlight in text"
+                          >
                             <span><span className="text-slate-500 font-bold">[{i + 1}]</span> <span className="font-semibold">"{h.text}"</span>{h.note && <span className="text-slate-500 ml-1">— {h.note}</span>}</span>
-                            <button onClick={() => setReviewHighlights(prev => prev.filter(x => x.id !== h.id))} className="text-red-400 hover:text-red-600 shrink-0"><X className="h-3 w-3" /></button>
+                            <button onClick={(e) => { e.stopPropagation(); setReviewHighlights(prev => prev.filter(x => x.id !== h.id)); }} className="text-red-400 hover:text-red-600 shrink-0"><X className="h-3 w-3" /></button>
                           </div>
                         ))}
                       </div>
