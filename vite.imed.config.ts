@@ -4,11 +4,11 @@ import path from 'path';
 import { defineConfig } from 'vite';
 
 // ============================================================
-// iMED — დამოუკიდებელი build კონფიგი (IMED458/iMED რეპოსთვის)
-// base: /iMED/  ·  მხოლოდ iMED აპლიკაცია
+// iMED — დამოუკიდებელი build კონფიგი (IMED458/iMED.github.io რეპოსთვის)
+// base: /iMED.github.io/  ·  მხოლოდ iMED აპლიკაცია
 // ============================================================
 export default defineConfig({
-  base: '/iMED/',
+  base: '/iMED.github.io/',
   plugins: [react(), tailwindcss()],
   build: {
     outDir: 'dist',
