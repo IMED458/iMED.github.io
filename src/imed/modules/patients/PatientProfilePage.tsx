@@ -40,6 +40,7 @@ export default function PatientProfilePage() {
   const [viewResult, setViewResult] = useState<LabResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
+  const combinedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -226,6 +227,17 @@ export default function PatientProfilePage() {
       {/* Tab: ლაბ. პასუხები (ექიმისთვის — დადასტურებული) */}
       {activeTab === 1 && (
         <div className="space-y-3">
+          {labResults.length > 0 && (
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-sm text-gray-500">{labResults.length} დადასტურებული პასუხი</p>
+              <PrintButton contentRef={combinedRef} documentTitle={`ლაბ-პასუხები-${patient.lastName}`}
+                label="ბეჭდვა — ყველა პასუხი (ერთ PDF)" className="!bg-green-600 hover:!bg-green-700" />
+            </div>
+          )}
+          {/* გაერთიანებული ბეჭდვადი ხედი — ეკრანზე გადამალული */}
+          <div ref={combinedRef} className="imed-print-source">
+            <LabResultSheet results={labResults} patient={patient} clinic={clinic} />
+          </div>
           {labResults.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
               <FlaskConical size={40} className="mx-auto mb-2 opacity-30" />

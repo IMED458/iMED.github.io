@@ -424,6 +424,9 @@ export interface LabResult {
   testName: string;
   testCode?: string;
   groupName: string;        // კვლევის ჯგუფი (ქვეკატეგორია)
+  groupCode?: string;       // ლაბ. ჯგუფის კოდი (მაგ. BL.6)
+  material?: string;        // მასალა (სისხლი / შრატი / შარდი)
+  sampleTime?: string;
   parameters: LabParameter[];
   comment?: string;
   status: LabResultStatus;

@@ -10,37 +10,39 @@ import {
 import type {
   LabResult, LabResultStatus, LabParameter, Order, Patient,
 } from '../../types';
-import { PANEL_ANALYTES, LAB_ANALYTES, findAnalyte, getReference, formatRange, flagValue } from '../../data/labReferences';
+import { LAB_ANALYTES, LAB_PANELS, findAnalyte, findPanel, getReference, formatRange, flagValue } from '../../data/labReferences';
+import type { LabPanel } from '../../data/labReferences';
 import { addAuditLog } from '../audit/auditService';
 import type { ImedUser } from '../../types';
 
+// ── პანელის ამოცნობა კვლევის სახელიდან ──
+export function detectPanel(testName: string): LabPanel | null {
+  const t = testName.toUpperCase();
+  const has = (...kw: string[]) => kw.some(k => t.includes(k.toUpperCase()));
+  if (has('CBC+5DIFF', '5DIFF', 'ხუთმაგი')) return findPanel('CBC5') || null;
+  if (has('CBC') || (has('სისხლის') && has('საერთო') && !has('შარდ'))) return findPanel('CBC') || null;
+  if (has('გაზები', 'BLOOD GAS', 'BLOOD_GAS')) return findPanel('GAS') || null;
+  if (has('ელექტროლიტ', 'ELECTROL')) return findPanel('GAS') || null;
+  if (has('კოაგულ', 'PT/INR') || (has('APTT') && has('FIB'))) return findPanel('COAG') || null;
+  if (has('ლიპიდ', 'LIPIDE')) return findPanel('LIPID') || null;
+  if (has('ღვიძლ')) return findPanel('LIVER') || null;
+  if (has('თირკმლის პან', 'თირკმლის ფუნ')) return findPanel('RENAL') || null;
+  if (has('ფარისებ')) return findPanel('THYROID') || null;
+  return null;
+}
+
 // ── პარამეტრების აგება პანელის/ანალიზის სახელიდან + პაციენტის სქესი/ასაკი ──
 export function buildParametersFor(testName: string, sex: 'male' | 'female', ageYears: number): LabParameter[] {
-  // პანელის key-ის ამოცნობა
-  let panelKey: string | undefined;
-  const t = testName.toUpperCase();
-  if (t.includes('CBC+5DIFF') || t.includes('5DIFF') || t.includes('ხუთმაგი')) panelKey = 'CBC+5DIFF';
-  else if (t.includes('CBC') || (t.includes('სისხლის') && t.includes('საერთო'))) panelKey = 'CBC';
-  else if (t.includes('გაზები') || t.includes('BLOOD GAS') || t.includes('ELECTROL') || t.includes('ელექტროლიტ')) panelKey = 'BLOOD_GAS';
-  else if (t.includes('კოაგულ') || t.includes('PT/INR') || (t.includes('APTT') && t.includes('FIB'))) panelKey = 'COAG';
-  else if (t.includes('ლიპიდ') || t.includes('LIPIDE')) panelKey = undefined; // ლიპიდები — ცალკე codes ქვემოთ
-
-  let codes: string[] = panelKey ? PANEL_ANALYTES[panelKey] : [];
-
-  // ლიპიდური პროფილი
-  if (codes.length === 0 && (t.includes('ლიპიდ') || t.includes('LIPIDE'))) {
-    codes = ['TCHOL', 'HDL', 'LDL', 'TRIG'].filter(c => findAnalyte(c));
-  }
+  const panel = detectPanel(testName);
+  let codes: string[] = panel ? panel.analytes : [];
 
   // ცალკეული ანალიტი — კოდით დამთხვევა (კატალოგის სახელები კოდით იწყება)
   if (codes.length === 0) {
     const upperName = testName.toUpperCase();
     const matched = LAB_ANALYTES.filter(a => {
       const code = a.code.toUpperCase();
-      // კოდი როგორც ცალკე სიტყვა/ტოკენი სახელში
       const re = new RegExp('(^|[^A-Z0-9])' + code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Z0-9]|$)');
       if (re.test(upperName)) return true;
-      // ქართული დასახელების პირველი მნიშვნელოვანი სიტყვა
       const firstWord = a.name.replace(/\(.*?\)/g, '').trim().split(/[\s—-]/)[0];
       return firstWord.length > 3 && testName.includes(firstWord);
     });
@@ -122,13 +124,17 @@ export async function saveLabResultDraft(params: {
     return existingId;
   }
 
+  const panel = detectPanel(testName);
   const data: Omit<LabResult, 'id'> = {
     patientId: patient.id,
     patientName: `${patient.lastName} ${patient.firstName}`,
     orderId: order.id,
     referralNumber: order.referralNumber,
     episodeId: order.episodeId,
-    testName, testCode, groupName,
+    testName, testCode,
+    groupName: panel?.groupName || groupName,
+    groupCode: panel?.groupCode,
+    material: 'სისხლი',
     parameters, comment: comment || '',
     status: 'draft',
     performedById: user.uid, performedByName: user.displayName,
