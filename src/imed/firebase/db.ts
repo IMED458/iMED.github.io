@@ -57,6 +57,7 @@ export const COLLECTIONS = {
   ORDERS: 'imed_orders',
   LAB_ORDERS: 'imed_lab_orders',
   LAB_TESTS: 'imed_lab_tests',
+  LAB_RESULTS: 'imed_lab_results',
   RADIO_ORDERS: 'imed_radio_orders',
   EPISODES: 'imed_episodes',
   DOCUMENTS: 'imed_documents',

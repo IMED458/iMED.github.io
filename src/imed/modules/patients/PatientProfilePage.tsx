@@ -10,6 +10,7 @@ import {
   ArrowLeft, Edit2, Plus, FileText, ClipboardList,
   BedDouble, Calendar, AlertCircle, Heart,
   FlaskConical, Scan, Users, Stethoscope, ChevronDown, ChevronRight,
+  Ambulance, FileCheck2, Printer, X, CheckCircle2,
 } from 'lucide-react';
 import { DOC_GROUPS, getDocLabel } from '../documents/docTemplates';
 import {
@@ -18,8 +19,14 @@ import {
 } from '../../firebase/db';
 import { useAuthStore } from '../../store/authStore';
 import { addAuditLog } from '../audit/auditService';
+import { getConfirmedResultsForPatient } from '../laboratory/labService';
+import { loadClinicConfig } from '../settings/clinicConfig';
+import LabResultSheet from '../../components/print/LabResultSheet';
+import PrintButton from '../../components/print/PrintButton';
+import type { LabResult, ClinicConfig } from '../../types';
+import { LAB_RESULT_STATUS_LABELS, LAB_RESULT_STATUS_COLORS } from '../../types';
 
-const TAB_LABELS = ['ბარათი', 'შეკვეთები', 'სტაციონარი', 'ვიზიტები', 'დოკუმენტები'];
+const TAB_LABELS = ['ბარათი', 'ლაბ. პასუხები', 'შეკვეთები', 'სტაციონარი', 'დოკუმენტები'];
 
 export default function PatientProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -28,6 +35,9 @@ export default function PatientProfilePage() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [episodes, setEpisodes] = useState<InpatientEpisode[]>([]);
+  const [labResults, setLabResults] = useState<LabResult[]>([]);
+  const [clinic, setClinic] = useState<ClinicConfig | null>(null);
+  const [viewResult, setViewResult] = useState<LabResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
 
@@ -66,6 +76,9 @@ export default function PatientProfilePage() {
         setOrders(ordSnap.docs.map(d => ({ id: d.id, ...d.data() } as Order)));
         setEpisodes(epSnap.docs.map(d => ({ id: d.id, ...d.data() } as InpatientEpisode)));
       }
+      const [results, c] = await Promise.all([getConfirmedResultsForPatient(id), loadClinicConfig()]);
+      setLabResults(results);
+      setClinic(c);
       setLoading(false);
     };
     load();
@@ -210,8 +223,54 @@ export default function PatientProfilePage() {
         </div>
       )}
 
-      {/* Tab: შეკვეთები */}
+      {/* Tab: ლაბ. პასუხები (ექიმისთვის — დადასტურებული) */}
       {activeTab === 1 && (
+        <div className="space-y-3">
+          {labResults.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <FlaskConical size={40} className="mx-auto mb-2 opacity-30" />
+              <p>დადასტურებული ლაბორატორიული პასუხები არ არის</p>
+              <p className="text-xs mt-1">ლაბორანტის მიერ დადასტურებული პასუხები აქ ავტომატურად გამოჩნდება</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <table className="w-full text-sm">
+                <thead><tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">კვლევა</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 hidden sm:table-cell">შედეგები</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">სტატუსი</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600">დადასტურდა</th>
+                  <th className="text-right px-4 py-3" />
+                </tr></thead>
+                <tbody className="divide-y divide-gray-100">
+                  {labResults.map(r => {
+                    const abn = r.parameters.filter(p => p.flag !== 'normal').length;
+                    return (
+                      <tr key={r.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-800">{r.testName}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500 hidden sm:table-cell">
+                          {r.parameters.filter(p => p.value).length} პარამეტრი
+                          {abn > 0 && <span className="ml-1 text-red-600 font-medium">· {abn} პათ.</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${LAB_RESULT_STATUS_COLORS[r.status]}`}>{LAB_RESULT_STATUS_LABELS[r.status]}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{r.confirmedByName}<br />{r.confirmedAt && new Date(r.confirmedAt).toLocaleDateString('ka-GE')}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button onClick={() => setViewResult(r)} className="text-blue-600 hover:underline text-xs font-medium">გახსნა</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: შეკვეთები */}
+      {activeTab === 2 && (
         <div className="space-y-3">
           <div className="flex justify-end">
             <Link to={`/imed/orders/new?patientId=${patient.id}`}
@@ -263,7 +322,7 @@ export default function PatientProfilePage() {
       )}
 
       {/* Tab: სტაციონარი */}
-      {activeTab === 2 && (
+      {activeTab === 3 && (
         <div className="space-y-3">
           <div className="flex justify-end">
             <Link to={`/imed/inpatient/admit?patientId=${patient.id}`}
@@ -305,17 +364,6 @@ export default function PatientProfilePage() {
         </div>
       )}
 
-      {/* Tab: ვიზიტები */}
-      {activeTab === 3 && (
-        <div className="text-center py-12 text-gray-400">
-          <Calendar size={40} className="mx-auto mb-2 opacity-30" />
-          <p>ვიზიტების ისტორია</p>
-          <Link to={`/imed/appointments?patientId=${patient.id}`} className="mt-2 inline-block text-blue-600 text-sm hover:underline">
-            ჩაწერის სიის ნახვა
-          </Link>
-        </div>
-      )}
-
       {/* Tab: დოკუმენტები */}
       {activeTab === 4 && (
         <div className="text-center py-12 text-gray-400">
@@ -325,6 +373,11 @@ export default function PatientProfilePage() {
             დოკუმენტების ნახვა
           </Link>
         </div>
+      )}
+
+      {/* ლაბ. პასუხის ნახვა + ბეჭდვა */}
+      {viewResult && (
+        <LabResultViewModal result={viewResult} patient={patient} clinic={clinic} onClose={() => setViewResult(null)} />
       )}
     </div>
   );
@@ -352,6 +405,18 @@ function PatientToolbar({ patientId, navigate }: { patientId: string; navigate: 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
       <div className="text-sm font-semibold text-gray-700 mb-3">ხელსაწყოები — დაამატე პაციენტზე</div>
+
+      {/* კლინიკური ფურცლები — ემერჯენსი + ფორმა 100 */}
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <button onClick={() => navigate(`/imed/patients/${patientId}/emergency`)}
+          className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-sm font-semibold">
+          <Ambulance size={18} /> ემერჯენსის ფურცელი
+        </button>
+        <button onClick={() => navigate(`/imed/patients/${patientId}/form100`)}
+          className="flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm font-semibold">
+          <FileCheck2 size={18} /> ფორმა 100 (IV-100/ა)
+        </button>
+      </div>
 
       {/* კვლევები/ორდერები */}
       <div className="text-xs text-gray-400 mb-2">კვლევა / კონსულტაცია (მრავალი ერთად)</div>
@@ -387,6 +452,29 @@ function PatientToolbar({ patientId, navigate }: { patientId: string; navigate: 
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── ლაბ. პასუხის ნახვის მოდალი (ექიმისთვის) ──
+function LabResultViewModal({ result, patient, clinic, onClose }: {
+  result: LabResult; patient: Patient; clinic: ClinicConfig | null; onClose: () => void;
+}) {
+  const printRef = useRef<HTMLDivElement>(null);
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white no-print">
+          <h3 className="font-bold text-gray-800">{result.testName}</h3>
+          <div className="flex items-center gap-2">
+            <PrintButton contentRef={printRef} documentTitle={`ლაბ-${result.testName}`} />
+            <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"><X size={20} /></button>
+          </div>
+        </div>
+        <div className="p-6">
+          <div ref={printRef}><LabResultSheet result={result} patient={patient} clinic={clinic} /></div>
+        </div>
+      </div>
     </div>
   );
 }

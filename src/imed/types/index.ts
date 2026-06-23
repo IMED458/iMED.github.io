@@ -365,6 +365,79 @@ export interface LabOrderTest {
 }
 
 // ============================================================
+// ლაბორატორიული პასუხი (LabResult) — სრული ნაკადი
+// ============================================================
+
+export type LabResultStatus =
+  | 'assigned'      // დანიშნულია
+  | 'in_progress'   // პროცესშია
+  | 'draft'         // მონახაზი
+  | 'confirmed'     // დადასტურებულია
+  | 'corrected'     // შესწორებულია
+  | 'cancelled';    // გაუქმებულია
+
+export const LAB_RESULT_STATUS_LABELS: Record<LabResultStatus, string> = {
+  assigned: 'დანიშნულია',
+  in_progress: 'პროცესშია',
+  draft: 'მონახაზი',
+  confirmed: 'დადასტურებულია',
+  corrected: 'შესწორებულია',
+  cancelled: 'გაუქმებულია',
+};
+
+export const LAB_RESULT_STATUS_COLORS: Record<LabResultStatus, string> = {
+  assigned: 'bg-yellow-100 text-yellow-800',
+  in_progress: 'bg-purple-100 text-purple-800',
+  draft: 'bg-gray-100 text-gray-700',
+  confirmed: 'bg-green-100 text-green-800',
+  corrected: 'bg-blue-100 text-blue-800',
+  cancelled: 'bg-red-100 text-red-600',
+};
+
+export type LabFlag = 'normal' | 'high' | 'low' | 'critical_high' | 'critical_low';
+
+export interface LabParameter {
+  code: string;
+  name: string;
+  value: string;
+  unit: string;
+  refRange: string;
+  flag: LabFlag;
+}
+
+export interface LabResultVersion {
+  parameters: LabParameter[];
+  comment?: string;
+  editedById: string;
+  editedByName: string;
+  editedAt: string;
+  status: LabResultStatus;
+}
+
+export interface LabResult {
+  id: string;
+  patientId: string;
+  patientName?: string;
+  orderId: string;
+  referralNumber?: string;
+  episodeId?: string;
+  testName: string;
+  testCode?: string;
+  groupName: string;        // კვლევის ჯგუფი (ქვეკატეგორია)
+  parameters: LabParameter[];
+  comment?: string;
+  status: LabResultStatus;
+  performedById?: string;   // შემსრულებელი ლაბორანტი
+  performedByName?: string;
+  confirmedById?: string;   // დამადასტურებელი
+  confirmedByName?: string;
+  createdAt: string;
+  updatedAt: string;
+  confirmedAt?: string;
+  versions?: LabResultVersion[];
+}
+
+// ============================================================
 // რადიოლოგია
 // ============================================================
 

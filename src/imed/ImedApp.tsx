@@ -24,6 +24,8 @@ import AdmitPage from './modules/inpatient/AdmitPage';
 import EpisodePage from './modules/inpatient/EpisodePage';
 import DocumentsPage from './modules/documents/DocumentsPage';
 import DocumentEditorPage from './modules/documents/DocumentEditorPage';
+import EmergencySheetPage from './modules/clinical/EmergencySheetPage';
+import Form100Page from './modules/clinical/Form100Page';
 import AuditPage from './modules/audit/AuditPage';
 import UsersPage from './modules/users/UsersPage';
 import SettingsPage from './modules/settings/SettingsPage';
@@ -67,6 +69,8 @@ export default function ImedApp() {
           <Route path="patients/new" element={<PatientForm />} />
           <Route path="patients/:id" element={<PatientProfilePage />} />
           <Route path="patients/:id/edit" element={<PatientFormEdit />} />
+          <Route path="patients/:id/emergency" element={<EmergencySheetPage />} />
+          <Route path="patients/:id/form100" element={<Form100Page />} />
 
           {/* ჩაწერა */}
           <Route path="appointments" element={<AppointmentsPage />} />
