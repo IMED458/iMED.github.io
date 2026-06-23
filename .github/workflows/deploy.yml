@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy iMED to GitHub Pages
 
 on:
   push:
@@ -31,50 +31,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Restore Vite entry for build
-        run: |
-          cat > index.html <<'EOF'
-          <!doctype html>
-          <html lang="en">
-            <head>
-              <meta charset="UTF-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <link rel="icon" type="image/png" sizes="512x512" href="/gbmnsubmit.github.io/favicon.png" />
-              <link rel="icon" type="image/png" sizes="32x32" href="/gbmnsubmit.github.io/favicon-32.png" />
-              <link rel="shortcut icon" href="/gbmnsubmit.github.io/favicon.png" />
-              <link rel="apple-touch-icon" href="/gbmnsubmit.github.io/favicon.png" />
-              <title>GBMN Manuscript Submission</title>
-            </head>
-            <body>
-              <div id="root"></div>
-              <script type="module" src="/src/main.tsx"></script>
-            </body>
-          </html>
-          EOF
+      - name: Build iMED (standalone, base /iMED/)
+        run: npx vite build --config vite.imed.config.ts
 
-      - name: Build
-        env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.VITE_FIREBASE_MEASUREMENT_ID }}
-          VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
-          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
-          VITE_EMAILJS_SERVICE_ID: ${{ secrets.VITE_EMAILJS_SERVICE_ID }}
-          VITE_EMAILJS_PUBLIC_KEY: ${{ secrets.VITE_EMAILJS_PUBLIC_KEY }}
-          VITE_EMAILJS_TEMPLATE_GENERIC: ${{ secrets.VITE_EMAILJS_TEMPLATE_GENERIC }}
-          VITE_EMAILJS_TEMPLATE_SUBMISSION: ${{ secrets.VITE_EMAILJS_TEMPLATE_SUBMISSION }}
-          VITE_EMAILJS_TEMPLATE_ACCEPTED: ${{ secrets.VITE_EMAILJS_TEMPLATE_ACCEPTED }}
-          VITE_EMAILJS_TEMPLATE_PUBLISHED: ${{ secrets.VITE_EMAILJS_TEMPLATE_PUBLISHED }}
-        run: npm run build
+      - name: Prepare SPA output
+        run: |
+          mv dist/imed/index.html dist/index.html
+          rmdir dist/imed || true
+          cp dist/index.html dist/404.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

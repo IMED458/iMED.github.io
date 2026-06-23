@@ -20,16 +20,31 @@ export function buildParametersFor(testName: string, sex: 'male' | 'female', age
   let panelKey: string | undefined;
   const t = testName.toUpperCase();
   if (t.includes('CBC+5DIFF') || t.includes('5DIFF') || t.includes('ხუთმაგი')) panelKey = 'CBC+5DIFF';
-  else if (t.includes('CBC') || t.includes('საერთო ანალიზი')) panelKey = 'CBC';
-  else if (t.includes('გაზები') || t.includes('BLOOD') || t.includes('ელექტროლიტ')) panelKey = 'BLOOD_GAS';
-  else if (t.includes('კოაგულ') || t.includes('PT/INR') || t.includes('APTT')) panelKey = 'COAG';
-  else if (t.includes('ფარისებ') || t.includes('TSH')) panelKey = 'THYROID';
+  else if (t.includes('CBC') || (t.includes('სისხლის') && t.includes('საერთო'))) panelKey = 'CBC';
+  else if (t.includes('გაზები') || t.includes('BLOOD GAS') || t.includes('ELECTROL') || t.includes('ელექტროლიტ')) panelKey = 'BLOOD_GAS';
+  else if (t.includes('კოაგულ') || t.includes('PT/INR') || (t.includes('APTT') && t.includes('FIB'))) panelKey = 'COAG';
+  else if (t.includes('ლიპიდ') || t.includes('LIPIDE')) panelKey = undefined; // ლიპიდები — ცალკე codes ქვემოთ
 
   let codes: string[] = panelKey ? PANEL_ANALYTES[panelKey] : [];
-  // თუ პანელი ვერ ვიპოვეთ — ვცადოთ ცალკეული ანალიტი სახელით
+
+  // ლიპიდური პროფილი
+  if (codes.length === 0 && (t.includes('ლიპიდ') || t.includes('LIPIDE'))) {
+    codes = ['TCHOL', 'HDL', 'LDL', 'TRIG'].filter(c => findAnalyte(c));
+  }
+
+  // ცალკეული ანალიტი — კოდით დამთხვევა (კატალოგის სახელები კოდით იწყება)
   if (codes.length === 0) {
-    const single = LAB_ANALYTES.find(a => testName.toLowerCase().includes(a.name.toLowerCase().split(' ')[0]));
-    if (single) codes = [single.code];
+    const upperName = testName.toUpperCase();
+    const matched = LAB_ANALYTES.filter(a => {
+      const code = a.code.toUpperCase();
+      // კოდი როგორც ცალკე სიტყვა/ტოკენი სახელში
+      const re = new RegExp('(^|[^A-Z0-9])' + code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Z0-9]|$)');
+      if (re.test(upperName)) return true;
+      // ქართული დასახელების პირველი მნიშვნელოვანი სიტყვა
+      const firstWord = a.name.replace(/\(.*?\)/g, '').trim().split(/[\s—-]/)[0];
+      return firstWord.length > 3 && testName.includes(firstWord);
+    });
+    codes = matched.map(a => a.code);
   }
 
   return codes.map(code => {

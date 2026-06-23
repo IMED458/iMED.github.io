@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { initAuthListener } from './store/authStore';
 import { useAuthStore } from './store/authStore';
 
@@ -46,7 +46,7 @@ export default function ImedApp() {
   }, []);
 
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/imed/login" element={<LoginPublicRoute />} />
         <Route path="/imed/setup" element={<SetupPage />} />
@@ -137,7 +137,7 @@ export default function ImedApp() {
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/imed/dashboard" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 

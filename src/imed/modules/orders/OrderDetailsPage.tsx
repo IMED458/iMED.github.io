@@ -11,6 +11,7 @@ import { useAuthStore } from '../../store/authStore';
 import { addAuditLog } from '../audit/auditService';
 import OrderReceipt from '../../components/print/OrderReceipt';
 import PrintButton from '../../components/print/PrintButton';
+import { printElement } from '../../utils/print';
 import { ArrowLeft, Printer, CheckCircle2 } from 'lucide-react';
 
 export default function OrderDetailsPage() {
@@ -135,8 +136,11 @@ function AutoPrint({ enabled, contentRef, flag, title }: { enabled: boolean; con
     if (!enabled || flag.current) return;
     const t = setTimeout(() => {
       flag.current = true;
-      window.print();
-    }, 600);
+      const prev = document.title;
+      document.title = title;
+      printElement(contentRef.current);
+      setTimeout(() => { document.title = prev; }, 1500);
+    }, 700);
     return () => clearTimeout(t);
   }, [enabled]);
   return null;

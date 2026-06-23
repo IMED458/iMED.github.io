@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import ImedApp from './ImedApp';
 import { seedLocalBackend } from './firebase/db';
 import '../index.css';
+import './print.css';
 
 // ლოკალური რეჟიმი — პირველი სუპერ-ადმინის ავტომატური შექმნა
 seedLocalBackend();

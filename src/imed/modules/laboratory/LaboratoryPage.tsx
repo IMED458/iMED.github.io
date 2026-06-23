@@ -167,6 +167,7 @@ function ResultEditor({ item, clinic, user, onClose, onSaved }: {
   const setVal = (idx: number, value: string) => setParams(prev => prev.map((p, i) => i === idx ? recomputeFlag({ ...p, value }, sex, ageY) : p));
   const setName = (idx: number, name: string) => setParams(prev => prev.map((p, i) => i === idx ? { ...p, name } : p));
   const setUnit = (idx: number, unit: string) => setParams(prev => prev.map((p, i) => i === idx ? { ...p, unit } : p));
+  const setRef = (idx: number, refRange: string) => setParams(prev => prev.map((p, i) => i === idx ? { ...p, refRange } : p));
   const addCustom = () => setParams(prev => [...prev, { code: 'CUSTOM' + prev.length, name: '', value: '', unit: '', refRange: '', flag: 'normal' }]);
 
   const editable = !isConfirmed || correctMode;
@@ -247,11 +248,15 @@ function ResultEditor({ item, clinic, user, onClose, onSaved }: {
                       </div>
                     </td>
                     <td className="px-3 py-1.5 text-gray-500 text-xs">
-                      {p.code.startsWith('CUSTOM') && editable
+                      {editable
                         ? <input placeholder="ერთ." value={p.unit} onChange={e => setUnit(i, e.target.value)} className="w-16 px-1 py-0.5 border border-gray-200 rounded text-xs" />
                         : p.unit}
                     </td>
-                    <td className="px-3 py-1.5 text-gray-500 text-xs">{p.refRange}</td>
+                    <td className="px-3 py-1.5 text-gray-500 text-xs">
+                      {editable
+                        ? <input placeholder="ნორმა" value={p.refRange} onChange={e => setRef(i, e.target.value)} className="w-24 px-1 py-0.5 border border-gray-200 rounded text-xs" />
+                        : p.refRange}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -265,8 +270,8 @@ function ResultEditor({ item, clinic, user, onClose, onSaved }: {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none disabled:bg-gray-50" />
           </div>
 
-          <div className="hidden">
-            <div ref={printRef}><LabResultSheet result={previewResult} patient={patient} clinic={clinic} /></div>
+          <div ref={printRef} className="imed-print-source">
+            <LabResultSheet result={previewResult} patient={patient} clinic={clinic} />
           </div>
         </div>
 

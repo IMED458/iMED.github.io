@@ -10,6 +10,7 @@ import {
 } from './clinicalService';
 import { Letterhead, SignatureBlock } from '../../components/common/Letterhead';
 import PrintButton from '../../components/print/PrintButton';
+import EmergencyPrintView from './EmergencyPrintView';
 import ICD10Picker from '../../components/icd10/ICD10Picker';
 import { ArrowLeft, Save, Loader2, X, Plus, CheckCircle2 } from 'lucide-react';
 
@@ -92,7 +93,12 @@ export default function EmergencySheetPage() {
       {saved && <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm no-print"><CheckCircle2 size={15} /> შენახულია</div>}
       {err && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm no-print">⚠ {err}</div>}
 
-      <div ref={printRef} className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+      {/* ბეჭდვადი ხედი — ეკრანზე გადამალული */}
+      <div ref={printRef} className="imed-print-source">
+        <EmergencyPrintView sheet={sheet} patient={patient} clinic={clinic} doctor={imedUser} />
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
         <Letterhead clinic={clinic} patient={patient} docTitle="ემერჯენსის გასინჯვის ფურცელი"
           formLegalRef="გადაუდებელი დახმარების სამედიცინო დოკუმენტაცია — №108/ნ" />
 

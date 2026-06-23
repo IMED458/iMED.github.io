@@ -1,0 +1,74 @@
+/* ============================================================
+   iMED — ბეჭდვის სტილები (საიმედო visibility-based მეთოდი)
+   ============================================================ */
+
+/* ბეჭდვის წყარო — ეკრანზე გადამალული, DOM-ში რჩება (ბეჭდვადი) */
+.imed-print-source {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 760px;
+  background: #fff;
+}
+
+@media print {
+  html, body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* ყველაფერი იმალება, გარდა .imed-printing-ისა */
+  body * { visibility: hidden !important; }
+  .imed-printing, .imed-printing * { visibility: visible !important; }
+
+  .imed-printing {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .imed-printing .no-print { display: none !important; }
+
+  /* ფორმის ველები — ბეჭდვისას სუფთად (ჩარჩოს გარეშე, მნიშვნელობით) */
+  .imed-printing input,
+  .imed-printing textarea,
+  .imed-printing select {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    resize: none !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    color: #000 !important;
+    padding: 0 !important;
+  }
+
+  /* ფერადი ფონების მოცილება */
+  .imed-printing [class*="bg-"] { background: #fff !important; }
+
+  /* ცხრილების საზღვრები */
+  .imed-printing table { border-collapse: collapse !important; width: 100% !important; }
+  .imed-printing td, .imed-printing th { border: 1px solid #999 !important; }
+
+  /* ბარკოდი — შავი */
+  .imed-printing svg rect[fill="#000"] { fill: #000 !important; }
+
+  .receipt-copy, .lab-result-sheet, .imed-print-block { page-break-inside: avoid; }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page { size: A4; margin: 14mm; }
+}

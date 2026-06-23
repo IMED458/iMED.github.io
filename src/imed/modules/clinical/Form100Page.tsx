@@ -10,6 +10,7 @@ import {
 } from './clinicalService';
 import { Letterhead } from '../../components/common/Letterhead';
 import PrintButton from '../../components/print/PrintButton';
+import Form100PrintView from './Form100PrintView';
 import ICD10Picker from '../../components/icd10/ICD10Picker';
 import { ArrowLeft, Save, Loader2, RefreshCw, X, CheckCircle2 } from 'lucide-react';
 
@@ -96,7 +97,7 @@ export default function Form100Page() {
             className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
             {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} შენახვა
           </button>
-          <PrintButton contentRef={printRef} documentTitle="ფორმა-100-IV-100а" />
+          <PrintButton contentRef={printRef} documentTitle="ფორმა-100" />
         </div>
       </div>
 
@@ -106,8 +107,13 @@ export default function Form100Page() {
         ⟳ ავტომატურად შევსებული ველები (პაციენტი, დიაგნოზი ემერჯენსიდან, ჩატარებული კვლევები) — შეგიძლიათ ხელით დაარედაქტიროთ, ცვლილება შეინახება.
       </div>
 
-      {/* ბეჭდვადი ფორმა */}
-      <div ref={printRef} className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-3 text-sm">
+      {/* ბეჭდვადი ხედი — ეკრანზე გადამალული */}
+      <div ref={printRef} className="imed-print-source">
+        <Form100PrintView form={form} patient={patient} clinic={clinic} doctor={imedUser} />
+      </div>
+
+      {/* რედაქტირებადი ფორმა (ეკრანზე) */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-3 text-sm">
         <Letterhead clinic={clinic} patient={undefined}
           docTitle="ცნობა ჯანმრთელობის მდგომარეობის შესახებ"
           formNumber="IV-100/ა"
