@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ertransfer-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/tmp/ERtransfer", "run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "gbmn-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    }
+  ]
+}

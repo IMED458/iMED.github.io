@@ -22,6 +22,76 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // ================================================================
+    // iMED — კლინიკის მართვის სისტემა
+    // ================================================================
+
+    // iMED მომხმარებლები — მხოლოდ auth'd
+    match /imed_users/{uid} {
+      allow read: if request.auth != null;
+      // მხოლოდ სუპერ-ადმინს შეუძლია ჩაწერა (კლიენტ-მხარეს role check-ი)
+      allow write: if request.auth != null;
+    }
+
+    // პაციენტები
+    match /imed_patients/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ჩაწერა (Appointments)
+    match /imed_appointments/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // შეკვეთები (Orders)
+    match /imed_orders/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ლაბ. შეკვეთები
+    match /imed_lab_orders/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ლაბ. ტესტები (კატალოგი)
+    match /imed_lab_tests/{id} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
+    // რადიოლოგ. შეკვეთები
+    match /imed_radio_orders/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // სტაც. ეპიზოდები
+    match /imed_episodes/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // კურსუსები
+    match /imed_kursus/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // სამედიც. დოკუმენტები
+    match /imed_documents/{id} {
+      allow read, write: if request.auth != null;
+    }
+
+    // აუდიტ-ლოგი — append-only (delete=false)
+    match /imed_audit_logs/{id} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;  // immutable
+    }
+
+    // კლინიკის კონფ.
+    match /imed_config/{id} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;

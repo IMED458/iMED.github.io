@@ -1,0 +1,33 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: GBMN Theme\n"
+"POT-Creation-Date: 2024-01-01\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "plugins.themes.gbmn.name"
+msgstr "GBMN Theme"
+
+msgid "plugins.themes.gbmn.description"
+msgstr "Georgian Biomedical and Medical Nexus journal theme — matches the gbmnsubmit.github.io design."
+
+msgid "plugins.themes.gbmn.option.accentColor.label"
+msgstr "Accent colour"
+
+msgid "plugins.themes.gbmn.option.accentColor.description"
+msgstr "Primary colour used for buttons, links, and highlights."
+
+msgid "plugins.themes.gbmn.option.topBarBg.label"
+msgstr "Top bar background colour"
+
+msgid "plugins.themes.gbmn.option.heroHeadline.label"
+msgstr "Hero headline"
+
+msgid "plugins.themes.gbmn.option.heroSubtitle.label"
+msgstr "Hero subtitle"
+
+msgid "plugins.themes.gbmn.option.issnPrint.label"
+msgstr "ISSN (Print)"
+
+msgid "plugins.themes.gbmn.option.issnFormerName.label"
+msgstr "Former journal name"

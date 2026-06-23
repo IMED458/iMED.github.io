@@ -7,6 +7,15 @@ export default defineConfig(() => {
   return {
     base: '/gbmnsubmit.github.io/',
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html'),
+          tatia: path.resolve(__dirname, 'tatia/index.html'),
+          imed: path.resolve(__dirname, 'imed/index.html'),
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#15090c" />
+<title>Tatia's Birthday Party — Invitation</title>
+
+<script src="vendor/tailwind.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Noto+Serif+Georgian:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          velvet:   '#160a0e',
+          'velvet-2':'#23121a',
+          shadow:   '#2c1820',
+          pearl:    '#F7EFE4',
+          ivory:    '#FBF6EC',
+          champagne:'#EBD9BD',
+          'champagne-deep':'#D8BE97',
+          blush:    '#E7B9BE',
+          'blush-deep':'#CC8E97',
+          nude:     '#E9C9C2',
+          gold:     '#C9A35E',
+          'gold-light':'#EBD3A0',
+          'gold-deep':'#A47E42',
+          ink:      '#5B4640',
+          'ink-soft':'#8A7268',
+        },
+        fontFamily: {
+          display: ['"Bodoni Moda"', 'serif'],
+          serif: ['"Cormorant Garamond"', 'serif'],
+          geo: ['"Noto Serif Georgian"', 'serif'],
+        },
+      },
+    },
+  };
+</script>
+
+<style>
+  :root {
+    --velvet: #160a0e;
+    --shadow: #2c1820;
+    --pearl: #F7EFE4;
+    --ivory: #FBF6EC;
+    --champagne: #EBD9BD;
+    --blush: #E7B9BE;
+    --gold: #C9A35E;
+    --gold-light: #EBD3A0;
+    --gold-deep: #A47E42;
+    --ink: #5B4640;
+  }
+
+  * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--velvet);
+    color: var(--ink);
+    font-family: 'Noto Serif Georgian', serif;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ===== Fixed canvas / backdrop layers ===== */
+  #stage-bg   { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  #particles  { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+  #ambient    { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+  #confetti   { position: fixed; inset: 0; z-index: 90; pointer-events: none; }
+  #root       { position: relative; z-index: 5; }
+
+  /* The big animated background gradient mesh — its color is driven by a JS var --lum (0=dark .. 1=light) */
+  .mesh {
+    position: fixed; inset: -10%; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(60% 45% at 22% 18%, rgba(204,142,151,calc(0.30 + 0.25*var(--lum,0))), transparent 60%),
+      radial-gradient(55% 40% at 82% 26%, rgba(201,163,94, calc(0.22 + 0.20*var(--lum,0))), transparent 58%),
+      radial-gradient(70% 55% at 50% 100%, rgba(231,185,190,calc(0.10 + 0.30*var(--lum,0))), transparent 62%);
+    filter: blur(14px);
+    transition: opacity 0.6s ease;
+  }
+
+  /* Refined eyebrow */
+  .eyebrow {
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 500;
+  }
+
+  /* Gold shimmering text */
+  .text-gold-grad {
+    background: linear-gradient(100deg, #A87E3E 0%, #EBD3A0 32%, #C9A35E 52%, #F3E3BC 72%, #A87E3E 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    background-size: 240% 100%;
+    animation: shimmer 8s linear infinite;
+  }
+  @keyframes shimmer { 0% { background-position: 0 0; } 100% { background-position: 240% 0; } }
+
+  /* Shimmer sweep that runs once across a masked element */
+  .sweep { position: relative; overflow: hidden; }
+  .sweep::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(105deg, transparent 38%, rgba(255,247,228,0.85) 50%, transparent 62%);
+    transform: translateX(-130%);
+  }
+  .sweep.go::after { animation: sweepmove 1.5s cubic-bezier(0.5,0,0.2,1) 0.2s both; }
+  @keyframes sweepmove { to { transform: translateX(130%); } }
+
+  .gold-rule { height: 1px; background: linear-gradient(90deg, transparent, rgba(201,163,94,0.85), transparent); }
+  .gold-diamond {
+    width: 6px; height: 6px; transform: rotate(45deg);
+    background: linear-gradient(135deg, #EBD3A0, #A47E42);
+    box-shadow: 0 0 10px rgba(201,163,94,0.7);
+  }
+
+  /* Glass card */
+  .glass {
+    background: linear-gradient(150deg, rgba(255,252,246,0.50), rgba(255,250,242,0.18));
+    backdrop-filter: blur(18px) saturate(1.15);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    border: 1px solid rgba(255,255,255,0.55);
+    box-shadow: 0 24px 60px -24px rgba(120,70,55,0.45), inset 0 1px 0 rgba(255,255,255,0.85);
+  }
+  .glass-border { position: relative; }
+  .glass-border::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background: linear-gradient(140deg, rgba(235,211,160,0.95), rgba(255,255,255,0.05) 45%, rgba(231,185,190,0.8));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+  }
+
+  /* Buttons */
+  .btn-lux {
+    position: relative; overflow: hidden;
+    transition: transform 0.45s cubic-bezier(0.22,1,0.36,1), box-shadow 0.45s ease, letter-spacing 0.45s ease;
+  }
+  .btn-lux:active { transform: scale(0.96); }
+  .btn-lux::after {
+    content: ""; position: absolute; top: 0; left: -130%; width: 65%; height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,0.9), transparent);
+    transition: left 0.85s ease;
+  }
+  .btn-lux:hover::after { left: 150%; }
+
+  /* Scroll cue */
+  @keyframes cuepulse {
+    0%   { transform: translateY(0); opacity: 0.35; }
+    50%  { transform: translateY(8px); opacity: 1; }
+    100% { transform: translateY(0); opacity: 0.35; }
+  }
+  .cue { animation: cuepulse 2.2s ease-in-out infinite; }
+
+  @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+  .floaty { animation: floaty 7s ease-in-out infinite; }
+  .floaty-s { animation: floaty 10s ease-in-out infinite; }
+
+  /* Letter mask reveal */
+  .mask-line { overflow: hidden; }
+  .mask-line > span { display: inline-block; transform: translateY(110%); }
+  .mask-line.go > span { animation: maskup 1.1s cubic-bezier(0.22,1,0.36,1) both; }
+  @keyframes maskup { to { transform: translateY(0); } }
+
+  .clip-hidden { clip-path: inset(0 100% 0 0); }
+  .draw-on { animation: drawclip 1.8s cubic-bezier(0.45,0,0.2,1) both; }
+  @keyframes drawclip { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .text-gold-grad, .floaty, .floaty-s, .cue, .sweep.go::after { animation: none !important; }
+  }
+
+  /* Prevent flash of unstyled root */
+  #root:empty::after {
+    content: ""; position: fixed; inset: 0;
+    background: radial-gradient(circle at 50% 42%, #2c1820, #160a0e 70%);
+  }
+</style>
+</head>
+<body>
+  <div class="mesh" id="mesh"></div>
+  <canvas id="ambient"></canvas>
+  <canvas id="particles"></canvas>
+  <div id="root"></div>
+  <canvas id="confetti"></canvas>
+
+  <script src="vendor/react.min.js"></script>
+  <script src="vendor/react-dom.min.js"></script>
+  <script src="vendor/babel.min.js"></script>
+
+  <script type="text/babel" src="cinematic/particles.jsx"></script>
+  <script type="text/babel" src="cinematic/intro.jsx"></script>
+  <script type="text/babel" src="cinematic/scenes.jsx"></script>
+  <script type="text/babel" src="cinematic/app.jsx"></script>
+</body>
+</html>
